@@ -21,6 +21,7 @@ import {
   Search,
   Settings,
   Terminal,
+  Trophy,
   Undo2,
   Zap,
   type LucideIcon,
@@ -31,11 +32,12 @@ import { PreviewClient } from "../preview/PreviewClient";
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
 const PREVIEW_DEBOUNCE_MS = 200;
+const SESSION_STARTED_AT = Date.now();
 
 type IconName = "activity" | "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
   "chevron-right" | "clock" | "download" | "file" | "filter" | "globe" | "keyboard" |
   "metronome" | "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" |
-  "settings" | "terminal" | "undo" | "zap";
+  "settings" | "terminal" | "trophy" | "undo" | "zap";
 
 const icons: Record<IconName, LucideIcon> = {
   activity: Activity,
@@ -59,6 +61,7 @@ const icons: Record<IconName, LucideIcon> = {
   search: Search,
   settings: Settings,
   terminal: Terminal,
+  trophy: Trophy,
   undo: Undo2,
   zap: Zap,
 };
@@ -89,6 +92,13 @@ function formatDuration(duration_seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function formatSessionDuration(duration_seconds: number): string {
+  const hours = Math.floor(duration_seconds / 3600);
+  const minutes = Math.floor((duration_seconds % 3600) / 60);
+  const seconds = duration_seconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
 function difficultyColor(difficulty: number): string {
   const hue = Math.max(0, 135 - difficulty * 18);
   return `hsl(${hue} 92% 52%)`;
@@ -114,6 +124,7 @@ export function SongSelectScreen({
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
+  const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -128,7 +139,7 @@ export function SongSelectScreen({
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    const timer = window.setInterval(() => setNow(new Date()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -196,6 +207,7 @@ export function SongSelectScreen({
     ?? selected_song?.charts.at(-1);
 
   useEffect(() => {
+    setLoadedBackgroundUrl(null);
     const timer = window.setTimeout(() => {
       setBackgroundUrl(selected_song?.background_url ?? null);
     }, PREVIEW_DEBOUNCE_MS);
@@ -230,18 +242,20 @@ export function SongSelectScreen({
   const date_text = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(now).replace(",", "");
+  const session_duration = formatSessionDuration(Math.floor((now.getTime() - SESSION_STARTED_AT) / 1_000));
   const speed_progress = (scroll_speed - 400) / 1600;
   const speed_style = {
     "--rate-angle": `${speed_progress * 270}deg`,
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
+  const hero_loaded = background_url === null || background_url === loaded_background_url;
 
   return (
     <main className="song-select-screen">
       <audio ref={audio_ref} autoPlay />
       <header className="song-select-header">
         <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU</span></div>
-        <div className="session-info"><time>{date_text}</time><span className="session-elapsed">00:00:45</span><span className="online-status"><b>238</b> ONLINE</span></div>
+        <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status"><b>1</b> ONLINE</span></div>
         <nav className="header-actions" aria-label="Account and settings">
           <div className="player-info"><span><strong>Username</strong><small><b>12,450</b> PP</small></span><i /></div>
           <div className="header-icon-dock">
@@ -260,18 +274,17 @@ export function SongSelectScreen({
 
       <section className="song-select-content">
         <div className="song-select-column left-column">
-          <article className="song-hero">
-            {background_url && <img className="song-hero-background" src={background_url} alt="" />}
+          <article className={`song-hero${hero_loaded ? " loaded" : ""}`}>
+            {background_url && <img key={background_url} className="song-hero-background" src={background_url} alt="" onLoad={() => setLoadedBackgroundUrl(background_url)} onError={() => setLoadedBackgroundUrl(background_url)} />}
             <div className="song-hero-chart"><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
             <div className="song-hero-metadata"><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
           </article>
           <section className="score-list" aria-label="Scores">
-            <header><span>Personal Best: <strong>95.46%</strong></span><div className="score-source">
+            <header><span>Not played yet</span><div className="score-source">
               <button className={score_source === "local" ? "active" : ""} onClick={() => setScoreSource("local")} aria-label="Local scores" aria-pressed={score_source === "local"}><Icon name="monitor" /></button>
               <button className={score_source === "online" ? "active" : ""} onClick={() => setScoreSource("online")} aria-label="Online scores" aria-pressed={score_source === "online"}><Icon name="globe" /></button>
             </div></header>
-            <button className="score-row filled"><span className="score-avatar" aria-hidden="true">U</span><span className="score-player">#1 Username</span><span className="score-details"><strong>99.33%</strong><span><b>CONST 1.05x</b> 1 second ago</span></span></button>
-            {[0, 1, 2, 3].map((row) => <div className="score-row" key={row} aria-hidden="true" />)}
+            <div className="no-records"><Icon name="trophy" /><span>No Records Set!</span></div>
           </section>
         </div>
 
