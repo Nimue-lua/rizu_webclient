@@ -15,20 +15,8 @@ export class PreviewClient {
   private channel: RTCDataChannel | null = null;
   private pending_command: PreviewCommand | null = null;
   private request_id = 0;
-  private audio: HTMLAudioElement | null = null;
-  private signal: AbortSignal | null = null;
 
   async connect(audio: HTMLAudioElement, signal: AbortSignal): Promise<void> {
-    this.audio = audio;
-    this.signal = signal;
-    await this.createConnection();
-  }
-
-  private async createConnection(): Promise<void> {
-    const audio = this.audio;
-    const signal = this.signal;
-    if (!audio || !signal || signal.aborted) return;
-
     const connection = new RTCPeerConnection();
     this.connection = connection;
     connection.addTransceiver("audio", { direction: "recvonly" });
@@ -66,10 +54,6 @@ export class PreviewClient {
 
   select(selection: PreviewSelection): void {
     for (const receiver of this.connection?.getReceivers() ?? []) setMinimumJitterBuffer(receiver);
-    this.queueSelection(selection);
-  }
-
-  private queueSelection(selection: PreviewSelection): void {
     this.pending_command = {
       type: "select_preview",
       requestId: ++this.request_id,
@@ -84,8 +68,6 @@ export class PreviewClient {
     this.connection?.close();
     this.channel = null;
     this.connection = null;
-    this.audio = null;
-    this.signal = null;
   }
 
   private flushSelection(): void {
@@ -107,7 +89,7 @@ function setMinimumJitterBuffer(receiver: RTCRtpReceiver): void {
     if ("jitterBufferTarget" in configurable_receiver) configurable_receiver.jitterBufferTarget = 0;
     if ("playoutDelayHint" in configurable_receiver) configurable_receiver.playoutDelayHint = 0;
   } catch {
-    // These experimental hints may be present but read-only in some browsers.
+    // Experimental receiver hints may be exposed as read-only by some browsers.
   }
 }
 
