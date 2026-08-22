@@ -8,20 +8,43 @@ import { SqliteCatalogProvider } from "../catalog/CatalogProvider";
 import { GameplayScreen } from "./GameplayScreen";
 import { LoadingScreen } from "./LoadingScreen";
 import { ResultScreen } from "./ResultScreen";
+import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
+const MASTER_VOLUME_KEY = "rizu.master-volume";
+const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const asset_provider = new HttpGameplayAssetProvider();
 const catalog_provider = new HttpChartCatalogProvider();
 const song_catalog_provider = new SqliteCatalogProvider();
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("song-select");
+  const [settings_open, setSettingsOpen] = useState(false);
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<LoadedGameplayAssets | null>(null);
   const [selected_song_id, setSelectedSongId] = useState<string | null>(null);
   const [loading_chart_id, setLoadingChartId] = useState<string | null>(null);
-  const [scroll_speed, setScrollSpeed] = useState(1200);
+  const [master_volume, setMasterVolume] = useState(() => {
+    const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
+    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
+    return Number.isFinite(stored_value) && stored_value >= 0 && stored_value <= 1 ? stored_value : 0.2;
+  });
+  const [scroll_speed, setScrollSpeed] = useState(() => {
+    const stored_setting = localStorage.getItem(SCROLL_SPEED_KEY);
+    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
+    return Number.isFinite(stored_value) && stored_value >= 100 && stored_value <= 4000 ? stored_value : 1200;
+  });
+
+  const changeMasterVolume = (value: number) => {
+    localStorage.setItem(MASTER_VOLUME_KEY, String(value));
+    setMasterVolume(value);
+  };
+
+  const changeScrollSpeed = (value: number) => {
+    localStorage.setItem(SCROLL_SPEED_KEY, String(value));
+    setScrollSpeed(value);
+  };
 
   const beginLoading = (chart_id: string) => {
     setLoadingChartId(chart_id);
@@ -64,6 +87,7 @@ export function App() {
       return (
         <GameplayScreen
           assets={assets}
+          master_volume={master_volume}
           scroll_speed={scroll_speed}
           onFinish={() => setScreen("result")}
         />
@@ -87,14 +111,27 @@ export function App() {
       return <ResultScreen onExit={leaveResults} />;
     case "song-select":
       return (
-        <SongSelectScreen
-          catalog_provider={song_catalog_provider}
-          selected_song_id={selected_song_id}
-          scroll_speed={scroll_speed}
-          onPlay={beginLoading}
-          onSongSelect={setSelectedSongId}
-          onScrollSpeedChange={setScrollSpeed}
-        />
+        <>
+          <SongSelectScreen
+            catalog_provider={song_catalog_provider}
+            selected_song_id={selected_song_id}
+            master_volume={master_volume}
+            scroll_speed={scroll_speed}
+            onPlay={beginLoading}
+            onSettings={() => setSettingsOpen(true)}
+            onSongSelect={setSelectedSongId}
+            onScrollSpeedChange={changeScrollSpeed}
+          />
+          {settings_open && (
+            <SettingsScreen
+              master_volume={master_volume}
+              scroll_speed={scroll_speed}
+              onMasterVolumeChange={changeMasterVolume}
+              onScrollSpeedChange={changeScrollSpeed}
+              onExit={() => setSettingsOpen(false)}
+            />
+          )}
+        </>
       );
   }
 }

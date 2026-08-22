@@ -129,6 +129,7 @@ export class GameplayRuntime {
   private readonly canvas: HTMLCanvasElement;
   private readonly fps_element: HTMLElement;
   private readonly assets: LoadedGameplayAssets;
+  private readonly master_volume: number;
   private readonly scroll_speed: number;
   private readonly finish: () => void;
   private readonly gl: WebGL2RenderingContext;
@@ -156,6 +157,7 @@ export class GameplayRuntime {
     canvas: HTMLCanvasElement,
     fps_element: HTMLElement,
     assets: LoadedGameplayAssets,
+    master_volume: number,
     scroll_speed: number,
     finish: () => void,
   ) {
@@ -183,6 +185,7 @@ export class GameplayRuntime {
     this.canvas = canvas;
     this.fps_element = fps_element;
     this.assets = assets;
+    this.master_volume = master_volume;
     this.scroll_speed = scroll_speed;
     this.finish = finish;
     this.gl = gl;
@@ -220,7 +223,7 @@ export class GameplayRuntime {
 
     const gain = this.assets.audio_context.createGain();
     const source = this.assets.audio_context.createBufferSource();
-    gain.gain.value = 0.2;
+    gain.gain.value = this.master_volume;
     source.buffer = this.assets.audio_buffer;
     source.connect(gain).connect(this.assets.audio_context.destination);
 

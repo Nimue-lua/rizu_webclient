@@ -75,7 +75,9 @@ interface SongSelectScreenProps {
   catalog_provider: CatalogProvider;
   selected_song_id: string | null;
   onPlay: (chart_id: string) => void;
+  onSettings: () => void;
   onSongSelect: (song_id: string) => void;
+  master_volume: number;
   scroll_speed: number;
   onScrollSpeedChange: (scroll_speed: number) => void;
 }
@@ -108,7 +110,9 @@ export function SongSelectScreen({
   catalog_provider,
   selected_song_id,
   onPlay,
+  onSettings,
   onSongSelect,
+  master_volume,
   scroll_speed,
   onScrollSpeedChange,
 }: SongSelectScreenProps) {
@@ -146,7 +150,6 @@ export function SongSelectScreen({
   useEffect(() => {
     const audio = audio_ref.current;
     if (!audio) return;
-    audio.volume = 0.2;
     const abort_controller = new AbortController();
     const preview_client = new PreviewClient();
     preview_client_ref.current = preview_client;
@@ -159,6 +162,10 @@ export function SongSelectScreen({
       preview_client_ref.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (audio_ref.current) audio_ref.current.volume = master_volume;
+  }, [master_volume]);
 
   useEffect(() => {
     if (!selected_chart_id) return;
@@ -243,7 +250,7 @@ export function SongSelectScreen({
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(now).replace(",", "");
   const session_duration = formatSessionDuration(Math.floor((now.getTime() - SESSION_STARTED_AT) / 1_000));
-  const speed_progress = (scroll_speed - 400) / 1600;
+  const speed_progress = (scroll_speed - 100) / 3900;
   const speed_style = {
     "--rate-angle": `${speed_progress * 270}deg`,
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
@@ -259,7 +266,7 @@ export function SongSelectScreen({
         <nav className="header-actions" aria-label="Account and settings">
           <div className="player-info"><span><strong>Username</strong><small><b>12,450</b> PP</small></span><i /></div>
           <div className="header-icon-dock">
-            <button aria-label="Settings"><Icon name="settings" /></button><button aria-label="Downloads"><Icon name="download" /></button>
+            <button aria-label="Settings" onClick={onSettings}><Icon name="settings" /></button><button aria-label="Downloads"><Icon name="download" /></button>
             <button aria-label="Command palette"><Icon name="terminal" /></button><button aria-label="Notifications"><Icon name="bell" /><i className="notification-dot" /></button>
           </div>
         </nav>
@@ -310,7 +317,7 @@ export function SongSelectScreen({
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
         <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs"><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="400" max="2000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && onPlay(selected_chart.id)}><span>PLAY</span><Icon name="play" /></button></div>
+        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="100" max="4000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && onPlay(selected_chart.id)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
     </main>
   );

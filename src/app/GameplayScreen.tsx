@@ -4,11 +4,12 @@ import { GameplayRuntime } from "../gameplay/GameplayRuntime";
 
 interface GameplayScreenProps {
   assets: LoadedGameplayAssets;
+  master_volume: number;
   scroll_speed: number;
   onFinish: () => void;
 }
 
-export function GameplayScreen({ assets, scroll_speed, onFinish }: GameplayScreenProps) {
+export function GameplayScreen({ assets, master_volume, scroll_speed, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const fps_ref = useRef<HTMLSpanElement>(null);
 
@@ -20,11 +21,11 @@ export function GameplayScreen({ assets, scroll_speed, onFinish }: GameplayScree
       return;
     }
 
-    const runtime = new GameplayRuntime(canvas, fps, assets, scroll_speed, onFinish);
+    const runtime = new GameplayRuntime(canvas, fps, assets, master_volume, scroll_speed, onFinish);
     runtime.start();
 
     return () => runtime.destroy();
-  }, [assets, onFinish, scroll_speed]);
+  }, [assets, master_volume, onFinish, scroll_speed]);
 
   return (
     <main className="gameplay-screen">
