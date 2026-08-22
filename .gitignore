@@ -5,3 +5,5 @@ public/catalog.sqlite
 public/catalog.sqlite-*
 server/catalog.sqlite
 server/catalog.sqlite-*
+public/charts
+public/chart-previews
