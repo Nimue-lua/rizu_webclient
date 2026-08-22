@@ -127,7 +127,7 @@ npm run cache:charts -- \
   --server-database /tmp/rizu-deploy/server/catalog.sqlite
 ```
 
-The command prints the number of cached songs, charts, and skipped invalid files.
+The command also uses FFmpeg to generate low-quality, 445px-high WebP previews in `public/chart-previews`. Existing previews newer than their source images are reused. It then prints the number of cached songs, charts, and skipped invalid files.
 
 ## Upload
 

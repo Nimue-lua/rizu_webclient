@@ -1,4 +1,4 @@
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 CREATE TABLE catalog (
 	schema_version INTEGER NOT NULL,
@@ -14,7 +14,8 @@ CREATE TABLE songs (
 	artist_unicode TEXT NOT NULL,
 	source TEXT NOT NULL,
 	tags TEXT NOT NULL,
-	preview_seconds REAL NOT NULL
+	preview_seconds REAL NOT NULL,
+	background_preview_path TEXT
 );
 
 CREATE TABLE charts (

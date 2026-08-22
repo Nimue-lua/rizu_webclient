@@ -197,6 +197,7 @@ func (s *server) offer(response http.ResponseWriter, request *http.Request) {
 	session := &previewSession{server: s, connection: connection, track: track}
 	connection.OnDataChannel(session.onDataChannel)
 	connection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		log.Printf("preview WebRTC state: %s", state)
 		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateClosed || state == webrtc.PeerConnectionStateDisconnected {
 			session.close()
 		}
@@ -242,13 +243,16 @@ func (s *previewSession) onDataChannel(channel *webrtc.DataChannel) {
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
 		var command previewCommand
 		if err := json.Unmarshal(message.Data, &command); err != nil || command.Type != "select_preview" || command.ChartID == "" {
+			log.Printf("invalid preview command: %s", string(message.Data))
 			s.sendResponse(channel, previewResponse{Type: "preview_error", RequestID: command.RequestID, Message: "invalid preview command"})
 			return
 		}
+		log.Printf("preview command: request=%d chart=%s start=%.3f", command.RequestID, command.ChartID, command.StartSeconds)
 		if command.StartSeconds < 0 {
 			command.StartSeconds = 0
 		}
 		if err := s.selectPreview(command.ChartID, command.StartSeconds); err != nil {
+			log.Printf("select preview failed: request=%d chart=%s: %v", command.RequestID, command.ChartID, err)
 			s.sendResponse(channel, previewResponse{Type: "preview_error", RequestID: command.RequestID, Message: err.Error()})
 			return
 		}
@@ -312,6 +316,7 @@ func (s *previewSession) selectPreview(chartID string, startSeconds float64) err
 }
 
 func (s *previewSession) stream(ctx context.Context, sourceID uint64, assetPath string, startSeconds float64) {
+	log.Printf("starting preview source=%d file=%s start=%.3f", sourceID, assetPath, startSeconds)
 	listener, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
 	if err != nil {
 		log.Printf("listen for FFmpeg RTP: %v", err)
@@ -366,6 +371,9 @@ func (s *previewSession) stream(ctx context.Context, sourceID uint64, assetPath 
 		packet.SequenceNumber = s.sequence
 		packet.Timestamp = s.timestamp
 		packet.Marker = firstPacket
+		if firstPacket {
+			log.Printf("preview source=%d received first RTP packet", sourceID)
+		}
 		firstPacket = false
 		s.mu.Unlock()
 		if err := s.track.WriteRTP(&packet); err != nil {

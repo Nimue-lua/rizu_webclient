@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
-import { access, readFile, readdir, rename, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { access, mkdir, readFile, readdir, rename, rm, stat } from "node:fs/promises";
+import { promisify } from "node:util";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
+const execFileAsync = promisify(execFile);
 
 function readProperty(source, name) {
   return source.match(new RegExp(`^${name}:\\s*(.*?)\\r?$`, "m"))?.[1]?.trim() ?? "";
@@ -33,6 +36,36 @@ async function readableFile(file_path) {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function generateBackgroundPreview(source_path, preview_path, ffmpeg_path) {
+  try {
+    const [source_stat, preview_stat] = await Promise.all([stat(source_path), stat(preview_path)]);
+    if (preview_stat.mtimeMs >= source_stat.mtimeMs) return;
+  } catch {
+    // A missing or unreadable preview is regenerated below.
+  }
+
+  const temporary_path = `${preview_path}.tmp.webp`;
+  await rm(temporary_path, { force: true });
+  try {
+    await execFileAsync(ffmpeg_path, [
+      "-loglevel", "error",
+      "-y",
+      "-i", source_path,
+      "-frames:v", "1",
+      "-vf", "scale=-2:445:flags=fast_bilinear",
+      "-c:v", "libwebp",
+      "-quality", "30",
+      "-compression_level", "2",
+      "-map_metadata", "-1",
+      temporary_path,
+    ]);
+    await rename(temporary_path, preview_path);
+  } catch (reason) {
+    await rm(temporary_path, { force: true });
+    throw reason;
   }
 }
 
@@ -70,7 +103,7 @@ export function parseOsuMetadata(source, folder, chart_file) {
   };
 }
 
-async function scanCharts(charts_directory) {
+async function scanCharts(charts_directory, background_previews_directory, ffmpeg_path) {
   const songs = new Map();
   const charts = [];
   let skipped = 0;
@@ -106,10 +139,19 @@ async function scanCharts(charts_directory) {
         : null;
       const song = songs.get(metadata.song_id);
       if (!song) {
+        let background_preview_path = null;
+        if (background_file) {
+          const source_path = path.join(folder_path, background_file);
+          const preview_file = `${metadata.song_id}.webp`;
+          await rm(`${source_path}.rizu-preview.webp`, { force: true });
+          await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
+          background_preview_path = path.posix.join("chart-previews", preview_file);
+        }
         songs.set(metadata.song_id, {
           ...metadata,
           audio_path: path.posix.join("charts", folder, metadata.audio_file),
           background_path: background_file ? path.posix.join("charts", folder, background_file) : null,
+          background_preview_path,
         });
       }
 
@@ -138,7 +180,7 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
     client_db.prepare("INSERT INTO catalog VALUES (?, ?, ?)").run(SCHEMA_VERSION, version, generated_at);
     server_db.prepare("INSERT INTO catalog VALUES (?, ?, ?)").run(SCHEMA_VERSION, version, generated_at);
 
-    const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     const insert_server_song = server_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?)");
     const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?)");
     const insert_server_chart = server_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -146,7 +188,7 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
     client_db.exec("BEGIN");
     server_db.exec("BEGIN");
     for (const song of data.songs) {
-      insert_client_song.run(song.song_id, song.title, song.title_unicode, song.artist, song.artist_unicode, song.source, song.tags, song.preview_seconds);
+      insert_client_song.run(song.song_id, song.title, song.title_unicode, song.artist, song.artist_unicode, song.source, song.tags, song.preview_seconds, song.background_preview_path);
       insert_server_song.run(song.song_id, song.title, song.artist, song.preview_seconds, song.audio_path, song.background_path);
     }
     for (const chart of data.charts) {
@@ -163,14 +205,22 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
   return version;
 }
 
-export async function cacheCharts({ charts_directory, client_database, server_database, schema_directory }) {
+export async function cacheCharts({
+  charts_directory,
+  client_database,
+  server_database,
+  schema_directory,
+  background_previews_directory = path.join(path.dirname(charts_directory), "chart-previews"),
+  ffmpeg_path = "ffmpeg",
+}) {
   const client_temp = `${client_database}.tmp`;
   const server_temp = `${server_database}.tmp`;
+  await mkdir(background_previews_directory, { recursive: true });
   await Promise.all([rm(client_temp, { force: true }), rm(server_temp, { force: true })]);
 
   try {
     const [data, client_schema, server_schema] = await Promise.all([
-      scanCharts(charts_directory),
+      scanCharts(charts_directory, background_previews_directory, ffmpeg_path),
       readFile(path.join(schema_directory, "client-catalog.sql"), "utf8"),
       readFile(path.join(schema_directory, "server-catalog.sql"), "utf8"),
     ]);

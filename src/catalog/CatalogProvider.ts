@@ -2,6 +2,7 @@ import initSqlJs from "sql.js";
 import sql_wasm_url from "sql.js/dist/sql-wasm.wasm?url";
 
 export interface CatalogSong {
+  background_url: string | null;
   id: string;
   preview_chart_id: string;
   title: string;
@@ -10,6 +11,11 @@ export interface CatalogSong {
 
 export interface CatalogProvider {
   getSongs(signal: AbortSignal): Promise<CatalogSong[]>;
+}
+
+function assetUrl(asset_path: unknown): string | null {
+  if (typeof asset_path !== "string") return null;
+  return `/${asset_path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 export class SqliteCatalogProvider implements CatalogProvider {
@@ -27,7 +33,8 @@ export class SqliteCatalogProvider implements CatalogProvider {
 
     try {
       const statement = database.prepare(`
-        SELECT songs.id, songs.title, songs.artist, MIN(charts.id) AS preview_chart_id
+        SELECT songs.id, songs.title, songs.artist, songs.background_preview_path,
+          MIN(charts.id) AS preview_chart_id
         FROM songs
         JOIN charts ON charts.song_id = songs.id
         GROUP BY songs.id
@@ -39,6 +46,7 @@ export class SqliteCatalogProvider implements CatalogProvider {
         while (statement.step()) {
           const row = statement.getAsObject();
           songs.push({
+            background_url: assetUrl(row.background_preview_path),
             id: String(row.id),
             preview_chart_id: String(row.preview_chart_id),
             title: String(row.title),

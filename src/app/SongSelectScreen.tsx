@@ -224,6 +224,7 @@ export function SongSelectScreen({
       <section className="song-select-content">
         <div className="song-select-column left-column">
           <article className="song-hero">
+            {selected_song?.background_url && <img className="song-hero-background" src={selected_song.background_url} alt="" />}
             <div className="song-hero-chart"><strong>Rizu Web Collection</strong><span>Selected from <b>{songs.length.toLocaleString()} songs</b></span></div>
             <div className="song-hero-metadata"><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
           </article>
