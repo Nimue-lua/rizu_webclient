@@ -1,9 +1,9 @@
 import type { LoadedGameplayAssets } from "../assets/GameplayAssetProvider";
 
 const CIRCLE_SEGMENTS = 48;
-const RECEPTOR_BOTTOM_MARGIN = 64;
-const MAX_NOTE_RADIUS = 42;
-const COLUMN_GAP = 1;
+const RECEPTOR_BOTTOM_MARGIN = 96;
+const MAX_NOTE_RADIUS = 84;
+const COLUMN_GAP = 3;
 const EARLY_HIT_WINDOW_MS = 160;
 const LATE_HIT_WINDOW_MS = 100;
 
