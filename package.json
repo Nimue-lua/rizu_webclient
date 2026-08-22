@@ -1,0 +1,30 @@
+{
+  "name": "rizu-webclient",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "cache:charts": "node server/cache-charts.mjs",
+    "dev": "vite",
+    "dev:preview": "go -C preview-server run . -catalog ../server/catalog.sqlite -public ../public",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --test server/*.test.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "^1.33.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "sql.js": "^1.14.2",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/sql.js": "^1.4.11"
+  }
+}
