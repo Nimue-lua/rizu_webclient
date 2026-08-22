@@ -107,7 +107,7 @@ func main() {
 	app := &server{config: cfg, db: database, api: webrtc.NewAPI(webrtc.WithSettingEngine(settingEngine))}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", app.health)
-	mux.HandleFunc("GET /api/charts/song/{songID}", app.chartForSong)
+	mux.HandleFunc("GET /api/charts/{chartID}", app.chart)
 	mux.HandleFunc("POST /api/preview/offer", app.offer)
 	log.Printf("preview server listening on http://%s", cfg.address)
 	log.Printf("WebRTC listening on UDP %s", cfg.udpAddress)
@@ -119,23 +119,21 @@ func (s *server) health(response http.ResponseWriter, _ *http.Request) {
 	_, _ = io.WriteString(response, `{"status":"ok"}`)
 }
 
-func (s *server) chartForSong(response http.ResponseWriter, request *http.Request) {
+func (s *server) chart(response http.ResponseWriter, request *http.Request) {
 	var audioPath string
 	var chartPath string
 	err := s.db.QueryRow(`
 		SELECT songs.audio_path, charts.chart_path
 		FROM charts
 		JOIN songs ON songs.id = charts.song_id
-		WHERE songs.id = ?
-		ORDER BY charts.id
-		LIMIT 1
-	`, request.PathValue("songID")).Scan(&audioPath, &chartPath)
+		WHERE charts.id = ?
+	`, request.PathValue("chartID")).Scan(&audioPath, &chartPath)
 	if errors.Is(err, sql.ErrNoRows) {
-		http.Error(response, "selected song was not found", http.StatusNotFound)
+		http.Error(response, "selected chart was not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		http.Error(response, "failed to query selected song", http.StatusInternalServerError)
+		http.Error(response, "failed to query selected chart", http.StatusInternalServerError)
 		return
 	}
 	response.Header().Set("Content-Type", "application/json")

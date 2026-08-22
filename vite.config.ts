@@ -10,15 +10,13 @@ function encodeAssetUrl(...segments: string[]) {
   return `/${segments.map(encodeURIComponent).join("/")}`;
 }
 
-function getChartForSong(database: DatabaseSync, song_id: string) {
+function getChart(database: DatabaseSync, chart_id: string) {
   const chart = database.prepare(`
     SELECT songs.audio_path, charts.chart_path
     FROM charts
     JOIN songs ON songs.id = charts.song_id
-    WHERE songs.id = ?
-    ORDER BY charts.id
-    LIMIT 1
-  `).get(song_id) as { audio_path: string; chart_path: string } | undefined;
+    WHERE charts.id = ?
+  `).get(chart_id) as { audio_path: string; chart_path: string } | undefined;
 
   if (!chart) {
     return null;
@@ -57,14 +55,14 @@ export default defineConfig({
       name: "development-chart-catalog",
       configureServer(server) {
         let database: DatabaseSync | null = null;
-        server.middlewares.use("/api/charts/song/", async (request, response) => {
+        server.middlewares.use("/api/charts/", async (request, response) => {
           try {
             database ??= new DatabaseSync(catalog_path, { readOnly: true });
-            const song_id = decodeURIComponent(request.url?.slice(1).split("?", 1)[0] ?? "");
-            const chart = getChartForSong(database, song_id);
+            const chart_id = decodeURIComponent(request.url?.slice(1).split("?", 1)[0] ?? "");
+            const chart = getChart(database, chart_id);
             if (!chart) {
               response.statusCode = 404;
-              response.end("Selected song was not found");
+              response.end("Selected chart was not found");
               return;
             }
             response.setHeader("Content-Type", "application/json");

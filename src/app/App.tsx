@@ -20,11 +20,11 @@ export function App() {
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<LoadedGameplayAssets | null>(null);
   const [selected_song_id, setSelectedSongId] = useState<string | null>(null);
-  const [loading_song_id, setLoadingSongId] = useState<string | null>(null);
+  const [loading_chart_id, setLoadingChartId] = useState<string | null>(null);
   const [scroll_speed, setScrollSpeed] = useState(1200);
 
-  const beginLoading = (song_id: string) => {
-    setLoadingSongId(song_id);
+  const beginLoading = (chart_id: string) => {
+    setLoadingChartId(chart_id);
     setAudioContext(new AudioContext());
     setScreen("loading");
   };
@@ -35,7 +35,7 @@ export function App() {
     }
 
     setAudioContext(null);
-    setLoadingSongId(null);
+    setLoadingChartId(null);
     setScreen("song-select");
   };
 
@@ -51,7 +51,7 @@ export function App() {
 
     setAssets(null);
     setAudioContext(null);
-    setLoadingSongId(null);
+    setLoadingChartId(null);
     setScreen("song-select");
   };
 
@@ -69,7 +69,7 @@ export function App() {
         />
       );
     case "loading":
-      if (!audio_context || !loading_song_id) {
+      if (!audio_context || !loading_chart_id) {
         throw new Error("Gameplay loading is not initialized");
       }
 
@@ -77,7 +77,7 @@ export function App() {
         <LoadingScreen
           asset_provider={asset_provider}
           catalog_provider={catalog_provider}
-          song_id={loading_song_id}
+          chart_id={loading_chart_id}
           audio_context={audio_context}
           onCancel={cancelLoading}
           onLoaded={finishLoading}

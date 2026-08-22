@@ -1,4 +1,4 @@
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 CREATE TABLE catalog (
 	schema_version INTEGER NOT NULL,
@@ -21,7 +21,15 @@ CREATE TABLE charts (
 	name TEXT NOT NULL,
 	creator TEXT NOT NULL,
 	mode INTEGER NOT NULL,
-	keys INTEGER NOT NULL,
+	keys INTEGER,
+	duration_seconds REAL NOT NULL,
+	note_count INTEGER NOT NULL,
+	long_note_ratio REAL NOT NULL,
+	bpm_min REAL NOT NULL,
+	bpm_max REAL NOT NULL,
+	bpm_avg REAL NOT NULL,
+	difficulty REAL NOT NULL,
+	format TEXT NOT NULL,
 	chart_path TEXT NOT NULL UNIQUE,
 	FOREIGN KEY (song_id) REFERENCES songs(id)
 );

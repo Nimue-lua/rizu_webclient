@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const execFileAsync = promisify(execFile);
 
 function readProperty(source, name) {
@@ -20,6 +20,112 @@ function readNumber(source, name) {
 function readBackground(source) {
   const events = source.match(/^\[Events\][^\S\r\n]*\r?\n([\s\S]*?)(?=^\[|(?![\s\S]))/m)?.[1] ?? "";
   return events.match(/^0,0,"([^"]+)"/m)?.[1] ?? null;
+}
+
+function readSection(source, name) {
+  return source.match(new RegExp(`^\\[${name}\\][^\\S\\r\\n]*\\r?\\n([\\s\\S]*?)(?=^\\[|(?![\\s\\S]))`, "m"))?.[1] ?? "";
+}
+
+function parseTimingPoints(source) {
+  return readSection(source, "TimingPoints").split(/\r?\n/).flatMap((line) => {
+    const fields = line.trim().split(",");
+    const offset = Number(fields[0]);
+    const beat_length = Number(fields[1]);
+    const uninherited = fields[6] === undefined ? beat_length > 0 : Number(fields[6]) === 1;
+    return Number.isFinite(offset) && Number.isFinite(beat_length)
+      ? [{ offset, beat_length, uninherited }]
+      : [];
+  }).sort((left, right) => left.offset - right.offset);
+}
+
+function sliderEndTime(start_time, fields, timing_points, slider_multiplier) {
+  const repeats = Number(fields[6]);
+  const pixel_length = Number(fields[7]);
+  if (!(repeats > 0) || !(pixel_length >= 0) || !(slider_multiplier > 0)) return start_time;
+
+  let beat_length = 0;
+  let speed_multiplier = 1;
+  for (const point of timing_points) {
+    if (point.offset > start_time) break;
+    if (point.uninherited && point.beat_length > 0) beat_length = point.beat_length;
+    else if (!point.uninherited && point.beat_length < 0) {
+      speed_multiplier = Math.min(Math.max(-100 / point.beat_length, 0.1), 10);
+    }
+  }
+  return beat_length > 0
+    ? start_time + (pixel_length * repeats * beat_length) / (slider_multiplier * 100 * speed_multiplier)
+    : start_time;
+}
+
+function computeBpm(timing_points, start_time, end_time) {
+  const tempo_points = timing_points.filter((point) => point.uninherited && point.beat_length > 0);
+  if (tempo_points.length === 0) return { bpm_min: 0, bpm_max: 0, bpm_avg: 0 };
+
+  const bpms = tempo_points.map((point) => 60000 / point.beat_length);
+  let weighted_bpm = 0;
+  let weighted_duration = 0;
+  for (let index = 0; index < tempo_points.length; index += 1) {
+    const point = tempo_points[index];
+    if (!point) continue;
+    const next_offset = tempo_points[index + 1]?.offset ?? end_time;
+    const segment_start = Math.max(start_time, index === 0 ? start_time : point.offset);
+    const segment_end = Math.min(end_time, next_offset);
+    if (segment_end > segment_start) {
+      const duration = segment_end - segment_start;
+      weighted_bpm += (60000 / point.beat_length) * duration;
+      weighted_duration += duration;
+    }
+  }
+
+  let active_point = tempo_points[0];
+  for (const point of tempo_points) {
+    if (point.offset > start_time) break;
+    active_point = point;
+  }
+  const active_bpm = active_point ? 60000 / active_point.beat_length : 0;
+  return {
+    bpm_min: Math.min(...bpms),
+    bpm_max: Math.max(...bpms),
+    bpm_avg: weighted_duration > 0 ? weighted_bpm / weighted_duration : active_bpm,
+  };
+}
+
+function computeChartStats(source) {
+  const timing_points = parseTimingPoints(source);
+  const slider_multiplier = readNumber(source, "SliderMultiplier") ?? 1.4;
+  let start_time = Infinity;
+  let end_time = -Infinity;
+  let note_count = 0;
+  let long_note_count = 0;
+
+  for (const line of readSection(source, "HitObjects").split(/\r?\n/)) {
+    const fields = line.trim().split(",");
+    const note_time = Number(fields[2]);
+    const type = Number(fields[3]);
+    if (!Number.isFinite(note_time) || !Number.isInteger(type)) continue;
+
+    let note_end_time = note_time;
+    if ((type & 128) !== 0 || (type & 8) !== 0) {
+      const parsed_end_time = Number(fields[5]?.split(":", 1)[0]);
+      if (Number.isFinite(parsed_end_time)) note_end_time = parsed_end_time;
+    } else if ((type & 2) !== 0) {
+      note_end_time = sliderEndTime(note_time, fields, timing_points, slider_multiplier);
+    }
+    note_count += 1;
+    if ((type & 128) !== 0) long_note_count += 1;
+    start_time = Math.min(start_time, note_time, note_end_time);
+    end_time = Math.max(end_time, note_time, note_end_time);
+  }
+
+  if (note_count === 0) start_time = end_time = 0;
+  const duration_seconds = Math.max(0, end_time - start_time) / 1000;
+  return {
+    duration_seconds,
+    note_count,
+    long_note_ratio: note_count > 0 ? long_note_count / note_count : 0,
+    difficulty: duration_seconds > 0 ? note_count / duration_seconds : 0,
+    ...computeBpm(timing_points, start_time, end_time),
+  };
 }
 
 function fallbackId(prefix, value) {
@@ -97,7 +203,9 @@ export function parseOsuMetadata(source, folder, chart_file) {
     name: readProperty(source, "Version") || path.basename(chart_file, path.extname(chart_file)),
     creator: readProperty(source, "Creator"),
     mode,
-    keys,
+    keys: mode === 3 && Number.isInteger(keys) && keys > 0 ? keys : null,
+    format: "osu",
+    ...computeChartStats(source),
     audio_file,
     background_file,
   };
@@ -122,7 +230,7 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
       const source = await readFile(path.join(folder_path, chart_file), "utf8");
       const metadata = parseOsuMetadata(source, folder, chart_file);
 
-      if (metadata.mode !== 3 || !Number.isInteger(metadata.keys) || metadata.keys <= 0 || !metadata.audio_file) {
+      if (!Number.isInteger(metadata.mode) || metadata.mode < 0 || metadata.mode > 3 || !metadata.audio_file) {
         skipped += 1;
         continue;
       }
@@ -167,9 +275,9 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
 
 function writeDatabases(client_path, server_path, client_schema, server_schema, data, generated_at) {
   const version_hash = createHash("sha256");
-  for (const chart of data.charts) {
-    version_hash.update(`${chart.chart_id}\0${chart.chart_path}\0`);
-  }
+  version_hash.update(JSON.stringify(data.songs));
+  version_hash.update("\0");
+  version_hash.update(JSON.stringify(data.charts));
   const version = version_hash.digest("hex");
   const client_db = new DatabaseSync(client_path);
   const server_db = new DatabaseSync(server_path);
@@ -182,8 +290,8 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
 
     const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     const insert_server_song = server_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?)");
-    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insert_server_chart = server_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_server_chart = server_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     client_db.exec("BEGIN");
     server_db.exec("BEGIN");
@@ -192,8 +300,9 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
       insert_server_song.run(song.song_id, song.title, song.artist, song.preview_seconds, song.audio_path, song.background_path);
     }
     for (const chart of data.charts) {
-      insert_client_chart.run(chart.chart_id, chart.song_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id);
-      insert_server_chart.run(chart.chart_id, chart.song_id, chart.name, chart.creator, chart.mode, chart.keys, chart.chart_path);
+      const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty, chart.format];
+      insert_client_chart.run(chart.chart_id, chart.song_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats);
+      insert_server_chart.run(chart.chart_id, chart.song_id, chart.name, chart.creator, chart.mode, chart.keys, ...stats, chart.chart_path);
     }
     client_db.exec("COMMIT");
     server_db.exec("COMMIT");

@@ -23,7 +23,7 @@ func TestHealth(t *testing.T) {
 	}
 }
 
-func TestChartForSong(t *testing.T) {
+func TestChart(t *testing.T) {
 	database, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -37,10 +37,10 @@ func TestChartForSong(t *testing.T) {
 	`); err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodGet, "/api/charts/song/song", nil)
-	request.SetPathValue("songID", "song")
+	request := httptest.NewRequest(http.MethodGet, "/api/charts/chart", nil)
+	request.SetPathValue("chartID", "chart")
 	response := httptest.NewRecorder()
-	(&server{db: database}).chartForSong(response, request)
+	(&server{db: database}).chart(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("unexpected chart response: %d %q", response.Code, response.Body.String())
 	}

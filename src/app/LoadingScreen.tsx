@@ -8,7 +8,7 @@ import type {
 interface LoadingScreenProps {
   asset_provider: GameplayAssetProvider;
   catalog_provider: ChartCatalogProvider;
-  song_id: string;
+  chart_id: string;
   audio_context: AudioContext;
   onCancel: () => void;
   onLoaded: (assets: LoadedGameplayAssets) => void;
@@ -17,7 +17,7 @@ interface LoadingScreenProps {
 export function LoadingScreen({
   asset_provider,
   catalog_provider,
-  song_id,
+  chart_id,
   audio_context,
   onCancel,
   onLoaded,
@@ -28,7 +28,7 @@ export function LoadingScreen({
     const abort_controller = new AbortController();
 
     void catalog_provider
-      .getForSong(song_id, abort_controller.signal)
+      .getChart(chart_id, abort_controller.signal)
       .then((reference) => asset_provider.load(
         reference,
         audio_context,
@@ -46,7 +46,7 @@ export function LoadingScreen({
       });
 
     return () => abort_controller.abort();
-  }, [asset_provider, audio_context, catalog_provider, onLoaded, song_id]);
+  }, [asset_provider, audio_context, catalog_provider, onLoaded, chart_id]);
 
   return (
     <main className="screen loading-screen">

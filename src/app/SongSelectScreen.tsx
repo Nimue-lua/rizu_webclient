@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Activity,
   ArrowUpDown,
-  AudioLines,
   Bell,
   ChevronDown,
   ChevronLeft,
@@ -13,6 +12,7 @@ import {
   Globe2,
   Keyboard,
   ListFilter,
+  Metronome,
   Monitor,
   Music2,
   Paintbrush,
@@ -25,7 +25,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { CatalogProvider, CatalogSong } from "../catalog/CatalogProvider";
+import type { CatalogChart, CatalogProvider, CatalogSong } from "../catalog/CatalogProvider";
 import { PreviewClient } from "../preview/PreviewClient";
 
 const ROW_HEIGHT = 82;
@@ -33,8 +33,8 @@ const OVERSCAN = 5;
 
 type IconName = "activity" | "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
   "chevron-right" | "clock" | "download" | "file" | "filter" | "globe" | "keyboard" |
-  "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" | "settings" |
-  "terminal" | "undo" | "wave" | "zap";
+  "metronome" | "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" |
+  "settings" | "terminal" | "undo" | "zap";
 
 const icons: Record<IconName, LucideIcon> = {
   activity: Activity,
@@ -49,6 +49,7 @@ const icons: Record<IconName, LucideIcon> = {
   filter: ListFilter,
   globe: Globe2,
   keyboard: Keyboard,
+  metronome: Metronome,
   monitor: Monitor,
   music: Music2,
   paintbrush: Paintbrush,
@@ -58,7 +59,6 @@ const icons: Record<IconName, LucideIcon> = {
   settings: Settings,
   terminal: Terminal,
   undo: Undo2,
-  wave: AudioLines,
   zap: Zap,
 };
 
@@ -70,16 +70,28 @@ function Icon({ name }: { name: IconName }) {
 interface SongSelectScreenProps {
   catalog_provider: CatalogProvider;
   selected_song_id: string | null;
-  onPlay: (song_id: string) => void;
+  onPlay: (chart_id: string) => void;
   onSongSelect: (song_id: string) => void;
   scroll_speed: number;
   onScrollSpeedChange: (scroll_speed: number) => void;
 }
 
-const difficulty_items = [
-  ["12.1", "#61f000"], ["17.1", "#e9ed00"], ["19.5", "#ffb000"],
-  ["20.4", "#ff9800"], ["22.2", "#ff7417"], ["23.3", "#ff4c16"],
-] as const;
+const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
+
+function chartMode(chart: CatalogChart): string {
+  const mode = mode_names[chart.mode] ?? "UNKNOWN";
+  return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K ${mode}` : mode;
+}
+
+function formatDuration(duration_seconds: number): string {
+  const seconds = Math.round(duration_seconds);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function difficultyColor(difficulty: number): string {
+  const hue = Math.max(0, 135 - difficulty * 18);
+  return `hsl(${hue} 92% 52%)`;
+}
 
 export function SongSelectScreen({
   catalog_provider,
@@ -93,6 +105,7 @@ export function SongSelectScreen({
   const audio_ref = useRef<HTMLAudioElement>(null);
   const preview_client_ref = useRef<PreviewClient | null>(null);
   const [songs, setSongs] = useState<CatalogSong[]>([]);
+  const [selected_chart_id, setSelectedChartId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [scroll_top, setScrollTop] = useState(0);
   const [viewport_height, setViewportHeight] = useState(0);
@@ -135,9 +148,8 @@ export function SongSelectScreen({
   }, []);
 
   useEffect(() => {
-    const song = songs.find((candidate) => candidate.id === selected_song_id);
-    if (song) preview_client_ref.current?.select({ chart_id: song.preview_chart_id });
-  }, [selected_song_id, songs]);
+    if (selected_chart_id) preview_client_ref.current?.select({ chart_id: selected_chart_id });
+  }, [selected_chart_id]);
 
   useEffect(() => {
     const abort_controller = new AbortController();
@@ -153,6 +165,13 @@ export function SongSelectScreen({
   }, [catalog_provider, onSongSelect]);
 
   useEffect(() => {
+    const song = songs.find((candidate) => candidate.id === selected_song_id) ?? songs[0];
+    if (song && !song.charts.some((chart) => chart.id === selected_chart_id)) {
+      setSelectedChartId(song.charts.at(-1)?.id ?? null);
+    }
+  }, [selected_chart_id, selected_song_id, songs]);
+
+  useEffect(() => {
     const viewport = viewport_ref.current;
     if (!viewport) return;
     const observer = new ResizeObserver(([entry]) => {
@@ -164,15 +183,19 @@ export function SongSelectScreen({
 
   const normalized_query = query.trim().toLocaleLowerCase();
   const filtered_songs = normalized_query
-    ? songs.filter((song) => `${song.title}\n${song.artist}`.toLocaleLowerCase().includes(normalized_query))
+    ? songs.filter((song) => `${song.title}\n${song.artist}\n${song.charts.map((chart) => `${chart.name} ${chart.creator}`).join("\n")}`.toLocaleLowerCase().includes(normalized_query))
     : songs;
   const selected_song = songs.find((song) => song.id === selected_song_id) ?? songs[0];
+  const selected_chart = selected_song?.charts.find((chart) => chart.id === selected_chart_id)
+    ?? selected_song?.charts.at(-1);
   const first_index = Math.max(0, Math.floor(scroll_top / ROW_HEIGHT) - OVERSCAN);
   const visible_count = Math.ceil(viewport_height / ROW_HEIGHT) + OVERSCAN * 2;
   const visible_songs = filtered_songs.slice(first_index, first_index + visible_count);
 
   const selectSong = (song_id: string) => {
     void audio_ref.current?.play().catch(() => undefined);
+    const song = songs.find((candidate) => candidate.id === song_id);
+    setSelectedChartId(song?.charts.at(-1)?.id ?? null);
     onSongSelect(song_id);
   };
 
@@ -225,7 +248,7 @@ export function SongSelectScreen({
         <div className="song-select-column left-column">
           <article className="song-hero">
             {selected_song?.background_url && <img className="song-hero-background" src={selected_song.background_url} alt="" />}
-            <div className="song-hero-chart"><strong>Rizu Web Collection</strong><span>Selected from <b>{songs.length.toLocaleString()} songs</b></span></div>
+            <div className="song-hero-chart"><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
             <div className="song-hero-metadata"><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
           </article>
           <section className="score-list" aria-label="Scores">
@@ -240,18 +263,18 @@ export function SongSelectScreen({
 
         <div className="song-select-column right-column">
           <section className="chart-summary" aria-label="Selected chart information">
-            <div className="chart-difficulty"><span className="chart-mode"><span>4K MANIA</span><b>22.2</b><em>MSD</em></span><div className="chart-patterns"><span>Jumpstream</span><span>20% Alternate</span></div></div>
-            <div className="chart-metadata"><span><Icon name="clock" /><b>2:27</b></span><span><Icon name="music" /><b>2052</b></span><span><Icon name="wave" /><b>212 BPM</b></span><span><strong>LN</strong><b className="accent">46%</b></span><span><Icon name="file" /><b>OSU</b></span></div>
+            <div className="chart-difficulty"><span className="chart-mode"><span>{selected_chart ? chartMode(selected_chart) : "NO CHART"}</span><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em>NPS</em></span></div>
+            <div className="chart-metadata"><span><Icon name="clock" /><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span><span><Icon name="music" /><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span><span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><Icon name="metronome" /><b>{Math.round(selected_chart?.bpm_avg ?? 0)} BPM</b></span><span><strong>LN</strong><b className="accent">{Math.round((selected_chart?.long_note_ratio ?? 0) * 100)}%</b></span><span><Icon name="file" /><b>{selected_chart?.format.toUpperCase() ?? "-"}</b></span></div>
           </section>
           <section className="chart-browser" aria-label="Chart browser">
             <div className="difficulty-strip"><button aria-label="Previous difficulties"><Icon name="chevron-left" /></button><div>
-              {difficulty_items.map(([difficulty, color], index) => <button className={index === 4 ? "selected" : ""} key={difficulty} style={{ "--difficulty-color": color } as CSSProperties}><strong>{difficulty}</strong><span>4K</span></button>)}
+              {selected_song?.charts.map((chart) => <button className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => setSelectedChartId(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
             </div><button aria-label="Next difficulties"><Icon name="chevron-right" /></button></div>
             {error ? <p className="song-library-error">{error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
               if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
-              if (event.key === "Enter" && selected_song_id) onPlay(selected_song_id);
+              if (event.key === "Enter" && selected_chart) onPlay(selected_chart.id);
             }}><div className="chart-list-space" style={{ height: filtered_songs.length * ROW_HEIGHT }}>
-              {visible_songs.map((song, offset) => <button aria-selected={song.id === selected_song_id} className={`chart-row${song.id === selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => onPlay(song.id)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": ["#00ee7a", "#62f000", "#ff6417", "#39ef00", "#f2c600", "#00d9ca", "#9b8cff"][(first_index + offset) % 7] } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>)}
+               {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selected_song_id} className={`chart-row${song.id === selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && onPlay(hardest_chart.id)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
             </div>{filtered_songs.length === 0 && <p className="empty-library">No songs match “{query}”</p>}</div>}
           </section>
         </div>
@@ -260,7 +283,7 @@ export function SongSelectScreen({
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
         <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs"><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="400" max="2000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_song_id} onClick={() => selected_song_id && onPlay(selected_song_id)}><span>PLAY</span><Icon name="play" /></button></div>
+        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="400" max="2000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && onPlay(selected_chart.id)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
     </main>
   );
