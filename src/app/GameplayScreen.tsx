@@ -6,10 +6,11 @@ interface GameplayScreenProps {
   assets: LoadedGameplayAssets;
   master_volume: number;
   scroll_speed: number;
+  input_bindings: readonly (string | null)[];
   onFinish: () => void;
 }
 
-export function GameplayScreen({ assets, master_volume, scroll_speed, onFinish }: GameplayScreenProps) {
+export function GameplayScreen({ assets, master_volume, scroll_speed, input_bindings, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const fps_ref = useRef<HTMLSpanElement>(null);
 
@@ -21,11 +22,11 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, onFinish }
       return;
     }
 
-    const runtime = new GameplayRuntime(canvas, fps, assets, master_volume, scroll_speed, onFinish);
+    const runtime = new GameplayRuntime(canvas, fps, assets, master_volume, scroll_speed, input_bindings, onFinish);
     runtime.start();
 
     return () => runtime.destroy();
-  }, [assets, master_volume, onFinish, scroll_speed]);
+  }, [assets, input_bindings, master_volume, onFinish, scroll_speed]);
 
   return (
     <main className="gameplay-screen">

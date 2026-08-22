@@ -13,11 +13,6 @@ const enum NoteState {
   Missed,
 }
 
-const key_bindings: Readonly<Record<number, readonly string[]>> = {
-  4: ["KeyA", "KeyS", "Semicolon", "Quote"],
-  7: ["KeyA", "KeyS", "KeyD", "Space", "KeyL", "Semicolon", "Quote"],
-};
-
 const vertex_shader_source = `#version 300 es
 in vec2 position;
 uniform vec2 center;
@@ -159,6 +154,7 @@ export class GameplayRuntime {
     assets: LoadedGameplayAssets,
     master_volume: number,
     scroll_speed: number,
+    input_bindings: readonly (string | null)[],
     finish: () => void,
   ) {
     const gl = canvas.getContext("webgl2");
@@ -206,8 +202,9 @@ export class GameplayRuntime {
       this.lane_notes[note.column - 1]!.push(index);
     }
 
-    const bindings = key_bindings[assets.chart.column_count] ?? [];
-    this.key_columns = new Map(bindings.map((code, column) => [code, column]));
+    this.key_columns = new Map(
+      input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]),
+    );
 
     gl.bindVertexArray(vertex_array);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);

@@ -290,3 +290,39 @@ svg { width: 22px; height: 22px; }
 .settings-control input[type="range"]::-moz-range-track { height: 9px; background: #0d0c0f; border-radius: 999px; }
 .settings-control input[type="range"]::-moz-range-progress { height: 9px; background: var(--accent); border-radius: 999px; }
 .settings-control input[type="range"]::-moz-range-thumb { width: 29px; height: 29px; background: var(--accent); border: 0; border-radius: 50%; box-shadow: 0 2px 7px #0005; }
+
+.input-bindings-layer {
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: var(--logical-width);
+  height: 1080px;
+  padding: 24px;
+  place-items: center;
+  background: #0d0c0fa3;
+  backdrop-filter: blur(4px);
+}
+
+.input-bindings-modal {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: min(1040px, calc(100% - 48px));
+  min-height: 520px;
+  padding: 58px 70px 42px;
+  overflow: hidden;
+  background: #211c2b;
+  border: 1px solid #ffffff0b;
+  border-radius: 20px;
+  box-shadow: 0 24px 80px #000a;
+}
+
+.input-bindings-modal h1 { margin: 0; font-size: 37px; text-align: center; }
+.input-bindings-modal h1 span { white-space: nowrap; }
+.input-bindings-modal > p { margin: 34px 0 0; color: #b6bfd6; font-size: 18px; text-align: center; }
+.input-binding-list { display: flex; align-items: center; justify-content: center; gap: 14px; min-width: 0; padding: 44px 0 30px; }
+.input-binding-list > div { display: grid; flex: 1 1 112px; min-width: 0; max-width: 112px; gap: 12px; color: #b6bfd6; font-size: 20px; font-weight: 700; text-align: center; }
+.input-binding-list button { height: 112px; padding: 8px; overflow: hidden; color: var(--text); background: #1e1928; border: 3px solid #504966; border-radius: 8px; font-size: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.input-binding-list button:hover, .input-binding-list button.listening { border-color: #9d59df; background: #2c2339; filter: none; }
+.input-binding-list button.listening { box-shadow: 0 0 0 4px #9d59df30; }

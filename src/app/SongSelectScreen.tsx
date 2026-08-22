@@ -27,7 +27,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { CatalogChart, CatalogProvider, CatalogSong } from "../catalog/CatalogProvider";
+import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
 import { PreviewClient } from "../preview/PreviewClient";
+import { InputBindingsModal } from "./InputBindingsModal";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
@@ -74,7 +76,7 @@ function Icon({ name }: { name: IconName }) {
 interface SongSelectScreenProps {
   catalog_provider: CatalogProvider;
   selected_song_id: string | null;
-  onPlay: (chart_id: string) => void;
+  onPlay: (chart_id: string, input_bindings: readonly (string | null)[]) => void;
   onSettings: () => void;
   onSongSelect: (song_id: string) => void;
   master_volume: number;
@@ -129,6 +131,7 @@ export function SongSelectScreen({
   const [now, setNow] = useState(() => new Date());
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
+  const [input_bindings_open, setInputBindingsOpen] = useState(false);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -256,6 +259,7 @@ export function SongSelectScreen({
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
   const hero_loaded = background_url === null || background_url === loaded_background_url;
+  const playChart = (chart: CatalogChart) => onPlay(chart.id, loadInputBindings(inputLayout(chart)));
 
   return (
     <main className="song-select-screen">
@@ -306,9 +310,9 @@ export function SongSelectScreen({
             </div><button aria-label="Next difficulties"><Icon name="chevron-right" /></button></div>
             {error ? <p className="song-library-error">{error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
               if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
-              if (event.key === "Enter" && selected_chart) onPlay(selected_chart.id);
+              if (event.key === "Enter" && selected_chart) playChart(selected_chart);
             }}><div className="chart-list-space" style={{ height: filtered_songs.length * ROW_HEIGHT }}>
-               {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selected_song_id} className={`chart-row${song.id === selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && onPlay(hardest_chart.id)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
+               {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selected_song_id} className={`chart-row${song.id === selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && playChart(hardest_chart)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
             </div>{filtered_songs.length === 0 && <p className="empty-library">No songs match “{query}”</p>}</div>}
           </section>
         </div>
@@ -316,9 +320,10 @@ export function SongSelectScreen({
 
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
-        <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs"><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="100" max="4000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && onPlay(selected_chart.id)}><span>PLAY</span><Icon name="play" /></button></div>
+        <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
+        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="100" max="4000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
+      {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
     </main>
   );
 }

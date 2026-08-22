@@ -25,6 +25,7 @@ export function App() {
   const [assets, setAssets] = useState<LoadedGameplayAssets | null>(null);
   const [selected_song_id, setSelectedSongId] = useState<string | null>(null);
   const [loading_chart_id, setLoadingChartId] = useState<string | null>(null);
+  const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [master_volume, setMasterVolume] = useState(() => {
     const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
@@ -46,8 +47,9 @@ export function App() {
     setScrollSpeed(value);
   };
 
-  const beginLoading = (chart_id: string) => {
+  const beginLoading = (chart_id: string, chart_input_bindings: readonly (string | null)[]) => {
     setLoadingChartId(chart_id);
+    setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
     setScreen("loading");
   };
@@ -89,6 +91,7 @@ export function App() {
           assets={assets}
           master_volume={master_volume}
           scroll_speed={scroll_speed}
+          input_bindings={input_bindings}
           onFinish={() => setScreen("result")}
         />
       );
