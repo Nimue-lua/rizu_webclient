@@ -30,6 +30,7 @@ import { PreviewClient } from "../preview/PreviewClient";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
+const PREVIEW_DEBOUNCE_MS = 200;
 
 type IconName = "activity" | "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
   "chevron-right" | "clock" | "download" | "file" | "filter" | "globe" | "keyboard" |
@@ -112,6 +113,7 @@ export function SongSelectScreen({
   const [score_source, setScoreSource] = useState<"local" | "online">("online");
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [background_url, setBackgroundUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -148,7 +150,11 @@ export function SongSelectScreen({
   }, []);
 
   useEffect(() => {
-    if (selected_chart_id) preview_client_ref.current?.select({ chart_id: selected_chart_id });
+    if (!selected_chart_id) return;
+    const timer = window.setTimeout(() => {
+      preview_client_ref.current?.select({ chart_id: selected_chart_id });
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
   }, [selected_chart_id]);
 
   useEffect(() => {
@@ -188,6 +194,14 @@ export function SongSelectScreen({
   const selected_song = songs.find((song) => song.id === selected_song_id) ?? songs[0];
   const selected_chart = selected_song?.charts.find((chart) => chart.id === selected_chart_id)
     ?? selected_song?.charts.at(-1);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setBackgroundUrl(selected_song?.background_url ?? null);
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [selected_song?.background_url]);
+
   const first_index = Math.max(0, Math.floor(scroll_top / ROW_HEIGHT) - OVERSCAN);
   const visible_count = Math.ceil(viewport_height / ROW_HEIGHT) + OVERSCAN * 2;
   const visible_songs = filtered_songs.slice(first_index, first_index + visible_count);
@@ -247,7 +261,7 @@ export function SongSelectScreen({
       <section className="song-select-content">
         <div className="song-select-column left-column">
           <article className="song-hero">
-            {selected_song?.background_url && <img className="song-hero-background" src={selected_song.background_url} alt="" />}
+            {background_url && <img className="song-hero-background" src={background_url} alt="" />}
             <div className="song-hero-chart"><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
             <div className="song-hero-metadata"><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
           </article>

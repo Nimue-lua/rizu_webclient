@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -100,6 +101,40 @@ func TestSelectPreviewRejectsPathOutsidePublicDirectory(t *testing.T) {
 	}}
 	if err := session.selectPreview("chart", 0); err == nil {
 		t.Fatal("expected an outside-public-directory error")
+	}
+}
+
+func TestSelectPreviewDoesNotReloadSameSong(t *testing.T) {
+	database, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.Exec(`
+		CREATE TABLE songs (id TEXT, audio_path TEXT, preview_seconds REAL);
+		CREATE TABLE charts (id TEXT, song_id TEXT);
+		INSERT INTO songs VALUES ('song', 'audio.ogg', 10);
+		INSERT INTO charts VALUES ('easy', 'song'), ('hard', 'song');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	publicPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(publicPath, "audio.ogg"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	session := &previewSession{server: &server{
+		config: config{publicPath: publicPath, ffmpegPath: "false"},
+		db:     database,
+	}}
+	if err := session.selectPreview("easy", 0); err != nil {
+		t.Fatal(err)
+	}
+	firstSourceID := session.sourceID
+	if err := session.selectPreview("hard", 0); err != nil {
+		t.Fatal(err)
+	}
+	if session.sourceID != firstSourceID {
+		t.Fatalf("same song started a new source: %d to %d", firstSourceID, session.sourceID)
 	}
 }
 

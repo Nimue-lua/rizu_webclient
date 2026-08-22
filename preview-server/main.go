@@ -63,6 +63,7 @@ type previewSession struct {
 	track        *webrtc.TrackLocalStaticRTP
 	mu           sync.Mutex
 	cancelSource context.CancelFunc
+	songID       string
 	sourceID     uint64
 	sequence     uint16
 	timestamp    uint32
@@ -266,14 +267,15 @@ func (s *previewSession) sendResponse(channel *webrtc.DataChannel, response prev
 }
 
 func (s *previewSession) selectPreview(chartID string, startSeconds float64) error {
+	var songID string
 	var audioPath string
 	var previewSeconds float64
 	err := s.server.db.QueryRow(`
-		SELECT songs.audio_path, songs.preview_seconds
+		SELECT songs.id, songs.audio_path, songs.preview_seconds
 		FROM charts
 		JOIN songs ON songs.id = charts.song_id
 		WHERE charts.id = ?
-	`, chartID).Scan(&audioPath, &previewSeconds)
+	`, chartID).Scan(&songID, &audioPath, &previewSeconds)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("chart %s was not found", chartID)
 	}
@@ -301,9 +303,14 @@ func (s *previewSession) selectPreview(chartID string, startSeconds float64) err
 	}
 
 	s.mu.Lock()
+	if s.songID == songID {
+		s.mu.Unlock()
+		return nil
+	}
 	if s.cancelSource != nil {
 		s.cancelSource()
 	}
+	s.songID = songID
 	s.sourceID++
 	sourceID := s.sourceID
 	context, cancel := context.WithCancel(context.Background())
