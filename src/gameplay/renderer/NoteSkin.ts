@@ -8,6 +8,7 @@ export interface NoteSkinConfig {
   mode: string;
   columnCount: number;
   columnSize: readonly number[];
+  gap: number;
   align: number;
   hitPosition: number;
   comboPosition: number;
@@ -69,6 +70,9 @@ export function parseNoteSkinConfig(value: unknown): NoteSkinConfig {
   if (raw.align !== undefined && (!finiteNumber(raw.align) || raw.align < 0 || raw.align > 1)) {
     throw new Error("align must be a number from 0 to 1");
   }
+  if (raw.gap !== undefined && (!finiteNumber(raw.gap) || raw.gap < 0)) {
+    throw new Error("gap must be a non-negative number");
+  }
   for (const field of ["hitPosition", "comboPosition", "judgePosition"] as const) {
     if (raw[field] !== undefined && !finiteNumber(raw[field])) throw new Error(`${field} must be a number`);
   }
@@ -76,6 +80,7 @@ export function parseNoteSkinConfig(value: unknown): NoteSkinConfig {
     mode: raw.mode,
     columnCount,
     columnSize: Array.from({ length: columnCount }, (_, column) => (columnSize as number[] | undefined)?.[column] ?? DEFAULT_COLUMN_SIZE),
+    gap: raw.gap as number | undefined ?? 0,
     align: raw.align as number | undefined ?? 0.5,
     hitPosition: raw.hitPosition as number | undefined ?? 380,
     comboPosition: raw.comboPosition as number | undefined ?? 200,

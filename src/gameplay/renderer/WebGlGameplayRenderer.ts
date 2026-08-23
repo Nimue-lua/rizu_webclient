@@ -287,7 +287,7 @@ export class WebGlGameplayRenderer {
     const height = NOTE_SKIN_LOGICAL_HEIGHT;
     const width = height * framebuffer_width / framebuffer_height;
     const configured_widths = this.skin?.config.columnSize ?? Array.from({ length: column_count }, () => FALLBACK_COLUMN_WIDTH);
-    const gap = this.skin ? 0 : FALLBACK_COLUMN_GAP;
+    const gap = this.skin?.config.gap ?? FALLBACK_COLUMN_GAP;
     const natural_width = configured_widths.reduce((sum, value) => sum + value, 0) + gap * (column_count - 1);
     const scale = Math.min(1, width / natural_width);
     const column_width = configured_widths.map((value) => value * scale);
