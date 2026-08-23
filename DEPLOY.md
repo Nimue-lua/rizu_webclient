@@ -1,6 +1,6 @@
 # VPS Deployment
 
-This guide deploys the static web client, client catalog, and background previews behind Nginx. Chart assets are managed separately and preserved across application deployments.
+This guide deploys the static web client, client catalog, and generated background/audio previews behind Nginx. Chart assets are managed separately and preserved across application deployments.
 
 The current production deployment uses:
 
@@ -16,7 +16,7 @@ For a normal production update, run:
 npm run deploy
 ```
 
-This runs the frontend checks, builds the application, refreshes the background previews and client catalog, checks VPS disk space, uploads changed application files, preserves existing VPS chart assets, atomically activates the release, and verifies the public endpoints.
+This runs the frontend checks, builds the application, refreshes the previews and client catalog, checks VPS disk space, uploads changed application files, preserves existing VPS chart assets, atomically activates the release, and verifies the public endpoints.
 
 The defaults can be overridden without editing the script:
 
@@ -35,7 +35,8 @@ Browser -- HTTPS :443 --> Nginx
                            |-- /               -> /srv/rizu/dist
                            |-- /catalog.sqlite -> client catalog
                            |-- /charts/        -> chart and audio assets
-                           `-- /chart-previews/ -> background thumbnails
+                           |-- /chart-previews/ -> background thumbnails
+                           `-- /audio-previews/ -> compact song previews
 ```
 
 No application service or non-HTTP media port is required.
@@ -86,7 +87,7 @@ ssh root@nimue.mom \
 
 ```bash
 rm -rf /tmp/rizu-deploy
-mkdir -p /tmp/rizu-deploy/{dist,public/chart-previews}
+mkdir -p /tmp/rizu-deploy/{dist,public/chart-previews,public/audio-previews}
 npm ci
 npm run typecheck
 npm test
@@ -95,6 +96,7 @@ cp -a dist/. /tmp/rizu-deploy/dist/
 npm run cache:charts -- \
   --charts public/charts \
   --background-previews /tmp/rizu-deploy/public/chart-previews \
+  --audio-previews /tmp/rizu-deploy/public/audio-previews \
   --client-database /tmp/rizu-deploy/public/catalog.sqlite
 ```
 

@@ -35,6 +35,7 @@ import { GamemodeFiltersModal } from "./GamemodeFiltersModal";
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
 const BACKGROUND_DEBOUNCE_MS = 200;
+const AUDIO_PREVIEW_DEBOUNCE_MS = 200;
 const SESSION_STARTED_AT = Date.now();
 
 type IconName = "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
@@ -77,6 +78,7 @@ interface SongSelectScreenProps {
   chart_selector: ChartSelector;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[]) => void;
   onSettings: () => void;
+  master_volume: number;
   music_rate: number;
   constant_scroll: boolean;
   tap_only: boolean;
@@ -113,6 +115,7 @@ export function SongSelectScreen({
   chart_selector,
   onPlay,
   onSettings,
+  master_volume,
   music_rate,
   constant_scroll,
   tap_only,
@@ -121,6 +124,9 @@ export function SongSelectScreen({
   onTapOnlyChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
+  const audio_ref = useRef<HTMLAudioElement>(null);
+  const preview_unlocked_ref = useRef(false);
+  const last_preview_change_ref = useRef<number | null>(null);
   const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
   const [scroll_top, setScrollTop] = useState(0);
@@ -178,6 +184,33 @@ export function SongSelectScreen({
     return () => window.clearTimeout(timer);
   }, [selected_chart?.background_url]);
 
+  useEffect(() => {
+    const audio = audio_ref.current;
+    if (audio) audio.volume = master_volume;
+  }, [master_volume]);
+
+  useEffect(() => {
+    const audio = audio_ref.current;
+    if (!audio) return;
+    const now = performance.now();
+    const previous_change = last_preview_change_ref.current;
+    last_preview_change_ref.current = now;
+    const switchPreview = () => {
+      const preview_url = selected_chart?.audio_preview_url ?? "";
+      audio.pause();
+      audio.src = preview_url;
+      if (preview_unlocked_ref.current && preview_url) {
+        void audio.play().catch(() => undefined);
+      }
+    };
+    if (previous_change === null || now - previous_change >= AUDIO_PREVIEW_DEBOUNCE_MS) {
+      switchPreview();
+      return;
+    }
+    const timer = window.setTimeout(switchPreview, AUDIO_PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [selected_chart?.audio_preview_url]);
+
   const first_index = Math.max(0, Math.floor(scroll_top / ROW_HEIGHT) - OVERSCAN);
   const visible_count = Math.ceil(viewport_height / ROW_HEIGHT) + OVERSCAN * 2;
   const visible_songs = filtered_songs.slice(first_index, first_index + visible_count);
@@ -222,7 +255,18 @@ export function SongSelectScreen({
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
   const hero_loaded = background_url === null || background_url === loaded_background_url;
-  const playChart = (chart: Chartview) => onPlay(chart, loadInputBindings(inputLayout(chart)));
+  const unlockPreview = () => {
+    if (preview_unlocked_ref.current) return;
+    preview_unlocked_ref.current = true;
+    const audio = audio_ref.current;
+    if (!audio || !selected_chart?.audio_preview_url) return;
+    audio.src = selected_chart.audio_preview_url;
+    void audio.play().catch(() => undefined);
+  };
+  const playChart = (chart: Chartview) => {
+    audio_ref.current?.pause();
+    onPlay(chart, loadInputBindings(inputLayout(chart)));
+  };
   const moveRateDrag = (client_x: number) => {
     const drag = rate_drag_ref.current;
     if (!drag) return;
@@ -231,7 +275,8 @@ export function SongSelectScreen({
   };
 
   return (
-    <main className="song-select-screen">
+    <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
+      <audio ref={audio_ref} preload="auto" />
       <header className="song-select-header">
         <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT</span></div>
         <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status"><b>1</b> ONLINE</span></div>

@@ -35,7 +35,7 @@ npm --prefix "$ROOT_DIR" test
 
 printf 'Building deployment bundle...\n'
 rm -rf -- "$STAGE_DIR"
-mkdir -p -- "$STAGE_DIR/dist" "$STAGE_DIR/public/chart-previews"
+mkdir -p -- "$STAGE_DIR/dist" "$STAGE_DIR/public/chart-previews" "$STAGE_DIR/public/audio-previews"
 npm --prefix "$ROOT_DIR" run build
 cp -a -- "$ROOT_DIR/dist/." "$STAGE_DIR/dist/"
 
@@ -43,7 +43,9 @@ printf 'Refreshing chart previews and catalogs...\n'
 npm --prefix "$ROOT_DIR" run cache:charts -- \
   --charts "$CHARTS_DIR" \
   --background-previews "$STAGE_DIR/public/chart-previews" \
+  --audio-previews "$ROOT_DIR/public/audio-previews" \
   --client-database "$STAGE_DIR/public/catalog.sqlite"
+cp -a -- "$ROOT_DIR/public/audio-previews/." "$STAGE_DIR/public/audio-previews/"
 
 bundle_bytes="$(du -sb "$STAGE_DIR" | cut -f1)"
 available_bytes="$(ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "df --output=avail -B1 '$DEPLOY_ROOT.new'" | tr -dc '0-9')"

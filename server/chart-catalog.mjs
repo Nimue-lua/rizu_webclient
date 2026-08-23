@@ -5,7 +5,9 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 7;
+const AUDIO_PREVIEW_DURATION_SECONDS = 10;
+const AUDIO_PREVIEW_PROFILE = "webm-opus-mono-32k-v1";
 const execFileAsync = promisify(execFile);
 
 function readProperty(source, name) {
@@ -184,6 +186,44 @@ async function generateBackgroundPreview(source_path, preview_path, ffmpeg_path)
   }
 }
 
+async function generateAudioPreview(source_path, preview_path, preview_seconds, ffmpeg_path) {
+  if (await readableFile(preview_path)) return;
+
+  const temporary_path = `${preview_path}.tmp.webm`;
+  await rm(temporary_path, { force: true });
+  try {
+    await execFileAsync(ffmpeg_path, [
+      "-loglevel", "error",
+      "-y",
+      "-ss", String(preview_seconds),
+      "-i", source_path,
+      "-t", String(AUDIO_PREVIEW_DURATION_SECONDS),
+      "-vn",
+      "-map_metadata", "-1",
+      "-ac", "1",
+      "-ar", "24000",
+      "-c:a", "libopus",
+      "-b:a", "32k",
+      "-vbr", "on",
+      "-compression_level", "10",
+      "-application", "audio",
+      temporary_path,
+    ]);
+    await rename(temporary_path, preview_path);
+  } catch (reason) {
+    await rm(temporary_path, { force: true });
+    throw reason;
+  }
+}
+
+async function removeStaleAudioPreviews(directory, referenced_files) {
+  for (const file of await readdir(directory)) {
+    if (file.endsWith(".webm") && !referenced_files.has(file)) {
+      await rm(path.join(directory, file), { force: true });
+    }
+  }
+}
+
 export function parseOsuMetadata(source, folder, chart_file, location = "") {
   const mode = readNumber(source, "Mode");
   const keys = readNumber(source, "CircleSize");
@@ -220,7 +260,7 @@ export function parseOsuMetadata(source, folder, chart_file, location = "") {
   };
 }
 
-async function scanCharts(charts_directory, background_previews_directory, ffmpeg_path) {
+async function scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path) {
   const locations = [];
   const songs = new Map();
   const charts = [];
@@ -271,6 +311,23 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
           continue;
         }
 
+        const audio_stat = await stat(audio_path);
+        const audio_preview_key = createHash("sha256").update([
+          path.posix.join("charts", location_name, folder, metadata.audio_file),
+          audio_stat.size,
+          audio_stat.mtimeMs,
+          metadata.preview_seconds,
+          AUDIO_PREVIEW_DURATION_SECONDS,
+          AUDIO_PREVIEW_PROFILE,
+        ].join("\0")).digest("hex").slice(0, 24);
+        const audio_preview_file = `${audio_preview_key}.webm`;
+        await generateAudioPreview(
+          audio_path,
+          path.join(audio_previews_directory, audio_preview_file),
+          metadata.preview_seconds,
+          ffmpeg_path,
+        );
+
         const background_file = metadata.background_file
           && await readableFile(path.join(folder_path, metadata.background_file))
           ? metadata.background_file
@@ -294,6 +351,7 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
           location_id,
           chart_path: path.posix.join("charts", location_name, folder, chart_file),
           audio_path: path.posix.join("charts", location_name, folder, metadata.audio_file),
+          audio_preview_path: path.posix.join("audio-previews", audio_preview_file),
           background_path: background_file ? path.posix.join("charts", location_name, folder, background_file) : null,
           background_preview_path,
         });
@@ -320,7 +378,7 @@ function writeDatabases(client_path, client_schema, data, generated_at) {
 
     const insert_client_location = client_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
     const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     client_db.exec("BEGIN");
     for (const location of data.locations) {
@@ -331,7 +389,7 @@ function writeDatabases(client_path, client_schema, data, generated_at) {
     }
     for (const chart of data.charts) {
       const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty, chart.format];
-      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats, chart.chart_path, chart.audio_path, chart.preview_seconds, chart.background_preview_path);
+      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats, chart.chart_path, chart.audio_path, chart.preview_seconds, chart.audio_preview_path, chart.background_preview_path);
     }
     client_db.exec("COMMIT");
   } finally {
@@ -346,20 +404,28 @@ export async function cacheCharts({
   client_database,
   schema_directory,
   background_previews_directory = path.join(path.dirname(charts_directory), "chart-previews"),
+  audio_previews_directory = path.join(path.dirname(charts_directory), "audio-previews"),
   ffmpeg_path = "ffmpeg",
 }) {
   const client_temp = `${client_database}.tmp`;
-  await mkdir(background_previews_directory, { recursive: true });
+  await Promise.all([
+    mkdir(background_previews_directory, { recursive: true }),
+    mkdir(audio_previews_directory, { recursive: true }),
+  ]);
   await rm(client_temp, { force: true });
 
   try {
     const [data, client_schema] = await Promise.all([
-      scanCharts(charts_directory, background_previews_directory, ffmpeg_path),
+      scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path),
       readFile(path.join(schema_directory, "client-catalog.sql"), "utf8"),
     ]);
     const generated_at = Math.floor(Date.now() / 1000);
     const version = writeDatabases(client_temp, client_schema, data, generated_at);
     await rename(client_temp, client_database);
+    await removeStaleAudioPreviews(
+      audio_previews_directory,
+      new Set(data.charts.map((chart) => path.basename(chart.audio_preview_path))),
+    );
     return { ...data, version };
   } catch (reason) {
     await rm(client_temp, { force: true });

@@ -174,6 +174,7 @@ export function App() {
         <>
           <SongSelectScreen
             chart_selector={chart_selector}
+            master_volume={master_volume}
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}
             tap_only={replay_base.tap_only}

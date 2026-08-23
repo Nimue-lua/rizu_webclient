@@ -25,6 +25,7 @@ The first version does not need feature parity with the native client, mobile ga
 - WebGL2 for gameplay rendering.
 - Web Audio API for gameplay audio and the authoritative song clock.
 - HTTP for the catalog, charts, gameplay audio, images, and result submission.
+- Short, pre-generated Opus previews streamed over HTTP for song select.
 - IndexedDB for catalog data, catalog version information, settings, and selected cached assets.
 - Web Workers for expensive catalog indexing, filtering, chart parsing, and decompression when profiling shows that main-thread work is visible.
 
@@ -35,6 +36,7 @@ Dependencies should remain deliberate and limited. A package should solve a demo
 - Opening the client should show the locally cached library immediately when one is available, then synchronize catalog updates in the background.
 - Song-list navigation should remain responsive with tens of thousands of entries.
 - Confirming a chart should display a loading state until its complete gameplay audio and chart data are available locally.
+- Selecting a song should stream its compact preview from the chart's configured preview time.
 - Gameplay should not depend on network availability after loading has completed.
 - Dropped render frames must not alter judgment timing or cause the gameplay clock to drift.
 - Players should be able to calibrate audio, input, and visual offsets.
@@ -173,7 +175,7 @@ These are ownership boundaries rather than a requirement to create every directo
 - Decide the catalog snapshot and incremental-update wire formats.
 - Decide whether chart conversion happens on the server or in a browser worker.
 - Define the replay format and the degree of server-side replay validation.
-- Evaluate short HTTP audio previews after the gameplay asset path is stable.
+- Measure preview bitrate and duration against storage use and perceived quality.
 - Measure whether encoded full-song playback can provide sufficiently reliable timing with lower memory use than fully decoded `AudioBuffer` playback.
 - Evaluate service-worker asset caching and offline play only after the basic online flow is stable.
 - Add WebGPU, `OffscreenCanvas`, `SharedArrayBuffer`, or WASM only when profiling identifies a problem they directly solve.

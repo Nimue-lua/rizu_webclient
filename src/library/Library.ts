@@ -2,7 +2,7 @@ import initSqlJs from "sql.js";
 import sql_wasm_url from "sql.js/dist/sql-wasm.wasm?url";
 import type { ChartfileSetView, Chartview, LibraryView } from "./views";
 
-const CATALOG_SCHEMA_VERSION = 6;
+const CATALOG_SCHEMA_VERSION = 7;
 
 export interface Library {
   load(signal: AbortSignal): Promise<LibraryView>;
@@ -43,7 +43,7 @@ export class SqliteLibrary implements Library {
           charts.id, charts.location_id, charts.name, charts.creator, charts.mode, charts.keys,
           charts.duration_seconds, charts.note_count, charts.long_note_ratio,
           charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty, charts.format,
-          charts.audio_path, charts.chart_path, charts.background_preview_path
+          charts.audio_path, charts.audio_preview_path, charts.chart_path, charts.background_preview_path
         FROM songs
         JOIN charts ON charts.song_id = songs.id
         ORDER BY songs.title COLLATE NOCASE, songs.artist COLLATE NOCASE, songs.id,
@@ -69,6 +69,7 @@ export class SqliteLibrary implements Library {
           }
           const chart: Chartview = {
             audio_url: assetUrl(row.audio_path) ?? "",
+            audio_preview_url: assetUrl(row.audio_preview_path) ?? "",
             background_url: assetUrl(row.background_preview_path),
             bpm_avg: Number(row.bpm_avg),
             bpm_max: Number(row.bpm_max),

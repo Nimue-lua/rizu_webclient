@@ -67,9 +67,12 @@ test("caches chart collections as locations", async () => {
   const charts_directory = path.join(temporary_directory, "public", "charts");
   const chart_directory = path.join(charts_directory, "Collection One", "Chart One");
   const client_database = path.join(temporary_directory, "client.sqlite");
+  const ffmpeg_path = path.join(temporary_directory, "fake-ffmpeg");
 
   try {
     await mkdir(chart_directory, { recursive: true });
+    await writeFile(ffmpeg_path, "#!/bin/sh\nfor output; do :; done\n: > \"$output\"\n");
+    await chmod(ffmpeg_path, 0o700);
     await writeFile(path.join(chart_directory, "song.ogg"), "audio");
     await writeFile(path.join(chart_directory, "chart.osu"), `osu file format v14
 [General]
@@ -94,6 +97,7 @@ CircleSize:4
       charts_directory,
       client_database,
       schema_directory: path.dirname(fileURLToPath(import.meta.url)),
+      ffmpeg_path,
     });
 
     assert.deepEqual(result.locations, [{
@@ -174,7 +178,8 @@ CircleSize:4
 
     const client = new DatabaseSync(client_database, { readOnly: true });
     try {
-      assert.deepEqual(client.prepare("SELECT id, audio_path, chart_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row })), [{
+      const media = client.prepare("SELECT id, audio_path, chart_path, preview_seconds, audio_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
+      assert.deepEqual(media.map(({ audio_preview_path: _, ...row }) => row), [{
         id: "101",
         audio_path: "charts/Collection/Song/Easy.ogg",
         chart_path: "charts/Collection/Song/Easy.osu",
@@ -190,6 +195,10 @@ CircleSize:4
         chart_path: "charts/Collection/Song/Normal.osu",
         preview_seconds: 10.3,
       }]);
+      assert.match(media[0]?.audio_preview_path, /^audio-previews\/[a-f0-9]{24}\.webm$/);
+      assert.match(media[1]?.audio_preview_path, /^audio-previews\/[a-f0-9]{24}\.webm$/);
+      assert.match(media[2]?.audio_preview_path, /^audio-previews\/[a-f0-9]{24}\.webm$/);
+      assert.notEqual(media[0]?.audio_preview_path, media[2]?.audio_preview_path);
       const previews = client.prepare("SELECT id, background_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
       assert.equal(previews.length, 3);
       assert.match(previews[0]?.background_preview_path, /^chart-previews\/[a-f0-9]{24}\.webp$/);
