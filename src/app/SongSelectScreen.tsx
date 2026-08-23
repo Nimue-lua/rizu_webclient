@@ -279,12 +279,12 @@ export function SongSelectScreen({
       <audio ref={audio_ref} preload="auto" />
       <header className="song-select-header">
         <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT</span></div>
-        <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status"><b>1</b> ONLINE</span></div>
+        <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status">OFFLINE</span></div>
         <nav className="header-actions" aria-label="Account and settings">
-          <div className="player-info"><span><strong>Username</strong><small><b>12,450</b> PP</small></span><i /></div>
+          <div className="player-info"><span><strong>Guest</strong></span><i /></div>
           <div className="header-icon-dock">
             <button aria-label="Settings" onClick={onSettings}><Icon name="settings" /></button><button aria-label="Downloads"><Icon name="download" /></button>
-            <button aria-label="Command palette"><Icon name="terminal" /></button><button aria-label="Notifications"><Icon name="bell" /><i className="notification-dot" /></button>
+            <button aria-label="Command palette"><Icon name="terminal" /></button><button aria-label="Notifications"><Icon name="bell" /></button>
           </div>
         </nav>
       </header>
@@ -293,7 +293,7 @@ export function SongSelectScreen({
          <label className="collection-button"><span><small>COLLECTION</small><strong>{selection.selected_location_id === null ? "All songs" : selection.locations.find((location) => location.id === selection.selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selection.selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{selection.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
         <button className="toolbar-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>Title</strong></span></button>
         <button className="toolbar-button" aria-haspopup="dialog" aria-expanded={filters_open} onClick={() => setFiltersOpen(true)}><Icon name="filter" /><span><small>FILTERS</small><strong>{selection.selected_mode === null ? "None" : mode_names[selection.selected_mode]}</strong></span></button>
-        <label className="chart-search"><Icon name="search" /><input value={selection.query} onChange={(event) => { chart_selector.setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /><kbd>CTRL K</kbd></label>
+        <label className="chart-search"><Icon name="search" /><input value={selection.query} onChange={(event) => { chart_selector.setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /></label>
       </section>
 
       <section className="song-select-content">

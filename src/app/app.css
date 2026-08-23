@@ -66,19 +66,15 @@ svg { width: 22px; height: 22px; }
 .session-elapsed, .online-status { padding-left: 12px; border-left: 1px solid var(--outline); }
 .session-elapsed { color: var(--text); font-weight: 700; }
 .online-status { font-size: 9px; font-weight: 600; letter-spacing: .06em; }
-.online-status b { color: var(--text); font-size: 10px; }
 .header-actions { display: flex; justify-self: end; height: 100%; }
 .player-info { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
 .player-info > span { display: grid; justify-items: end; gap: 2px; }
 .player-info strong { font-size: 13px; }
-.player-info small { color: var(--muted); font-size: 8px; letter-spacing: .06em; }
-.player-info small b { color: var(--text); font-size: 9px; }
 .player-info > i { width: 34px; height: 34px; background: linear-gradient(145deg, #45417d, #2d2955); border: 1px solid var(--outline); border-radius: 4px; }
 .header-icon-dock { display: flex; height: 100%; background: #2d283e6b; border-left: 1px solid var(--outline); }
 .header-icon-dock button { position: relative; display: grid; width: 42px; height: 100%; padding: 0; place-items: center; color: var(--muted); background: transparent; }
 .header-icon-dock button:hover { color: var(--text); background: var(--hover); }
 .header-icon-dock svg { width: 20px; height: 20px; }
-.notification-dot { position: absolute; top: 11px; right: 10px; width: 7px; height: 7px; background: var(--back); border: 2px solid var(--panel); border-radius: 50%; }
 
 .library-toolbar { display: grid; grid-template-columns: 240px 150px 225px minmax(260px, 1fr); gap: 8px; padding: 10px 18px; background: #1b1820; border-bottom: 1px solid #ffffff0b; box-shadow: 0 10px 26px #0004; }
 .library-toolbar button { border-radius: 5px; }
