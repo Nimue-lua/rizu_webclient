@@ -132,6 +132,27 @@ test("a large time jump misses both hold endpoints", () => {
   assert.equal(engine.visible_notes[0]?.state, NoteState.EndMissed);
 });
 
+test("releasing held inputs before jumping to the chart end finalizes every note", () => {
+  const engine = new RhythmEngine(createChart([
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 2, weight: -1 },
+    { column: 1, absolute_time: 3, weight: 0 },
+  ]));
+  const caught = engine.press(0, 1);
+
+  engine.release(caught!, 1.5);
+  engine.update(4.2, 0, 0);
+
+  assert.deepEqual(engine.logic_events.map((event) => event.new_state), [
+    NoteState.StartPassedPressed,
+    NoteState.StartMissed,
+    NoteState.EndMissed,
+    NoteState.Missed,
+  ]);
+  assert.equal(engine.score.judges.perfect, 1);
+  assert.equal(engine.score.judges.miss, 3);
+});
+
 test("recovered missed holds do not use successful hold clamping", () => {
   const engine = new RhythmEngine(createChart([
     { column: 1, absolute_time: 1, weight: 1 },

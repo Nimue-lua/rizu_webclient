@@ -90,7 +90,7 @@ export class GameplayRuntime {
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.repeat) return;
     if (event.code === "Escape") {
-      this.finishGameplay();
+      this.abortGameplay(this.getSongTime(event.timeStamp));
       return;
     }
     const column = this.key_columns.get(event.code);
@@ -116,6 +116,16 @@ export class GameplayRuntime {
       ? context_time + (performance_time - output_performance_time) / 1000
       : this.data.audio_context.currentTime + (performance_time - performance.now()) / 1000;
     return (audio_time - this.audio_start_time) * this.music_rate;
+  }
+
+  private abortGameplay(song_time: number): void {
+    if (this.finished) return;
+    for (const note_index of this.key_catches.values()) {
+      this.rhythm_engine.release(note_index, song_time);
+    }
+    this.key_catches.clear();
+    this.rhythm_engine.update(getGameplayEndTime(this.data, this.music_rate), 0, 0);
+    this.finishGameplay();
   }
 
   private readonly finishGameplay = () => {
