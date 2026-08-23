@@ -9,10 +9,12 @@ import {
 
 interface SettingsScreenProps {
   master_volume: number;
+  music_offset: number;
   scroll_speed: number;
   scroll_speed_type: ScrollSpeedType;
   hit_registration: HitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
+  onMusicOffsetChange: (music_offset: number) => void;
   onScrollSpeedChange: (scroll_speed: number) => void;
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
   onHitRegistrationChange: (hit_registration: HitRegistration) => void;
@@ -25,10 +27,12 @@ function sliderStyle(value: number, minimum: number, maximum: number): CSSProper
 
 export function SettingsScreen({
   master_volume,
+  music_offset,
   scroll_speed,
   scroll_speed_type,
   hit_registration,
   onMasterVolumeChange,
+  onMusicOffsetChange,
   onScrollSpeedChange,
   onScrollSpeedTypeChange,
   onHitRegistrationChange,
@@ -100,6 +104,20 @@ export function SettingsScreen({
             onChange={(event) => onMasterVolumeChange(Number(event.target.value) / 100)}
           />
           <small>Controls preview and gameplay audio.</small>
+        </label>
+        <label className="settings-control" htmlFor="music-offset">
+          <span>Music offset <output htmlFor="music-offset">{music_offset} ms</output></span>
+          <input
+            id="music-offset"
+            type="range"
+            min="-200"
+            max="200"
+            step="1"
+            value={music_offset}
+            style={sliderStyle(music_offset, -200, 200)}
+            onChange={(event) => onMusicOffsetChange(Number(event.target.value))}
+          />
+          <small>Positive values delay the music relative to the notes.</small>
         </label>
 
         <header className="settings-heading settings-heading-spaced" id="gameplay-settings">

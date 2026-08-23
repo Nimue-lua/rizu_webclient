@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameplayData } from "../src/library/GameplayLoader";
-import { getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/GameplayRuntime";
+import { applyMusicOffset, getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/GameplayRuntime";
 
 function createData(note_times: readonly number[]): GameplayData {
   return {
@@ -33,4 +33,10 @@ test("ends 1.2 real seconds after the last note", () => {
   assert.equal(getGameplayEndTime(createData([1, 5, 3]), 1), 6.2);
   assert.equal(getGameplayEndTime(createData([1, 5, 3]), 2), 7.4);
   assert.equal(getGameplayEndTime(createData([1, 5, 3]), 0.5), 5.6);
+});
+
+test("applies music offset in real time at every playback rate", () => {
+  assert.equal(applyMusicOffset(1, 1, 200), 1.2);
+  assert.equal(applyMusicOffset(1, 2, 200), 1.4);
+  assert.equal(applyMusicOffset(1, 0.5, -200), 0.9);
 });

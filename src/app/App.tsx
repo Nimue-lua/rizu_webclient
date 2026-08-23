@@ -21,6 +21,7 @@ import {
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
+const MUSIC_OFFSET_KEY = "rizu.music-offset";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
@@ -48,6 +49,11 @@ export function App() {
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     return Number.isFinite(stored_value) && stored_value >= 0 && stored_value <= 1 ? stored_value : 0.2;
   });
+  const [music_offset, setMusicOffset] = useState(() => {
+    const stored_setting = localStorage.getItem(MUSIC_OFFSET_KEY);
+    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
+    return Number.isFinite(stored_value) && stored_value >= -200 && stored_value <= 200 ? stored_value : 0;
+  });
   const [scroll_speed, setScrollSpeed] = useState(() => {
     const stored_setting = localStorage.getItem(SCROLL_SPEED_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
@@ -70,6 +76,12 @@ export function App() {
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
     setMasterVolume(value);
+  };
+
+  const changeMusicOffset = (value: number) => {
+    const offset = Math.min(200, Math.max(-200, Math.round(value)));
+    localStorage.setItem(MUSIC_OFFSET_KEY, String(offset));
+    setMusicOffset(offset);
   };
 
   const changeScrollSpeed = (value: number) => {
@@ -185,6 +197,7 @@ export function App() {
           <GameplayScreen
             assets={assets}
             master_volume={master_volume}
+            music_offset={music_offset}
             scroll_speed={scroll_speed}
             replay_base={replay_base}
             input_bindings={input_bindings}
@@ -251,10 +264,12 @@ export function App() {
           {settings_open && (
             <SettingsScreen
               master_volume={master_volume}
+              music_offset={music_offset}
               scroll_speed={scroll_speed}
               scroll_speed_type={scroll_speed_type}
               hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
+              onMusicOffsetChange={changeMusicOffset}
               onScrollSpeedChange={changeScrollSpeed}
               onScrollSpeedTypeChange={changeScrollSpeedType}
               onHitRegistrationChange={changeHitRegistration}

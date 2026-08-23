@@ -8,6 +8,7 @@ import type { ReplayBase } from "../replay/ReplayBase";
 interface GameplayScreenProps {
   assets: GameplayData;
   master_volume: number;
+  music_offset: number;
   scroll_speed: number;
   replay_base: ReplayBase;
   input_bindings: readonly (string | null)[];
@@ -15,7 +16,7 @@ interface GameplayScreenProps {
   onFinish: (score: ScoreResult) => void;
 }
 
-export function GameplayScreen({ assets, master_volume, scroll_speed, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
+export function GameplayScreen({ assets, master_volume, music_offset, scroll_speed, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const accuracy_ref = useRef<HTMLSpanElement>(null);
   const judge_ref = useRef<HTMLSpanElement>(null);
@@ -32,7 +33,7 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, replay_bas
       return;
     }
 
-    const runtime = new GameplayRuntime(canvas, accuracy, judge, combo, assets, master_volume, scroll_speed, replay_base,
+    const runtime = new GameplayRuntime(canvas, accuracy, judge, combo, assets, master_volume, music_offset, scroll_speed, replay_base,
       input_bindings, hit_registration, onFinish);
     runtime_ref.current = runtime;
     runtime.start();
@@ -41,7 +42,7 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, replay_bas
       runtime_ref.current = null;
       runtime.destroy();
     };
-  }, [assets, hit_registration, input_bindings, master_volume, onFinish, replay_base, scroll_speed]);
+  }, [assets, hit_registration, input_bindings, master_volume, music_offset, onFinish, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">

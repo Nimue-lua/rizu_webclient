@@ -20,12 +20,17 @@ export function getGameplayEndTime(data: GameplayData, music_rate: number): numb
   return last_note_time + RESULT_DELAY * music_rate;
 }
 
+export function applyMusicOffset(song_time: number, music_rate: number, music_offset: number): number {
+  return song_time + music_offset / 1000 * music_rate;
+}
+
 export class GameplayRuntime {
   private readonly accuracy_element: HTMLElement;
   private readonly judge_element: HTMLElement;
   private readonly combo_element: HTMLElement;
   private readonly data: GameplayData;
   private readonly master_volume: number;
+  private readonly music_offset: number;
   private readonly scroll_speed: number;
   private readonly music_rate: number;
   private readonly finish: (score: ScoreResult) => void;
@@ -48,7 +53,7 @@ export class GameplayRuntime {
   private previous_judges_total = 0;
 
   constructor(canvas: HTMLCanvasElement, accuracy_element: HTMLElement, judge_element: HTMLElement,
-    combo_element: HTMLElement, data: GameplayData, master_volume: number,
+    combo_element: HTMLElement, data: GameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: HitRegistration,
     finish: (score: ScoreResult) => void) {
     this.accuracy_element = accuracy_element;
@@ -56,6 +61,7 @@ export class GameplayRuntime {
     this.combo_element = combo_element;
     this.data = data;
     this.master_volume = master_volume;
+    this.music_offset = music_offset;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
     this.finish = finish;
@@ -148,7 +154,7 @@ export class GameplayRuntime {
     const audio_time = context_time !== undefined && output_performance_time !== undefined && output_performance_time > 0
       ? context_time + (performance_time - output_performance_time) / 1000
       : this.data.audio_context.currentTime + (performance_time - performance.now()) / 1000;
-    return (audio_time - this.audio_start_time) * this.music_rate;
+    return applyMusicOffset((audio_time - this.audio_start_time) * this.music_rate, this.music_rate, this.music_offset);
   }
 
   private abortGameplay(song_time: number): void {
