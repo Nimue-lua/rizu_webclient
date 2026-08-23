@@ -5,6 +5,15 @@ import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 import { SpringValue } from "./SpringValue";
 import type { ReplayBase } from "../replay/ReplayBase";
 
+const AUDIO_SCHEDULE_MARGIN = 0.1;
+const FIRST_NOTE_LEAD_IN = 1.2;
+
+export function getAudioStartDelay(data: GameplayData, music_rate: number): number {
+  const first_note_time = data.chart.notes.reduce((first, note) => note.weight >= 0 ? Math.min(first, note.absolute_time) : first, Infinity);
+  if (!Number.isFinite(first_note_time)) return AUDIO_SCHEDULE_MARGIN;
+  return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN - first_note_time / music_rate);
+}
+
 export class GameplayRuntime {
   private readonly accuracy_element: HTMLElement;
   private readonly judge_element: HTMLElement;
@@ -53,7 +62,7 @@ export class GameplayRuntime {
     source.buffer = this.data.audio_buffer;
     source.playbackRate.value = this.music_rate;
     source.connect(gain).connect(this.data.audio_context.destination);
-    this.audio_start_time = this.data.audio_context.currentTime + 0.1;
+    this.audio_start_time = this.data.audio_context.currentTime + getAudioStartDelay(this.data, this.music_rate);
     source.start(this.audio_start_time);
     this.audio_source = source;
     void this.data.audio_context.resume();
