@@ -180,8 +180,8 @@ export class WebGlGameplayRenderer {
     for (const note of notes) {
       if (note.end_dt === undefined) continue;
       const column = note.column - 1;
-      const head_y = Math.min(layout.receptor_y, layout.receptor_y - note.start_dt * speed);
-      const tail_y = Math.min(layout.receptor_y, layout.receptor_y - note.end_dt * speed);
+      const head_y = layout.receptor_y - note.start_dt * speed;
+      const tail_y = layout.receptor_y - note.end_dt * speed;
       const head_height = this.getSpriteHeight(skin.config.longNoteHeads?.[column], column, layout);
       const brightness = getLongNoteBrightness(note.state);
       this.addSprite(skin.config.longNoteBodies?.[column], column, layout, tail_y,
@@ -190,7 +190,7 @@ export class WebGlGameplayRenderer {
     for (const note of notes) {
       if (note.end_dt === undefined) continue;
       const column = note.column - 1;
-      const tail_y = Math.min(layout.receptor_y, layout.receptor_y - note.end_dt * speed);
+      const tail_y = layout.receptor_y - note.end_dt * speed;
       this.addSprite(skin.config.longNoteTails?.[column], column, layout, tail_y, undefined,
         getLongNoteBrightness(note.state), false, 1);
     }
@@ -236,8 +236,8 @@ export class WebGlGameplayRenderer {
       const column = note.column - 1;
       const x = layout.playfield_left + layout.column_left[column]!;
       const width = layout.column_width[column]!;
-      const head_y = Math.min(layout.receptor_y, layout.receptor_y - note.start_dt * speed);
-      const tail_y = Math.min(layout.receptor_y, layout.receptor_y - note.end_dt * speed);
+      const head_y = layout.receptor_y - note.start_dt * speed;
+      const tail_y = layout.receptor_y - note.end_dt * speed;
       const brightness = getLongNoteBrightness(note.state);
       const color = colors[column]!;
       this.addQuad(x, tail_y, width, Math.max(0, head_y - tail_y),
