@@ -12,11 +12,13 @@ export default defineConfig({
     {
       name: "public-logo",
       buildStart() {
-        this.emitFile({
-          type: "asset",
-          fileName: "rizu-logo.svg",
-          source: readFileSync(path.resolve(import.meta.dirname, "public/rizu-logo.svg")),
-        });
+        for (const fileName of ["rizu-logo.svg", "skins/circles.zip"]) {
+          this.emitFile({
+            type: "asset",
+            fileName,
+            source: readFileSync(path.resolve(import.meta.dirname, "public", fileName)),
+          });
+        }
       },
     },
   ],

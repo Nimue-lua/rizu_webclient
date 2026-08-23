@@ -34,6 +34,9 @@ export class GameplayRuntime {
   private readonly key_columns: ReadonlyMap<string, number>;
   private readonly key_catches = new Map<string, number>();
   private readonly pointer_catches = new Map<number, number>();
+  private readonly pressed_keys = new Set<string>();
+  private readonly pointer_columns = new Map<number, number>();
+  private readonly pressed_columns: Uint16Array;
   private animation_frame: number | null = null;
   private audio_source: AudioBufferSourceNode | null = null;
   private audio_start_time = 0;
@@ -57,8 +60,15 @@ export class GameplayRuntime {
     this.music_rate = replay_base.rate;
     this.finish = finish;
     this.rhythm_engine = new RhythmEngine(data.chart, hit_registration, this.music_rate, replay_base.const, replay_base.tap_only);
-    this.renderer = new WebGlGameplayRenderer(canvas);
+    this.renderer = new WebGlGameplayRenderer(canvas, data.note_skin);
+    if (this.renderer.judgePosition !== undefined) {
+      this.judge_element.style.top = `${this.renderer.judgePosition / 480 * 100}%`;
+    }
+    if (this.renderer.comboPosition !== undefined) {
+      this.combo_element.style.top = `${this.renderer.comboPosition / 480 * 100}%`;
+    }
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
+    this.pressed_columns = new Uint16Array(data.chart.column_count);
   }
 
   start(): void {
@@ -89,16 +99,21 @@ export class GameplayRuntime {
   }
 
   pressPointer(pointer_id: number, column: number, performance_time: number): void {
-    if (this.pointer_catches.has(pointer_id)) return;
+    if (this.pointer_columns.has(pointer_id)) return;
+    this.pointer_columns.set(pointer_id, column);
+    this.pressed_columns[column]! += 1;
     const note_index = this.rhythm_engine.press(column, this.getSongTime(performance_time));
     if (note_index !== undefined) this.pointer_catches.set(pointer_id, note_index);
   }
 
   releasePointer(pointer_id: number, performance_time: number): void {
+    const column = this.pointer_columns.get(pointer_id);
+    if (column === undefined) return;
+    this.pointer_columns.delete(pointer_id);
+    this.pressed_columns[column]! -= 1;
     const note_index = this.pointer_catches.get(pointer_id);
-    if (note_index === undefined) return;
-    this.rhythm_engine.release(note_index, this.getSongTime(performance_time));
     this.pointer_catches.delete(pointer_id);
+    if (note_index !== undefined) this.rhythm_engine.release(note_index, this.getSongTime(performance_time));
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
@@ -110,16 +125,20 @@ export class GameplayRuntime {
     const column = this.key_columns.get(event.code);
     if (column === undefined) return;
     event.preventDefault();
+    this.pressed_keys.add(event.code);
+    this.pressed_columns[column]! += 1;
     const note_index = this.rhythm_engine.press(column, this.getSongTime(event.timeStamp));
     if (note_index !== undefined) this.key_catches.set(event.code, note_index);
   };
 
   private readonly handleKeyUp = (event: KeyboardEvent) => {
-    const note_index = this.key_catches.get(event.code);
-    if (note_index === undefined) return;
+    const column = this.key_columns.get(event.code);
+    if (column === undefined || !this.pressed_keys.delete(event.code)) return;
     event.preventDefault();
-    this.rhythm_engine.release(note_index, this.getSongTime(event.timeStamp));
+    this.pressed_columns[column]! -= 1;
+    const note_index = this.key_catches.get(event.code);
     this.key_catches.delete(event.code);
+    if (note_index !== undefined) this.rhythm_engine.release(note_index, this.getSongTime(event.timeStamp));
   };
 
   private getSongTime(performance_time: number): number {
@@ -142,6 +161,9 @@ export class GameplayRuntime {
     }
     this.key_catches.clear();
     this.pointer_catches.clear();
+    this.pressed_keys.clear();
+    this.pointer_columns.clear();
+    this.pressed_columns.fill(0);
     this.rhythm_engine.update(getGameplayEndTime(this.data, this.music_rate), 0, 0);
     this.finishGameplay();
   }
@@ -159,7 +181,7 @@ export class GameplayRuntime {
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
     const song_time = this.getSongTime(timestamp);
     this.rhythm_engine.update(song_time, range.past, range.future);
-    this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, visual_scroll_speed);
+    this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, visual_scroll_speed, this.pressed_columns);
     const score = this.rhythm_engine.score;
     const target_accuracy = (score.accuracy ?? 0) * 100;
     this.accuracy_element.textContent = `${this.displayed_accuracy.update(target_accuracy, delta_time).toFixed(2)}%`;
@@ -172,7 +194,7 @@ export class GameplayRuntime {
     const combo = score.combo ?? 0;
     if (combo > this.previous_combo) this.combo_offset.teleport(-10);
     this.combo_element.textContent = `${combo}x`;
-    this.combo_element.style.transform = `translateY(${this.combo_offset.update(0, delta_time).toFixed(2)}px)`;
+    this.combo_element.style.transform = `translate(-50%, ${this.combo_offset.update(0, delta_time).toFixed(2)}px)`;
     this.previous_combo = combo;
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
