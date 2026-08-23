@@ -83,12 +83,14 @@ svg { width: 22px; height: 22px; }
 .library-toolbar { display: grid; grid-template-columns: 240px 150px 225px minmax(260px, 1fr); gap: 8px; padding: 10px 18px; background: #1b1820; border-bottom: 1px solid #ffffff0b; box-shadow: 0 10px 26px #0004; }
 .library-toolbar button { border-radius: 5px; }
 .collection-button, .toolbar-button { display: flex; align-items: center; min-width: 0; padding: 0 14px; background: var(--elements); text-align: left; }
-.collection-button { justify-content: space-between; }
+.collection-button { position: relative; justify-content: space-between; border-radius: 5px; cursor: pointer; }
 .collection-button > span, .toolbar-button span { display: grid; min-width: 0; }
 .library-toolbar small { align-self: end; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .library-toolbar strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .collection-button strong { font-size: 16px; }
 .collection-button svg { color: var(--muted); }
+.collection-button select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.collection-button:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
 .toolbar-button { gap: 11px; }
 .toolbar-button > svg { color: var(--accent); }
 .chart-search { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 0 12px; background: #292435; border: 1px solid var(--outline); border-radius: 5px; }

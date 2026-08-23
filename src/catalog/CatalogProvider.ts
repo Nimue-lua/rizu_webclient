@@ -12,6 +12,7 @@ export interface CatalogChart {
   id: string;
   keys: number | null;
   long_note_ratio: number;
+  location_id: number;
   mode: number;
   name: string;
   note_count: number;
@@ -25,8 +26,18 @@ export interface CatalogSong {
   artist: string;
 }
 
+export interface CatalogLocation {
+  id: number;
+  name: string;
+}
+
+export interface CatalogLibrary {
+  locations: CatalogLocation[];
+  songs: CatalogSong[];
+}
+
 export interface CatalogProvider {
-  getSongs(signal: AbortSignal): Promise<CatalogSong[]>;
+  getLibrary(signal: AbortSignal): Promise<CatalogLibrary>;
 }
 
 function assetUrl(asset_path: unknown): string | null {
@@ -35,7 +46,7 @@ function assetUrl(asset_path: unknown): string | null {
 }
 
 export class SqliteCatalogProvider implements CatalogProvider {
-  async getSongs(signal: AbortSignal): Promise<CatalogSong[]> {
+  async getLibrary(signal: AbortSignal): Promise<CatalogLibrary> {
     const [sql, response] = await Promise.all([
       initSqlJs({ locateFile: () => sql_wasm_url }),
       fetch("/catalog.sqlite", { signal }),
@@ -48,9 +59,14 @@ export class SqliteCatalogProvider implements CatalogProvider {
     const database = new sql.Database(new Uint8Array(await response.arrayBuffer()));
 
     try {
+      const locations_result = database.exec("SELECT id, name FROM locations ORDER BY name COLLATE NOCASE, id");
+      const locations = (locations_result[0]?.values ?? []).map(([id, name]) => ({
+        id: Number(id),
+        name: String(name),
+      }));
       const statement = database.prepare(`
         SELECT songs.id AS song_id, songs.title, songs.artist, songs.background_preview_path,
-          charts.id, charts.name, charts.creator, charts.mode, charts.keys,
+          charts.id, charts.location_id, charts.name, charts.creator, charts.mode, charts.keys,
           charts.duration_seconds, charts.note_count, charts.long_note_ratio,
           charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty, charts.format
         FROM songs
@@ -88,6 +104,7 @@ export class SqliteCatalogProvider implements CatalogProvider {
             id: String(row.id),
             keys: row.keys === null ? null : Number(row.keys),
             long_note_ratio: Number(row.long_note_ratio),
+            location_id: Number(row.location_id),
             mode: Number(row.mode),
             name: String(row.name),
             note_count: Number(row.note_count),
@@ -97,7 +114,7 @@ export class SqliteCatalogProvider implements CatalogProvider {
         statement.free();
       }
 
-      return songs;
+      return { locations, songs };
     } finally {
       database.close();
     }

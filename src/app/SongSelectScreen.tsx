@@ -26,7 +26,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { CatalogChart, CatalogProvider, CatalogSong } from "../catalog/CatalogProvider";
+import type { CatalogChart, CatalogLocation, CatalogProvider, CatalogSong } from "../catalog/CatalogProvider";
 import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
 import { PreviewClient } from "../preview/PreviewClient";
 import { InputBindingsModal } from "./InputBindingsModal";
@@ -108,6 +108,12 @@ function difficultyColor(difficulty: number): string {
   return `hsl(${hue} 92% 52%)`;
 }
 
+function chartsInLocation(song: CatalogSong, location_id: number | null): CatalogChart[] {
+  return location_id === null
+    ? song.charts
+    : song.charts.filter((chart) => chart.location_id === location_id);
+}
+
 export function SongSelectScreen({
   catalog_provider,
   selected_song_id,
@@ -122,6 +128,8 @@ export function SongSelectScreen({
   const audio_ref = useRef<HTMLAudioElement>(null);
   const preview_client_ref = useRef<PreviewClient | null>(null);
   const [songs, setSongs] = useState<CatalogSong[]>([]);
+  const [locations, setLocations] = useState<CatalogLocation[]>([]);
+  const [selected_location_id, setSelectedLocationId] = useState<number | null>(null);
   const [selected_chart_id, setSelectedChartId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [scroll_top, setScrollTop] = useState(0);
@@ -180,10 +188,11 @@ export function SongSelectScreen({
 
   useEffect(() => {
     const abort_controller = new AbortController();
-    void catalog_provider.getSongs(abort_controller.signal).then((loaded_songs) => {
-      setSongs(loaded_songs);
-      if (!loaded_songs.some((song) => song.id === selected_song_id) && loaded_songs[0]) {
-        onSongSelect(loaded_songs[0].id);
+    void catalog_provider.getLibrary(abort_controller.signal).then((library) => {
+      setLocations(library.locations);
+      setSongs(library.songs);
+      if (!library.songs.some((song) => song.id === selected_song_id) && library.songs[0]) {
+        onSongSelect(library.songs[0].id);
       }
     }).catch((reason: unknown) => {
       if (!abort_controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Failed to load song catalog");
@@ -192,11 +201,14 @@ export function SongSelectScreen({
   }, [catalog_provider, onSongSelect]);
 
   useEffect(() => {
-    const song = songs.find((candidate) => candidate.id === selected_song_id) ?? songs[0];
-    if (song && !song.charts.some((chart) => chart.id === selected_chart_id)) {
-      setSelectedChartId(song.charts.at(-1)?.id ?? null);
+    const available_songs = songs.filter((song) => chartsInLocation(song, selected_location_id).length > 0);
+    const song = available_songs.find((candidate) => candidate.id === selected_song_id) ?? available_songs[0];
+    const charts = song ? chartsInLocation(song, selected_location_id) : [];
+    if (!charts.some((chart) => chart.id === selected_chart_id)) {
+      setSelectedChartId(charts.at(-1)?.id ?? null);
+      if (song && song.id !== selected_song_id) onSongSelect(song.id);
     }
-  }, [selected_chart_id, selected_song_id, songs]);
+  }, [onSongSelect, selected_chart_id, selected_location_id, selected_song_id, songs]);
 
   useEffect(() => {
     const viewport = viewport_ref.current;
@@ -208,11 +220,17 @@ export function SongSelectScreen({
     return () => observer.disconnect();
   }, []);
 
+  const songs_in_location = selected_location_id === null
+    ? songs
+    : songs.flatMap((song) => {
+      const charts = chartsInLocation(song, selected_location_id);
+      return charts.length > 0 ? [{ ...song, charts }] : [];
+    });
   const normalized_query = query.trim().toLocaleLowerCase();
   const filtered_songs = normalized_query
-    ? songs.filter((song) => `${song.title}\n${song.artist}\n${song.charts.map((chart) => `${chart.name} ${chart.creator}`).join("\n")}`.toLocaleLowerCase().includes(normalized_query))
-    : songs;
-  const selected_song = songs.find((song) => song.id === selected_song_id) ?? songs[0];
+    ? songs_in_location.filter((song) => `${song.title}\n${song.artist}\n${song.charts.map((chart) => `${chart.name} ${chart.creator}`).join("\n")}`.toLocaleLowerCase().includes(normalized_query))
+    : songs_in_location;
+  const selected_song = songs_in_location.find((song) => song.id === selected_song_id) ?? filtered_songs[0] ?? songs_in_location[0];
   const selected_chart = selected_song?.charts.find((chart) => chart.id === selected_chart_id)
     ?? selected_song?.charts.at(-1);
 
@@ -231,8 +249,23 @@ export function SongSelectScreen({
   const selectSong = (song_id: string) => {
     void audio_ref.current?.play().catch(() => undefined);
     const song = songs.find((candidate) => candidate.id === song_id);
-    setSelectedChartId(song?.charts.at(-1)?.id ?? null);
+    setSelectedChartId(song ? chartsInLocation(song, selected_location_id).at(-1)?.id ?? null : null);
     onSongSelect(song_id);
+  };
+
+  const selectLocation = (location_id: number | null) => {
+    setSelectedLocationId(location_id);
+    setQuery("");
+    setScrollTop(0);
+    if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
+    const first_song = location_id === null
+      ? songs[0]
+      : songs.find((song) => song.charts.some((chart) => chart.location_id === location_id));
+    if (first_song) {
+      const charts = chartsInLocation(first_song, location_id);
+      setSelectedChartId(charts.at(-1)?.id ?? null);
+      onSongSelect(first_song.id);
+    }
   };
 
   const moveSelection = (offset: number) => {
@@ -277,7 +310,7 @@ export function SongSelectScreen({
       </header>
 
       <section className="library-toolbar" aria-label="Chart library controls">
-        <button className="collection-button"><span><small>COLLECTION</small><strong>All songs</strong></span><Icon name="chevron-down" /></button>
+        <label className="collection-button"><span><small>COLLECTION</small><strong>{selected_location_id === null ? "All songs" : locations.find((location) => location.id === selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
         <button className="toolbar-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>Title</strong></span></button>
         <button className="toolbar-button"><Icon name="filter" /><span><small>FILTERS</small><strong>None</strong></span></button>
         <label className="chart-search"><Icon name="search" /><input value={query} onChange={(event) => { setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /><kbd>CTRL K</kbd></label>
@@ -313,7 +346,7 @@ export function SongSelectScreen({
               if (event.key === "Enter" && selected_chart) playChart(selected_chart);
             }}><div className="chart-list-space" style={{ height: filtered_songs.length * ROW_HEIGHT }}>
                {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selected_song_id} className={`chart-row${song.id === selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && playChart(hardest_chart)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
-            </div>{filtered_songs.length === 0 && <p className="empty-library">No songs match “{query}”</p>}</div>}
+            </div>{filtered_songs.length === 0 && <p className="empty-library">{query ? `No songs match “${query}”` : "No songs in this collection"}</p>}</div>}
           </section>
         </div>
       </section>

@@ -25,5 +25,5 @@ const result = await cacheCharts({
   ffmpeg_path: readValue("--ffmpeg", "ffmpeg"),
 });
 
-console.log(`Cached ${result.songs.length} songs and ${result.charts.length} charts (${result.skipped} skipped).`);
+console.log(`Cached ${result.locations.length} locations, ${result.songs.length} songs, and ${result.charts.length} charts (${result.skipped} skipped).`);
 console.log(`Catalog version: ${result.version}`);
