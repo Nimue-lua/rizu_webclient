@@ -32,6 +32,18 @@ button:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .55; }
 svg { width: 22px; height: 22px; }
 
 .screen { display: grid; min-height: 100vh; place-items: center; }
+.screen-transition {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  transform-origin: center;
+  animation: screen-in 400ms cubic-bezier(.2, .75, .25, 1) both;
+}
+
+@keyframes screen-in {
+  from { transform: scale(1.02); opacity: 0; }
+}
+
 .loading-screen { padding: 2rem; text-align: center; }
 .loading-screen p, .song-library-error { color: #ff8d8d; }
 
@@ -123,6 +135,7 @@ svg { width: 22px; height: 22px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .screen-transition { animation: none; }
   .song-hero-background { transform: none; transition: none; }
   .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { transform: none; }
   .song-hero.loaded .song-hero-chart strong, .song-hero.loaded .song-hero-chart span, .song-hero.loaded .song-hero-metadata h1, .song-hero.loaded .song-hero-metadata p { animation-duration: 1ms; animation-delay: 0s; }

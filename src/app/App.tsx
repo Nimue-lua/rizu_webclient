@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type PropsWithChildren } from "react";
 import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
 import { SqliteLibrary } from "../library/Library";
 import type { Chartview } from "../library/views";
@@ -21,6 +21,10 @@ const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
 const TAP_ONLY_KEY = "rizu.no-long-notes";
 const gameplay_loader = new HttpGameplayLoader();
 const chart_selector = new ChartSelector(new SqliteLibrary());
+
+function ScreenTransition({ children }: PropsWithChildren) {
+  return <div className="screen-transition">{children}</div>;
+}
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("song-select");
@@ -151,18 +155,20 @@ export function App() {
       }
 
       return (
-        <GameplayScreen
-          assets={assets}
-          master_volume={master_volume}
-          scroll_speed={scroll_speed}
-          replay_base={replay_base}
-          input_bindings={input_bindings}
-          hit_registration={hit_registration}
-          onFinish={(gameplay_score) => {
-            setScore(gameplay_score);
-            setScreen("result");
-          }}
-        />
+        <ScreenTransition key="gameplay">
+          <GameplayScreen
+            assets={assets}
+            master_volume={master_volume}
+            scroll_speed={scroll_speed}
+            replay_base={replay_base}
+            input_bindings={input_bindings}
+            hit_registration={hit_registration}
+            onFinish={(gameplay_score) => {
+              setScore(gameplay_score);
+              setScreen("result");
+            }}
+          />
+        </ScreenTransition>
       );
     case "loading":
       if (!audio_context || !loading_location) {
@@ -170,34 +176,38 @@ export function App() {
       }
 
       return (
-        <LoadingScreen
-          gameplay_loader={gameplay_loader}
-          location={loading_location}
-          audio_context={audio_context}
-          onCancel={cancelLoading}
-          onLoaded={finishLoading}
-        />
+        <ScreenTransition key="loading">
+          <LoadingScreen
+            gameplay_loader={gameplay_loader}
+            location={loading_location}
+            audio_context={audio_context}
+            onCancel={cancelLoading}
+            onLoaded={finishLoading}
+          />
+        </ScreenTransition>
       );
     case "result":
       return (
-        <ResultScreen
-          score={score}
-          background_url={loading_location?.background_url ?? null}
-          title={loading_location?.title ?? "Unknown title"}
-          artist={loading_location?.artist ?? "Unknown artist"}
-          chart_name={loading_location?.chart_name ?? "Unknown chart"}
-          duration_seconds={loading_location?.duration_seconds ?? 0}
-          long_note_ratio={loading_location?.long_note_ratio ?? 0}
-          bpm={loading_location?.bpm ?? 0}
-          music_rate={replay_base.rate}
-          difficulty={loading_location?.difficulty ?? 0}
-          overall_difficulty={assets?.chart.overall_difficulty ?? 5}
-          onExit={leaveResults}
-        />
+        <ScreenTransition key="result">
+          <ResultScreen
+            score={score}
+            background_url={loading_location?.background_url ?? null}
+            title={loading_location?.title ?? "Unknown title"}
+            artist={loading_location?.artist ?? "Unknown artist"}
+            chart_name={loading_location?.chart_name ?? "Unknown chart"}
+            duration_seconds={loading_location?.duration_seconds ?? 0}
+            long_note_ratio={loading_location?.long_note_ratio ?? 0}
+            bpm={loading_location?.bpm ?? 0}
+            music_rate={replay_base.rate}
+            difficulty={loading_location?.difficulty ?? 0}
+            overall_difficulty={assets?.chart.overall_difficulty ?? 5}
+            onExit={leaveResults}
+          />
+        </ScreenTransition>
       );
     case "song-select":
       return (
-        <>
+        <ScreenTransition key="song-select">
           <SongSelectScreen
             chart_selector={chart_selector}
             master_volume={master_volume}
@@ -221,7 +231,7 @@ export function App() {
               onExit={() => setSettingsOpen(false)}
             />
           )}
-        </>
+        </ScreenTransition>
       );
   }
 }
