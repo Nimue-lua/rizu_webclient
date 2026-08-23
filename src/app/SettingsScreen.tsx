@@ -1,13 +1,20 @@
 import { useEffect, type CSSProperties } from "react";
 import { Gamepad2, Settings, Undo2, Volume2 } from "lucide-react";
 import type { HitRegistration } from "../gameplay/RhythmEngine";
+import {
+  scrollSpeedToCanonical,
+  scrollSpeedToDisplay,
+  type ScrollSpeedType,
+} from "../gameplay/ScrollSpeed";
 
 interface SettingsScreenProps {
   master_volume: number;
   scroll_speed: number;
+  scroll_speed_type: ScrollSpeedType;
   hit_registration: HitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
   onScrollSpeedChange: (scroll_speed: number) => void;
+  onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
   onHitRegistrationChange: (hit_registration: HitRegistration) => void;
   onExit: () => void;
 }
@@ -19,9 +26,11 @@ function sliderStyle(value: number, minimum: number, maximum: number): CSSProper
 export function SettingsScreen({
   master_volume,
   scroll_speed,
+  scroll_speed_type,
   hit_registration,
   onMasterVolumeChange,
   onScrollSpeedChange,
+  onScrollSpeedTypeChange,
   onHitRegistrationChange,
   onExit,
 }: SettingsScreenProps) {
@@ -47,6 +56,10 @@ export function SettingsScreen({
   }, [onExit]);
 
   const master_volume_percent = Math.round(master_volume * 100);
+  const displayed_scroll_speed = scrollSpeedToDisplay(scroll_speed_type, scroll_speed);
+  const scroll_speed_range = scroll_speed_type === "osu"
+    ? { minimum: 1, maximum: 40, step: 1 }
+    : { minimum: 0.05, maximum: 3, step: 0.05 };
 
   return (
     <div className="settings-modal-layer" role="presentation" onMouseDown={(event) => {
@@ -93,17 +106,29 @@ export function SettingsScreen({
           <Gamepad2 aria-hidden="true" />
           <h2>Gameplay</h2>
         </header>
+        <label className="settings-control" htmlFor="settings-scroll-speed-type">
+          <span>Scroll speed type</span>
+          <select id="settings-scroll-speed-type" value={scroll_speed_type}
+            onChange={(event) => onScrollSpeedTypeChange(event.target.value as ScrollSpeedType)}>
+            <option value="default">Rizu</option>
+            <option value="osu">osu!</option>
+          </select>
+          <small>Chooses the scale used by the scroll speed slider.</small>
+        </label>
         <label className="settings-control" htmlFor="settings-scroll-speed">
-          <span>Scroll speed <output htmlFor="settings-scroll-speed">{scroll_speed.toFixed(2)}x</output></span>
+          <span>Scroll speed <output htmlFor="settings-scroll-speed">
+            {scroll_speed_type === "osu" ? displayed_scroll_speed : `${displayed_scroll_speed.toFixed(2)}x`}
+          </output></span>
           <input
             id="settings-scroll-speed"
             type="range"
-            min="0.05"
-            max="3"
-            step="0.05"
-            value={scroll_speed}
-            style={sliderStyle(scroll_speed, 0.05, 3)}
-            onChange={(event) => onScrollSpeedChange(Number(event.target.value))}
+            min={scroll_speed_range.minimum}
+            max={scroll_speed_range.maximum}
+            step={scroll_speed_range.step}
+            value={displayed_scroll_speed}
+            style={sliderStyle(displayed_scroll_speed, scroll_speed_range.minimum, scroll_speed_range.maximum)}
+            onChange={(event) => onScrollSpeedChange(
+              scrollSpeedToCanonical(scroll_speed_type, Number(event.target.value)))}
           />
           <small>Multiplies the visual-time scroll distance.</small>
         </label>

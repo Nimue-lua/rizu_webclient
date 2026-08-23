@@ -10,6 +10,7 @@ import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import type { HitRegistration } from "../gameplay/RhythmEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
+import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
 import { ReplayBase } from "../replay/ReplayBase";
 import {
   loadNoteSkinSelections,
@@ -21,6 +22,7 @@ import {
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
+const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const MUSIC_RATE_KEY = "rizu.music-rate";
 const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
@@ -51,6 +53,8 @@ export function App() {
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     return Number.isFinite(stored_value) && stored_value >= 0.05 && stored_value <= 3 ? stored_value : 1;
   });
+  const [scroll_speed_type, setScrollSpeedType] = useState<ScrollSpeedType>(() =>
+    localStorage.getItem(SCROLL_SPEED_TYPE_KEY) === "osu" ? "osu" : "default");
   const [hit_registration, setHitRegistration] = useState<HitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
   const [replay_base, setReplayBase] = useState(() => {
@@ -71,6 +75,11 @@ export function App() {
   const changeScrollSpeed = (value: number) => {
     localStorage.setItem(SCROLL_SPEED_KEY, String(value));
     setScrollSpeed(value);
+  };
+
+  const changeScrollSpeedType = (value: ScrollSpeedType) => {
+    localStorage.setItem(SCROLL_SPEED_TYPE_KEY, value);
+    setScrollSpeedType(value);
   };
 
   const changeHitRegistration = (value: HitRegistration) => {
@@ -243,9 +252,11 @@ export function App() {
             <SettingsScreen
               master_volume={master_volume}
               scroll_speed={scroll_speed}
+              scroll_speed_type={scroll_speed_type}
               hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
               onScrollSpeedChange={changeScrollSpeed}
+              onScrollSpeedTypeChange={changeScrollSpeedType}
               onHitRegistrationChange={changeHitRegistration}
               onExit={() => setSettingsOpen(false)}
             />
