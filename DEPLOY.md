@@ -1,6 +1,6 @@
 # VPS Deployment
 
-This guide deploys the static web client, client catalog, and generated background/audio previews behind Nginx. Chart assets are managed separately and preserved across application deployments.
+This guide deploys the static web client, client catalog, generated previews, and required gameplay assets behind Nginx.
 
 The current production deployment uses:
 
@@ -16,7 +16,7 @@ For a normal production update, run:
 npm run deploy
 ```
 
-This runs the frontend checks, builds the application, refreshes the previews and client catalog, checks VPS disk space, uploads changed application files, preserves existing VPS chart assets, atomically activates the release, and verifies the public endpoints.
+This runs the frontend checks, builds the application, refreshes the previews and client catalog, checks VPS disk space, uploads changed files, activates the release, validates and reloads the checked-in Nginx configuration, and verifies the public endpoints.
 
 The defaults can be overridden without editing the script:
 
@@ -24,7 +24,9 @@ The defaults can be overridden without editing the script:
 DEPLOY_HOST=root@example.com DEPLOY_ROOT=/srv/rizu DEPLOY_URL=https://rizu.example.com npm run deploy
 ```
 
-Catalogs and previews are generated from local `public/charts`, but chart assets are not uploaded by this command. `CHARTS_DIR` can override the catalog source, `STAGE_DIR` can override the local staging path, and `MIN_FREE_BYTES` can change the default 512 MiB post-upload safety margin.
+Catalogs and previews are generated from local `public/charts`. Deployment uploads only `.osu` files and audio referenced by the generated catalog. Original background images, videos, storyboards, and unrelated files are excluded because song select uses generated WebP thumbnails. `CHARTS_DIR` can override the chart source, `STAGE_DIR` can override the local staging path, and `MIN_FREE_BYTES` can change the default 512 MiB post-upload safety margin.
+
+Unchanged gameplay assets are hard-linked from the active release with `rsync --link-dest`, so they are not uploaded again or duplicated on disk. Deployment removes full backgrounds left by older releases from the active chart tree. No rollback copy is retained because VPS storage is limited; any existing `/srv/rizu.old` is deleted at the start of deployment.
 
 ## Architecture
 
@@ -65,7 +67,7 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ```
 
-Install the checked-in Nginx configuration, updating its hostname first when necessary:
+The checked-in Nginx configuration expects an existing Let's Encrypt certificate for the deployment hostname. Install it after obtaining the certificate, updating its hostname and certificate paths first when necessary:
 
 ```bash
 scp deploy/rizu.nginx root@nimue.mom:/etc/nginx/sites-available/rizu
@@ -76,12 +78,14 @@ ssh root@nimue.mom '
 '
 ```
 
-After DNS resolves publicly:
+If the certificate does not exist yet, use a temporary HTTP virtual host and obtain it after DNS resolves publicly:
 
 ```bash
 ssh root@nimue.mom \
   'certbot --nginx -d rizu.nimue.mom --non-interactive --agree-tos --redirect'
 ```
+
+Normal `npm run deploy` runs upload `deploy/rizu.nginx`, validate it with `nginx -t`, and reload Nginx automatically. A failed validation restores the previous configuration.
 
 ## Manual Bundle
 
@@ -97,10 +101,19 @@ npm run cache:charts -- \
   --charts public/charts \
   --background-previews /tmp/rizu-deploy/public/chart-previews \
   --audio-previews /tmp/rizu-deploy/public/audio-previews \
-  --client-database /tmp/rizu-deploy/public/catalog.sqlite
+  --client-database /tmp/rizu-deploy/public/catalog.sqlite \
+  --asset-manifest /tmp/rizu-deploy/chart-assets.list
 ```
 
-Vite uses `copyPublicDir: false`; chart assets are uploaded and managed separately rather than copied into `dist`.
+The manifest is NUL-delimited so spaces and unusual characters in chart paths are safe. Upload its referenced files with:
+
+```bash
+mkdir -p /tmp/rizu-deploy/public/charts
+rsync -a --from0 --files-from=/tmp/rizu-deploy/chart-assets.list \
+  public/charts/ /tmp/rizu-deploy/public/charts/
+```
+
+Vite uses `copyPublicDir: false`; chart assets are staged separately rather than copied into `dist`.
 
 ## Verify Deployment
 
@@ -111,17 +124,3 @@ curl -fsSI 'https://rizu.nimue.mom/charts/<collection>/<song>/<audio-file>'
 ```
 
 If gameplay assets return 404, regenerate the catalog from the same chart tree that exists under `/srv/rizu/public/charts` and avoid renaming files after catalog generation.
-
-## Rollback
-
-The deployment script leaves the previous release in `/srv/rizu.old`. To restore it:
-
-```bash
-ssh root@nimue.mom '
-  set -eu
-  mv /srv/rizu /srv/rizu.failed
-  mv /srv/rizu.old /srv/rizu
-'
-```
-
-Keep `/srv/rizu.failed` until the failure has been inspected.

@@ -8,6 +8,7 @@ The cache command scans your chart folders and creates:
 
 - `public/catalog.sqlite`: the song list used by the web client.
 - `public/chart-previews/`: small background images used on song select.
+- `public/audio-previews/`: compact audio clips streamed on song select.
 
 Run the command again whenever you add, remove, rename, or move charts.
 
@@ -89,6 +90,10 @@ Catalog version: c9394375...
 
 `skipped` means some chart files were invalid, unsupported, or missing their audio. A small number does not stop valid charts from being cached.
 
+Audio previews use each `.osu` file's `PreviewTime`. They are 10-second mono Opus/WebM clips encoded at 32 kbps, normally around 40 KB each. Charts that use the same audio and preview time share one generated file.
+
+Existing previews are reused. Files no longer referenced by any chart are removed after a successful rebuild.
+
 ## 5. Start The Client
 
 ```bash
@@ -127,6 +132,7 @@ That directory must still contain collection folders, followed by song folders:
 npm run cache:charts -- \
   --charts "/path/to/charts" \
   --background-previews "/path/to/chart-previews" \
+  --audio-previews "/path/to/audio-previews" \
   --client-database "/path/to/catalog.sqlite"
 ```
 
@@ -164,6 +170,18 @@ Check that:
 - The named audio file exists in the song folder.
 - File names match exactly, including uppercase and lowercase letters.
 - The current user can read the chart and audio files.
+
+### Preview audio starts in the wrong place
+
+Open the chart's `.osu` file and check the `[General]` section:
+
+```ini
+[General]
+AudioFilename: audio.ogg
+PreviewTime: 45000
+```
+
+`PreviewTime` is measured in milliseconds. In this example the preview starts 45 seconds into the song. Run `npm run cache:charts` again after changing it.
 
 ### The song appears but gameplay returns 404
 

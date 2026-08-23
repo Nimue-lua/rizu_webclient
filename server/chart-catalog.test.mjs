@@ -5,7 +5,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { cacheCharts, parseOsuMetadata } from "./chart-catalog.mjs";
+import { cacheCharts, gameplayAssetManifest, parseOsuMetadata } from "./chart-catalog.mjs";
 
 test("parses public and private osu catalog metadata", () => {
   const metadata = parseOsuMetadata(`osu file format v14
@@ -60,6 +60,24 @@ test("caches all osu modes and only assigns keys to mania", () => {
 test("rejects asset paths outside a chart folder", () => {
   const metadata = parseOsuMetadata("AudioFilename: ../song.ogg\nMode: 3\nCircleSize:4", "folder", "chart.osu");
   assert.equal(metadata.audio_file, null);
+});
+
+test("gameplay asset manifest excludes full backgrounds", () => {
+  const manifest = gameplayAssetManifest([{
+    audio_path: "charts/Collection/Song/audio.ogg",
+    background_path: "charts/Collection/Song/background.png",
+    chart_path: "charts/Collection/Song/chart.osu",
+  }, {
+    audio_path: "charts/Collection/Song/audio.ogg",
+    background_path: "charts/Collection/Song/other.png",
+    chart_path: "charts/Collection/Song/hard.osu",
+  }]);
+
+  assert.deepEqual(manifest.split("\0").filter(Boolean), [
+    "Collection/Song/audio.ogg",
+    "Collection/Song/chart.osu",
+    "Collection/Song/hard.osu",
+  ]);
 });
 
 test("caches chart collections as locations", async () => {

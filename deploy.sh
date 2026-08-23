@@ -12,7 +12,7 @@ readonly CHARTS_DIR="${CHARTS_DIR:-$ROOT_DIR/public/charts}"
 readonly MIN_FREE_BYTES="${MIN_FREE_BYTES:-536870912}"
 readonly SSH_OPTIONS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=6)
 
-for command in npm node ffmpeg rsync ssh curl; do
+for command in npm node ffmpeg rsync scp ssh curl; do
   command -v "$command" >/dev/null || {
     printf 'Required command not found: %s\n' "$command" >&2
     exit 1
@@ -26,7 +26,7 @@ fi
 
 printf 'Checking VPS access and available storage...\n'
 ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" \
-  "set -eu; rm -rf -- '$DEPLOY_ROOT.new'; mkdir -p '$DEPLOY_ROOT.new/public'; if [ -d '$DEPLOY_ROOT/public/charts' ]; then cp -al -- '$DEPLOY_ROOT/public/charts' '$DEPLOY_ROOT.new/public/charts'; else mkdir -p '$DEPLOY_ROOT.new/public/charts'; fi; df -h '$DEPLOY_ROOT.new'"
+  "set -eu; rm -rf -- '$DEPLOY_ROOT.new' '$DEPLOY_ROOT.old'; mkdir -p '$DEPLOY_ROOT.new/public/charts'; df -h '$DEPLOY_ROOT.new'"
 
 printf 'Installing dependencies and running checks...\n'
 npm --prefix "$ROOT_DIR" ci
@@ -44,7 +44,8 @@ npm --prefix "$ROOT_DIR" run cache:charts -- \
   --charts "$CHARTS_DIR" \
   --background-previews "$STAGE_DIR/public/chart-previews" \
   --audio-previews "$ROOT_DIR/public/audio-previews" \
-  --client-database "$STAGE_DIR/public/catalog.sqlite"
+  --client-database "$STAGE_DIR/public/catalog.sqlite" \
+  --asset-manifest "$STAGE_DIR/chart-assets.list"
 cp -a -- "$ROOT_DIR/public/audio-previews/." "$STAGE_DIR/public/audio-previews/"
 
 bundle_bytes="$(du -sb "$STAGE_DIR" | cut -f1)"
@@ -59,9 +60,17 @@ fi
 printf 'Uploading deployment...\n'
 rsync -a --delete --partial --info=progress2 \
   --exclude='/public/charts/***' \
+  --exclude='/chart-assets.list' \
   --link-dest="$DEPLOY_ROOT" \
   -e "ssh ${SSH_OPTIONS[*]}" \
   "$STAGE_DIR/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/"
+
+printf 'Uploading referenced gameplay assets without full backgrounds...\n'
+rsync -a --delete --partial --info=progress2 \
+  --from0 --files-from="$STAGE_DIR/chart-assets.list" \
+  --link-dest="$DEPLOY_ROOT/public/charts" \
+  -e "ssh ${SSH_OPTIONS[*]}" \
+  "$CHARTS_DIR/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/public/charts/"
 
 printf 'Activating deployment...\n'
 ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$DEPLOY_ROOT" <<'REMOTE'
@@ -69,11 +78,24 @@ set -Eeuo pipefail
 deploy_root="$1"
 
 chown -R www-data:www-data "$deploy_root.new"
-rm -rf -- "$deploy_root.old"
-if [[ -e "$deploy_root" ]]; then
-  mv -- "$deploy_root" "$deploy_root.old"
-fi
+rm -rf -- "$deploy_root"
 mv -- "$deploy_root.new" "$deploy_root"
+REMOTE
+
+printf 'Updating Nginx configuration...\n'
+scp "${SSH_OPTIONS[@]}" "$ROOT_DIR/deploy/rizu.nginx" "$DEPLOY_HOST:/etc/nginx/sites-available/rizu.new"
+ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" 'bash -s' <<'REMOTE'
+set -Eeuo pipefail
+config=/etc/nginx/sites-available/rizu
+cp -- "$config" "$config.previous"
+mv -- "$config.new" "$config"
+if nginx -t; then
+  systemctl reload nginx
+  rm -f -- "$config.previous"
+else
+  mv -- "$config.previous" "$config"
+  exit 1
+fi
 REMOTE
 
 printf 'Verifying public endpoints...\n'

@@ -1,7 +1,12 @@
 server {
-	listen 80;
-	listen [::]:80;
+	listen 443 ssl;
+	listen [::]:443 ssl;
 	server_name rizu.nimue.mom;
+
+	ssl_certificate /etc/letsencrypt/live/rizu.nimue.mom/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/rizu.nimue.mom/privkey.pem;
+	include /etc/letsencrypt/options-ssl-nginx.conf;
+	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
 	root /srv/rizu/dist;
 
@@ -28,5 +33,11 @@ server {
 		alias /srv/rizu/public/audio-previews/;
 		add_header Cache-Control "public, max-age=31536000, immutable" always;
 	}
+}
 
+server {
+	listen 80;
+	listen [::]:80;
+	server_name rizu.nimue.mom;
+	return 301 https://$host$request_uri;
 }

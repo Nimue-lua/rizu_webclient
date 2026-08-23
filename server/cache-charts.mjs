@@ -1,6 +1,7 @@
 import path from "node:path";
+import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { cacheCharts } from "./chart-catalog.mjs";
+import { cacheCharts, gameplayAssetManifest } from "./chart-catalog.mjs";
 
 const server_directory = path.dirname(fileURLToPath(import.meta.url));
 const root_directory = path.dirname(server_directory);
@@ -24,6 +25,11 @@ const result = await cacheCharts({
   schema_directory: server_directory,
   ffmpeg_path: readValue("--ffmpeg", "ffmpeg"),
 });
+
+const asset_manifest = readOption("--asset-manifest", "");
+if (asset_manifest) {
+  await writeFile(asset_manifest, gameplayAssetManifest(result.charts));
+}
 
 console.log(`Cached ${result.locations.length} locations, ${result.songs.length} songs, and ${result.charts.length} charts (${result.skipped} skipped).`);
 console.log(`Catalog version: ${result.version}`);

@@ -260,6 +260,13 @@ export function parseOsuMetadata(source, folder, chart_file, location = "") {
   };
 }
 
+export function gameplayAssetManifest(charts) {
+  const assets = [...new Set(charts.flatMap((chart) => [chart.chart_path, chart.audio_path]))]
+    .map((asset_path) => asset_path.replace(/^charts\//, ""))
+    .sort();
+  return assets.length ? `${assets.join("\0")}\0` : "";
+}
+
 async function scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path) {
   const locations = [];
   const songs = new Map();
