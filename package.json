@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "cache:charts": "node server/cache-charts.mjs",
+    "deploy": "bash deploy.sh",
     "dev": "vite",
     "dev:preview": "go -C preview-server run . -catalog ../server/catalog.sqlite -public ../public",
     "build": "tsc -b && vite build",

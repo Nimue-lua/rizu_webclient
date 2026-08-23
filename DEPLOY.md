@@ -13,6 +13,24 @@ The current production deployment uses:
 
 Change those values in the commands and files when deploying elsewhere.
 
+## One-Command Update
+
+For a normal production update with the first 100 chart folders, run:
+
+```bash
+npm run deploy
+```
+
+This runs the frontend and Go checks, builds both applications, refreshes chart previews and both SQLite catalogs, checks VPS disk space, uploads only changed files, atomically activates the release, restarts the preview service, and verifies the private health check and public endpoints. If activation fails, it restores the previous release automatically.
+
+The defaults match the production values above. They can be overridden without editing the script:
+
+```bash
+DEPLOY_HOST=root@example.com DEPLOY_ROOT=/srv/rizu DEPLOY_URL=https://rizu.example.com npm run deploy
+```
+
+Chart folders are selected deterministically by sorted folder name. Set `CHART_LIMIT` to change the count, for example `CHART_LIMIT=150 npm run deploy`. `STAGE_DIR` can override the local staging path, and `MIN_FREE_BYTES` can change the default 512 MiB post-upload safety margin. The VPS must already have the service, Nginx, TLS, and firewall configured as described below.
+
 ## Architecture
 
 Nginx terminates HTTPS and serves the frontend, catalog, and chart files. It proxies `/api/` to the Go service. WebRTC media travels directly between the browser and the Go service over UDP port 50000.
