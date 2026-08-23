@@ -114,7 +114,7 @@ export class WebGlGameplayRenderer {
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
     const layout = this.getLayout(column_count);
-    const pixels_per_ms = scroll_speed * layout.pixel_ratio / 1000;
+    const pixels_per_ms = scroll_speed / 1000;
     return {
       future: (layout.receptor_y + layout.note_radius) / pixels_per_ms,
       past: (layout.height + layout.note_radius - layout.receptor_y) / pixels_per_ms,
@@ -123,9 +123,9 @@ export class WebGlGameplayRenderer {
 
   draw(column_count: number, notes: readonly VisualNote[], scroll_speed: number): void {
     const layout = this.getLayout(column_count);
-    const pixels_per_ms = scroll_speed * layout.pixel_ratio / 1000;
+    const pixels_per_ms = scroll_speed / 1000;
     const background = this.skin.background_color;
-    this.gl.viewport(0, 0, layout.width, layout.height);
+    this.gl.viewport(0, 0, layout.framebuffer_width, layout.framebuffer_height);
     this.gl.clearColor(...background);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.useProgram(this.program);
@@ -150,21 +150,23 @@ export class WebGlGameplayRenderer {
   }
 
   private getLayout(column_count: number) {
-    const pixel_ratio = window.devicePixelRatio;
-    const width = Math.round(this.canvas.clientWidth * pixel_ratio);
-    const height = Math.round(this.canvas.clientHeight * pixel_ratio);
-    if (this.canvas.width !== width || this.canvas.height !== height) {
-      this.canvas.width = width;
-      this.canvas.height = height;
+    const device_pixel_ratio = window.devicePixelRatio;
+    const framebuffer_width = Math.max(1, Math.round(this.canvas.clientWidth * device_pixel_ratio));
+    const framebuffer_height = Math.max(1, Math.round(this.canvas.clientHeight * device_pixel_ratio));
+    if (this.canvas.width !== framebuffer_width || this.canvas.height !== framebuffer_height) {
+      this.canvas.width = framebuffer_width;
+      this.canvas.height = framebuffer_height;
     }
-    const gap = this.skin.column_gap * pixel_ratio;
-    const note_radius = Math.min(this.skin.max_note_radius * pixel_ratio, (width - gap * (column_count - 1)) / (column_count * 2));
+    const height = this.skin.logical_height;
+    const width = height * framebuffer_width / framebuffer_height;
+    const gap = this.skin.column_gap;
+    const note_radius = Math.min(this.skin.max_note_radius, (width - gap * (column_count - 1)) / (column_count * 2));
     const column_width = note_radius * 2 + gap;
     const playfield_width = note_radius * 2 * column_count + gap * (column_count - 1);
     return {
-      width, height, pixel_ratio, note_radius, column_width,
+      width, height, framebuffer_width, framebuffer_height, note_radius, column_width,
       playfield_left: (width - playfield_width) / 2,
-      receptor_y: height - this.skin.receptor_bottom_margin * pixel_ratio,
+      receptor_y: height - this.skin.receptor_bottom_margin,
     };
   }
 
