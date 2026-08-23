@@ -65,13 +65,14 @@ export class RhythmEngine {
     for (let index = 0; index < this.linked_notes.length; index += 1) {
       const note = this.linked_notes[index]!;
       const state = this.note_states[index] as NoteState;
-      if (!isActive(state, note.end !== undefined)) continue;
+      if (note.end === undefined && !isActive(state, false)) continue;
+      if (state === NoteState.EndPassed) continue;
       const start_point = interpolateVisualPoint(this.chart.visual_points, note.start.absolute_time);
       const end_point = note.end && interpolateVisualPoint(this.chart.visual_points, note.end.absolute_time);
       let start_dt = (start_point.visual_time - current_point.visual_time) * current_point.global_speed * start_point.local_speed;
       const end_dt = end_point && (end_point.visual_time - current_point.visual_time) * current_point.global_speed * end_point.local_speed;
       if ((end_dt ?? start_dt) < -past_window || start_dt > future_window) continue;
-      if (state === NoteState.StartMissedPressed || state === NoteState.StartPassedPressed) start_dt = Math.max(0, start_dt);
+      if (state === NoteState.StartPassedPressed) start_dt = Math.max(0, start_dt);
       this.visible_notes.push({
         index, column: note.start.column, state, type: note.end === undefined ? "short" : "long", start_dt, end_dt,
       });

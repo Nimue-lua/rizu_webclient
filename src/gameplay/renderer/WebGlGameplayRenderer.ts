@@ -1,7 +1,17 @@
-import type { VisualNote } from "../RhythmEngine";
+import { NoteState, type VisualNote } from "../RhythmEngine";
 import { default_note_skin, type NoteSkin } from "./NoteSkin";
 
 const CIRCLE_SEGMENTS = 48;
+
+export function getLongNoteBrightness(state: NoteState): number {
+  if (state === NoteState.StartMissedPressed) return 0.75;
+  if (state === NoteState.StartMissed || state === NoteState.EndMissed || state === NoteState.EndMissedPassed) return 0.5;
+  return 1;
+}
+
+function dimColor(color: readonly [number, number, number, number], brightness: number): readonly [number, number, number, number] {
+  return [color[0] * brightness, color[1] * brightness, color[2] * brightness, color[3]];
+}
 
 const vertex_shader_source = `#version 300 es
 in vec2 position;
@@ -138,17 +148,18 @@ export class WebGlGameplayRenderer {
     for (let column = 0; column < column_count; column += 1) {
       this.drawRing(layout.playfield_left + layout.note_radius + layout.column_width * column, layout.receptor_y, layout.note_radius);
     }
-    this.setColor(this.skin.long_note_body_color);
     for (const note of notes) {
       if (note.end_dt === undefined) continue;
+      this.setColor(dimColor(this.skin.long_note_body_color, getLongNoteBrightness(note.state)));
       const x = layout.playfield_left + layout.note_radius + layout.column_width * (note.column - 1);
-      const head_y = layout.receptor_y - note.start_dt * pixels_per_visual_second;
-      const tail_y = layout.receptor_y - note.end_dt * pixels_per_visual_second;
+      const head_y = Math.min(layout.receptor_y, layout.receptor_y - note.start_dt * pixels_per_visual_second);
+      const tail_y = Math.min(layout.receptor_y, layout.receptor_y - note.end_dt * pixels_per_visual_second);
       this.drawRectangle(x, (head_y + tail_y) / 2, layout.note_radius * 0.72, Math.abs(tail_y - head_y) / 2);
-      this.drawCircle(x, tail_y, layout.note_radius * 0.82);
+      this.drawCircle(x, tail_y, layout.note_radius * 0.72);
     }
-    this.setColor(this.skin.note_color);
     for (const note of notes) {
+      const brightness = note.end_dt === undefined ? 1 : getLongNoteBrightness(note.state);
+      this.setColor(dimColor(this.skin.note_color, brightness));
       const x = layout.playfield_left + layout.note_radius + layout.column_width * (note.column - 1);
       const y = layout.receptor_y - note.start_dt * pixels_per_visual_second;
       this.drawCircle(x, y, layout.note_radius);

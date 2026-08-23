@@ -64,6 +64,8 @@ test("holds stay active after the head and score their release", () => {
   assert.equal(engine.visible_notes[0]?.start_dt, 0);
   engine.release(caught!, 2);
   assert.equal(engine.note_states[0], NoteState.EndPassed);
+  engine.update(2, 2, 2);
+  assert.equal(engine.visible_notes.length, 0);
   assert.equal(engine.score.judges.perfect, 2);
   assert.equal(engine.score.accuracy, 1);
 });
@@ -107,6 +109,21 @@ test("a large time jump misses both hold endpoints", () => {
   assert.equal(engine.note_states[0], NoteState.EndMissed);
   assert.deepEqual(engine.logic_events.map((event) => event.new_state), [NoteState.StartMissed, NoteState.EndMissed]);
   assert.equal(engine.score.judges.miss, 2);
+  engine.update(2.5, 2, 2);
+  assert.equal(engine.visible_notes.length, 1);
+  assert.equal(engine.visible_notes[0]?.state, NoteState.EndMissed);
+});
+
+test("recovered missed holds do not use successful hold clamping", () => {
+  const engine = new RhythmEngine(createChart([
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 2, weight: -1 },
+  ]));
+  engine.update(1.2, 2, 2);
+  engine.press(0, 1.3);
+  engine.update(1.5, 2, 2);
+  assert.equal(engine.note_states[0], NoteState.StartMissedPressed);
+  assertClose(engine.visible_notes[0]?.start_dt, -0.5);
 });
 
 test("earliest and nearest registration choose different overlapping notes", () => {
