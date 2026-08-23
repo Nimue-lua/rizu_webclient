@@ -1,16 +1,19 @@
 import { useEffect, useRef } from "react";
 import type { GameplayData } from "../library/GameplayLoader";
 import { GameplayRuntime } from "../gameplay/GameplayRuntime";
+import type { HitRegistration } from "../gameplay/RhythmEngine";
+import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
 
 interface GameplayScreenProps {
   assets: GameplayData;
   master_volume: number;
   scroll_speed: number;
   input_bindings: readonly (string | null)[];
-  onFinish: () => void;
+  hit_registration: HitRegistration;
+  onFinish: (score: ScoreResult) => void;
 }
 
-export function GameplayScreen({ assets, master_volume, scroll_speed, input_bindings, onFinish }: GameplayScreenProps) {
+export function GameplayScreen({ assets, master_volume, scroll_speed, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const fps_ref = useRef<HTMLSpanElement>(null);
 
@@ -22,11 +25,11 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, input_bind
       return;
     }
 
-    const runtime = new GameplayRuntime(canvas, fps, assets, master_volume, scroll_speed, input_bindings, onFinish);
+    const runtime = new GameplayRuntime(canvas, fps, assets, master_volume, scroll_speed, input_bindings, hit_registration, onFinish);
     runtime.start();
 
     return () => runtime.destroy();
-  }, [assets, input_bindings, master_volume, onFinish, scroll_speed]);
+  }, [assets, hit_registration, input_bindings, master_volume, onFinish, scroll_speed]);
 
   return (
     <main className="gameplay-screen">

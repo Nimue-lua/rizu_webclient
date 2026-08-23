@@ -7,10 +7,13 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
+import type { HitRegistration } from "../gameplay/RhythmEngine";
+import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
+const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const gameplay_loader = new HttpGameplayLoader();
 const chart_selector = new ChartSelector(new SqliteLibrary());
 
@@ -21,6 +24,7 @@ export function App() {
   const [assets, setAssets] = useState<GameplayData | null>(null);
   const [loading_chart_id, setLoadingChartId] = useState<string | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
+  const [score, setScore] = useState<ScoreResult | null>(null);
   const [master_volume, setMasterVolume] = useState(() => {
     const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
@@ -31,6 +35,8 @@ export function App() {
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     return Number.isFinite(stored_value) && stored_value >= 0.05 && stored_value <= 3 ? stored_value : 1;
   });
+  const [hit_registration, setHitRegistration] = useState<HitRegistration>(() =>
+    localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
 
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
@@ -42,10 +48,16 @@ export function App() {
     setScrollSpeed(value);
   };
 
+  const changeHitRegistration = (value: HitRegistration) => {
+    localStorage.setItem(HIT_REGISTRATION_KEY, value);
+    setHitRegistration(value);
+  };
+
   const beginLoading = (chart_id: string, chart_input_bindings: readonly (string | null)[]) => {
     setLoadingChartId(chart_id);
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
+    setScore(null);
     setScreen("loading");
   };
 
@@ -70,6 +82,7 @@ export function App() {
     }
 
     setAssets(null);
+    setScore(null);
     setAudioContext(null);
     setLoadingChartId(null);
     setScreen("song-select");
@@ -87,7 +100,11 @@ export function App() {
           master_volume={master_volume}
           scroll_speed={scroll_speed}
           input_bindings={input_bindings}
-          onFinish={() => setScreen("result")}
+          hit_registration={hit_registration}
+          onFinish={(gameplay_score) => {
+            setScore(gameplay_score);
+            setScreen("result");
+          }}
         />
       );
     case "loading":
@@ -105,7 +122,7 @@ export function App() {
         />
       );
     case "result":
-      return <ResultScreen onExit={leaveResults} />;
+      return <ResultScreen score={score} onExit={leaveResults} />;
     case "song-select":
       return (
         <>
@@ -121,8 +138,10 @@ export function App() {
             <SettingsScreen
               master_volume={master_volume}
               scroll_speed={scroll_speed}
+              hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
               onScrollSpeedChange={changeScrollSpeed}
+              onHitRegistrationChange={changeHitRegistration}
               onExit={() => setSettingsOpen(false)}
             />
           )}

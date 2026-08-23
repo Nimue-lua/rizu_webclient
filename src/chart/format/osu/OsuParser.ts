@@ -68,6 +68,7 @@ export function parseOsuChart(source: string): Chart {
   let section = "";
   let mode = 3;
   let column_count: number | null = null;
+  let overall_difficulty = 5;
   const timing_points: OsuTimingPoint[] = [];
   const hit_objects: ParsedHitObject[] = [];
 
@@ -86,6 +87,9 @@ export function parseOsuChart(source: string): Chart {
       if (section === "General" && property_match[1] === "Mode") mode = Number(property_match[2]);
       if (section === "Difficulty" && property_match[1] === "CircleSize") {
         column_count = Math.floor(Number(property_match[2]));
+      }
+      if (section === "Difficulty" && property_match[1] === "OverallDifficulty") {
+        overall_difficulty = Number(property_match[2]);
       }
       continue;
     }
@@ -124,6 +128,9 @@ export function parseOsuChart(source: string): Chart {
   if (column_count === null || !Number.isInteger(column_count) || column_count <= 0) {
     throw new Error("Chart has an invalid CircleSize");
   }
+  if (!Number.isFinite(overall_difficulty) || overall_difficulty < 0 || overall_difficulty > 10) {
+    throw new Error("Chart has an invalid OverallDifficulty");
+  }
   const key_count = column_count;
 
   const notes: Note[] = [];
@@ -144,6 +151,7 @@ export function parseOsuChart(source: string): Chart {
   const primary_tempo = computePrimaryTempo(timing_changes, last_time);
   return {
     column_count: key_count,
+    overall_difficulty,
     primary_tempo,
     notes,
     visual_points: createVisualPoints(timing_changes, primary_tempo),

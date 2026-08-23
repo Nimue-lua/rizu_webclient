@@ -1,11 +1,14 @@
 import { useEffect, type CSSProperties } from "react";
 import { Gamepad2, Settings, Undo2, Volume2 } from "lucide-react";
+import type { HitRegistration } from "../gameplay/RhythmEngine";
 
 interface SettingsScreenProps {
   master_volume: number;
   scroll_speed: number;
+  hit_registration: HitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
   onScrollSpeedChange: (scroll_speed: number) => void;
+  onHitRegistrationChange: (hit_registration: HitRegistration) => void;
   onExit: () => void;
 }
 
@@ -16,8 +19,10 @@ function sliderStyle(value: number, minimum: number, maximum: number): CSSProper
 export function SettingsScreen({
   master_volume,
   scroll_speed,
+  hit_registration,
   onMasterVolumeChange,
   onScrollSpeedChange,
+  onHitRegistrationChange,
   onExit,
 }: SettingsScreenProps) {
   useEffect(() => {
@@ -101,6 +106,15 @@ export function SettingsScreen({
             onChange={(event) => onScrollSpeedChange(Number(event.target.value))}
           />
           <small>Multiplies the visual-time scroll distance.</small>
+        </label>
+        <label className="settings-control" htmlFor="settings-hit-registration">
+          <span>Hit registration</span>
+          <select id="settings-hit-registration" value={hit_registration}
+            onChange={(event) => onHitRegistrationChange(event.target.value as HitRegistration)}>
+            <option value="earliest">Earliest note</option>
+            <option value="nearest">Nearest note</option>
+          </select>
+          <small>Chooses between the first active note and the note nearest to the music time.</small>
         </label>
         </section>
       </main>

@@ -14,6 +14,7 @@ export interface VisualPoint {
 
 export interface Chart {
   column_count: number;
+  overall_difficulty?: number;
   primary_tempo: number;
   notes: readonly Note[];
   visual_points: readonly VisualPoint[];

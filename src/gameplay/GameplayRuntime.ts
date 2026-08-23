@@ -1,5 +1,6 @@
 import type { GameplayData } from "../library/GameplayLoader";
-import { RhythmEngine } from "./RhythmEngine";
+import { RhythmEngine, type HitRegistration } from "./RhythmEngine";
+import type { ScoreResult } from "./scoring/ScoreEngine";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 
 export class GameplayRuntime {
@@ -7,10 +8,11 @@ export class GameplayRuntime {
   private readonly data: GameplayData;
   private readonly master_volume: number;
   private readonly scroll_speed: number;
-  private readonly finish: () => void;
+  private readonly finish: (score: ScoreResult) => void;
   private readonly rhythm_engine: RhythmEngine;
   private readonly renderer: WebGlGameplayRenderer;
   private readonly key_columns: ReadonlyMap<string, number>;
+  private readonly key_catches = new Map<string, number>();
   private animation_frame: number | null = null;
   private audio_source: AudioBufferSourceNode | null = null;
   private audio_start_time = 0;
@@ -18,19 +20,21 @@ export class GameplayRuntime {
   private fps_sample_start = 0;
 
   constructor(canvas: HTMLCanvasElement, fps_element: HTMLElement, data: GameplayData, master_volume: number,
-    scroll_speed: number, input_bindings: readonly (string | null)[], finish: () => void) {
+    scroll_speed: number, input_bindings: readonly (string | null)[], hit_registration: HitRegistration,
+    finish: (score: ScoreResult) => void) {
     this.fps_element = fps_element;
     this.data = data;
     this.master_volume = master_volume;
     this.scroll_speed = scroll_speed;
     this.finish = finish;
-    this.rhythm_engine = new RhythmEngine(data.chart);
+    this.rhythm_engine = new RhythmEngine(data.chart, hit_registration);
     this.renderer = new WebGlGameplayRenderer(canvas);
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
   }
 
   start(): void {
     window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
     const gain = this.data.audio_context.createGain();
     const source = this.data.audio_context.createBufferSource();
     gain.gain.value = this.master_volume;
@@ -46,6 +50,7 @@ export class GameplayRuntime {
 
   destroy(): void {
     window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
     if (this.animation_frame !== null) cancelAnimationFrame(this.animation_frame);
     if (this.audio_source) {
       this.audio_source.stop();
@@ -57,13 +62,22 @@ export class GameplayRuntime {
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.repeat) return;
     if (event.code === "Escape") {
-      this.finish();
+      this.finish(this.rhythm_engine.score);
       return;
     }
     const column = this.key_columns.get(event.code);
     if (column === undefined) return;
     event.preventDefault();
-    this.rhythm_engine.press(column, this.getSongTime(event.timeStamp));
+    const note_index = this.rhythm_engine.press(column, this.getSongTime(event.timeStamp));
+    if (note_index !== undefined) this.key_catches.set(event.code, note_index);
+  };
+
+  private readonly handleKeyUp = (event: KeyboardEvent) => {
+    const note_index = this.key_catches.get(event.code);
+    if (note_index === undefined) return;
+    event.preventDefault();
+    this.rhythm_engine.release(note_index, this.getSongTime(event.timeStamp));
+    this.key_catches.delete(event.code);
   };
 
   private getSongTime(performance_time: number): number {

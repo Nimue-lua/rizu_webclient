@@ -1,11 +1,14 @@
 import type { Chart, Note } from "../chart/Chart";
 import { interpolateVisualPoint } from "../chart/VisualTimeline";
+import { NoteState, type LogicEvent } from "./LogicEvent";
+import { ScoreEngine, type ScoreResult } from "./scoring/ScoreEngine";
+import { OsuManiaV2Score } from "./scoring/systems/OsuManiaV2Score";
+import { createOsuManiaV2TimingValues } from "./timing/OsuManiaV2Timings";
+import { classifyTiming, type TimingResult, type TimingWindow } from "./timing/TimingValues";
 
-export const enum NoteState {
-  Clear,
-  Missed,
-  Passed,
-}
+export { NoteState } from "./LogicEvent";
+
+export type HitRegistration = "earliest" | "nearest";
 
 export interface VisualNote {
   index: number;
@@ -21,26 +24,38 @@ interface LinkedNote {
   end?: Note;
 }
 
-const EARLY_HIT_WINDOW = 0.16;
-const LATE_HIT_WINDOW = 0.1;
 const TIME_EPSILON = 1e-9;
+
+function isActive(state: NoteState, hold: boolean): boolean {
+  if (!hold) return state === NoteState.Clear;
+  return state === NoteState.Clear || state === NoteState.StartMissed ||
+    state === NoteState.StartMissedPressed || state === NoteState.StartPassedPressed;
+}
 
 export class RhythmEngine {
   readonly note_states: Uint8Array;
   readonly visible_notes: VisualNote[] = [];
+  readonly logic_events: LogicEvent[] = [];
   private readonly chart: Chart;
   private readonly linked_notes: readonly LinkedNote[];
   private readonly lane_notes: number[][];
-  private readonly lane_cursors: Uint32Array;
-  private miss_cursor = 0;
+  private readonly timings;
+  private readonly score_engine: ScoreEngine;
+  private readonly hit_registration: HitRegistration;
 
-  constructor(chart: Chart) {
+  constructor(chart: Chart, hit_registration: HitRegistration = "earliest") {
     this.chart = chart;
     this.linked_notes = this.linkNotes(chart.notes);
     this.note_states = new Uint8Array(this.linked_notes.length);
     this.lane_notes = Array.from({ length: chart.column_count }, () => []);
-    this.lane_cursors = new Uint32Array(chart.column_count);
     this.linked_notes.forEach((note, index) => this.lane_notes[note.start.column - 1]?.push(index));
+    this.timings = createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
+    this.score_engine = new ScoreEngine([new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
+    this.hit_registration = hit_registration;
+  }
+
+  get score(): ScoreResult {
+    return this.score_engine.getResult();
   }
 
   update(song_time: number, past_window: number, future_window: number): void {
@@ -49,56 +64,139 @@ export class RhythmEngine {
     const current_point = interpolateVisualPoint(this.chart.visual_points, song_time);
     for (let index = 0; index < this.linked_notes.length; index += 1) {
       const note = this.linked_notes[index]!;
+      const state = this.note_states[index] as NoteState;
+      if (!isActive(state, note.end !== undefined)) continue;
       const start_point = interpolateVisualPoint(this.chart.visual_points, note.start.absolute_time);
       const end_point = note.end && interpolateVisualPoint(this.chart.visual_points, note.end.absolute_time);
-      const start_dt = (start_point.visual_time - current_point.visual_time) * current_point.global_speed * start_point.local_speed;
+      let start_dt = (start_point.visual_time - current_point.visual_time) * current_point.global_speed * start_point.local_speed;
       const end_dt = end_point && (end_point.visual_time - current_point.visual_time) * current_point.global_speed * end_point.local_speed;
-      if ((end_dt ?? start_dt) < -past_window) continue;
-      if (start_dt > future_window) continue;
-      const state = this.note_states[index] as NoteState;
-      if (state !== NoteState.Clear) continue;
+      if ((end_dt ?? start_dt) < -past_window || start_dt > future_window) continue;
+      if (state === NoteState.StartMissedPressed || state === NoteState.StartPassedPressed) start_dt = Math.max(0, start_dt);
       this.visible_notes.push({
-        index,
-        column: note.start.column,
-        state,
-        type: note.end === undefined ? "short" : "long",
-        start_dt,
-        end_dt,
+        index, column: note.start.column, state, type: note.end === undefined ? "short" : "long", start_dt, end_dt,
       });
     }
   }
 
-  press(column: number, song_time: number): void {
+  press(column: number, song_time: number): number | undefined {
     this.updateMisses(song_time);
+    const candidates = this.getCandidates(column, song_time);
+    if (candidates.length === 0) return undefined;
+    const maximum_priority = Math.max(...candidates.map((index) => this.note_states[index] === NoteState.Clear ? 0 : -1));
+    const prioritized = candidates.filter((index) => (this.note_states[index] === NoteState.Clear ? 0 : -1) === maximum_priority);
+    let note_index = prioritized[0]!;
+    if (this.hit_registration === "nearest") {
+      let nearest_time = Math.abs(song_time - this.linked_notes[note_index]!.start.absolute_time);
+      for (const index of prioritized.slice(1)) {
+        const distance = Math.abs(song_time - this.linked_notes[index]!.start.absolute_time);
+        if (distance < nearest_time - TIME_EPSILON) {
+          note_index = index;
+          nearest_time = distance;
+        }
+      }
+    }
+    this.input(note_index, true, song_time);
+    return note_index;
+  }
+
+  release(note_index: number, song_time: number): void {
+    this.updateMisses(song_time);
+    if (note_index >= 0 && note_index < this.linked_notes.length) this.input(note_index, false, song_time);
+  }
+
+  private getCandidates(column: number, song_time: number): number[] {
     const lane = this.lane_notes[column];
-    if (!lane) return;
-    let cursor = this.lane_cursors[column]!;
-    while (cursor < lane.length && this.note_states[lane[cursor]!] !== NoteState.Clear) cursor += 1;
-    this.lane_cursors[column] = cursor;
-    const note_index = lane[cursor];
-    if (note_index === undefined) return;
-    const offset = song_time - this.linked_notes[note_index]!.start.absolute_time;
-    if (offset >= -EARLY_HIT_WINDOW - TIME_EPSILON && offset <= LATE_HIT_WINDOW + TIME_EPSILON) {
-      this.note_states[note_index] = NoteState.Passed;
-      this.lane_cursors[column] = cursor + 1;
+    if (!lane) return [];
+    const candidates: number[] = [];
+    let included_future_note = false;
+    for (const index of lane) {
+      const note = this.linked_notes[index]!;
+      if (!isActive(this.note_states[index] as NoteState, note.end !== undefined)) continue;
+      const minimum = note.start.absolute_time + this.timings.long_note_start.miss[0];
+      if (minimum > song_time + TIME_EPSILON) {
+        if (!included_future_note) candidates.push(index);
+        included_future_note = true;
+        break;
+      }
+      candidates.push(index);
+    }
+    return candidates;
+  }
+
+  private input(index: number, pressed: boolean, song_time: number): void {
+    const note = this.linked_notes[index]!;
+    const state = this.note_states[index] as NoteState;
+    if (!note.end) {
+      if (!pressed || state !== NoteState.Clear) return;
+      const result = classifyTiming(this.timings.short_note, song_time - note.start.absolute_time);
+      if (result === "too early") this.switchState(index, NoteState.Clear, song_time, this.timings.short_note, note.start.absolute_time);
+      else if (result === "early" || result === "late") this.switchState(index, NoteState.Missed, song_time, this.timings.short_note, note.start.absolute_time);
+      else if (result === "exactly") this.switchState(index, NoteState.Passed, song_time, this.timings.short_note, note.start.absolute_time);
+      return;
+    }
+
+    const start_result = classifyTiming(this.timings.long_note_start, song_time - note.start.absolute_time);
+    const end_result = classifyTiming(this.timings.long_note_end, song_time - note.end.absolute_time);
+    if (pressed) {
+      if (state === NoteState.Clear) {
+        if (start_result === "too early") this.switchState(index, NoteState.Clear, song_time, this.timings.long_note_start, note.start.absolute_time);
+        else if (start_result === "early" || start_result === "late") this.switchState(index, NoteState.StartMissedPressed, song_time, this.timings.long_note_start, note.start.absolute_time);
+        else if (start_result === "exactly") this.switchState(index, NoteState.StartPassedPressed, song_time, this.timings.long_note_start, note.start.absolute_time);
+      } else if (state === NoteState.StartMissed) {
+        this.switchState(index, NoteState.StartMissedPressed, song_time, this.timings.long_note_end, note.end.absolute_time);
+      }
+    } else if (state === NoteState.StartPassedPressed) {
+      this.releaseHold(index, end_result, false, song_time);
+    } else if (state === NoteState.StartMissedPressed) {
+      this.releaseHold(index, end_result, true, song_time);
     }
   }
 
+  private releaseHold(index: number, result: TimingResult, missed_start: boolean, song_time: number): void {
+    const note = this.linked_notes[index]!;
+    if (result === "too early") this.switchState(index, NoteState.StartMissed, song_time, this.timings.long_note_end, note.end!.absolute_time);
+    else if (result === "early" || result === "late") this.switchState(index, NoteState.EndMissed, song_time, this.timings.long_note_end, note.end!.absolute_time);
+    else if (result === "exactly") this.switchState(index, missed_start ? NoteState.EndMissedPassed : NoteState.EndPassed,
+      song_time, this.timings.long_note_end, note.end!.absolute_time);
+  }
+
   private updateMisses(song_time: number): void {
-    while (this.miss_cursor < this.linked_notes.length &&
-      this.linked_notes[this.miss_cursor]!.start.absolute_time < song_time - LATE_HIT_WINDOW - TIME_EPSILON) {
-      if (this.note_states[this.miss_cursor] === NoteState.Clear) this.note_states[this.miss_cursor] = NoteState.Missed;
-      this.miss_cursor += 1;
+    for (let index = 0; index < this.linked_notes.length; index += 1) {
+      const note = this.linked_notes[index]!;
+      let state = this.note_states[index] as NoteState;
+      if (!isActive(state, note.end !== undefined)) continue;
+      const start_window = note.end ? this.timings.long_note_start : this.timings.short_note;
+      if (state === NoteState.Clear && song_time > note.start.absolute_time + start_window.miss[1] + TIME_EPSILON) {
+        this.switchState(index, note.end ? NoteState.StartMissed : NoteState.Missed, song_time, start_window, note.start.absolute_time);
+        state = this.note_states[index] as NoteState;
+      }
+      if (note.end && isActive(state, true) && song_time > note.end.absolute_time + this.timings.long_note_end.miss[1] + TIME_EPSILON) {
+        this.switchState(index, NoteState.EndMissed, song_time, this.timings.long_note_end, note.end.absolute_time);
+      }
     }
+  }
+
+  private switchState(index: number, new_state: NoteState, song_time: number, window: TimingWindow, target_time: number): void {
+    const old_state = this.note_states[index] as NoteState;
+    this.note_states[index] = new_state;
+    const event: LogicEvent = {
+      index,
+      type: this.linked_notes[index]!.end ? "hold" : "tap",
+      time: Math.min(song_time, target_time + window.miss[1]),
+      delta_time: Math.min(song_time - target_time, window.miss[1]),
+      old_state,
+      new_state,
+    };
+    this.logic_events.push(event);
+    this.score_engine.receive(event);
   }
 
   private linkNotes(notes: readonly Note[]): LinkedNote[] {
     const linked_notes: LinkedNote[] = [];
     const open_notes = Array.from({ length: this.chart.column_count }, () => [] as number[]);
     for (const note of notes) {
-      if (note.weight === 0) {
-        linked_notes.push({ start: note });
-      } else if (note.weight === 1) {
+      if (note.weight === 0) linked_notes.push({ start: note });
+      else if (note.weight === 1) {
         open_notes[note.column - 1]?.push(linked_notes.length);
         linked_notes.push({ start: note });
       } else {

@@ -15,7 +15,7 @@ export const default_note_skin: NoteSkin = {
   note_color: [1, 1, 1, 1],
   long_note_body_color: [0.65, 0.85, 1, 0.8],
   logical_height: 480,
-  receptor_bottom_margin: 80,
+  receptor_bottom_margin: 60,
   max_note_radius: 30,
   column_gap: 2,
 };

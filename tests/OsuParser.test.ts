@@ -20,6 +20,7 @@ CircleSize:4
 
   assert.deepEqual(chart, {
     column_count: 4,
+    overall_difficulty: 5,
     primary_tempo: 120,
     notes: [
       { column: 1, absolute_time: 0.1, weight: 1 },
@@ -31,6 +32,17 @@ CircleSize:4
       { absolute_time: 0.15, visual_time: 0.15, current_speed: 2, local_speed: 1, global_speed: 1 },
     ],
   });
+});
+
+test("parses overall difficulty for gameplay timings", () => {
+  const chart = parseOsuChart(`
+[Difficulty]
+CircleSize:4
+OverallDifficulty:7.5
+[HitObjects]
+64,192,100,1,0,0:0:0:0:
+`);
+  assert.equal(chart.overall_difficulty, 7.5);
 });
 
 test("resets scroll velocity at BPM timing points", () => {
