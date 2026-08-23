@@ -238,6 +238,31 @@ svg { width: 22px; height: 22px; }
 .modifier-checkbox strong { font-size: 19px; font-weight: 600; }
 .modifier-checkbox:hover > span { filter: brightness(1.12); }
 
+.filters-modal-layer {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  padding: 36px;
+  place-items: center;
+  background: #0d0c0f91;
+  backdrop-filter: blur(6px);
+}
+
+.filters-modal {
+  width: min(520px, calc(100% - 72px));
+  padding: 42px;
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: 0 28px 90px #000b;
+}
+
+.filters-modal h1 { margin: 0 0 30px; font-size: 32px; }
+.gamemode-filter-list { display: grid; gap: 14px; margin: 0; padding: 0; border: 0; }
+.gamemode-filter-list legend { margin-bottom: 14px; color: var(--muted); font-size: 14px; font-weight: 700; text-transform: uppercase; }
+.gamemode-filter-list label { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--elements); border-radius: 5px; cursor: pointer; text-transform: capitalize; }
+.gamemode-filter-list input { width: 20px; height: 20px; accent-color: var(--accent); }
+
 .gameplay-screen { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
 .gameplay-screen canvas { display: block; width: 100%; height: 100%; }
 .gameplay-accuracy { position: absolute; top: 1rem; right: 1rem; width: 7ch; color: #fff; font-family: "Rubik", sans-serif; font-feature-settings: "tnum" 1; font-size: 32px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; text-align: right; text-shadow: 0 1px 4px #000; }

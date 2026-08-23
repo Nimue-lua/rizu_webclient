@@ -31,6 +31,7 @@ import { PreviewClient } from "../preview/PreviewClient";
 import type { ChartSelector } from "../select/ChartSelector";
 import { InputBindingsModal } from "./InputBindingsModal";
 import { GameplayModifiersModal } from "./GameplayModifiersModal";
+import { GamemodeFiltersModal } from "./GamemodeFiltersModal";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
@@ -134,6 +135,7 @@ export function SongSelectScreen({
   const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
   const [input_bindings_open, setInputBindingsOpen] = useState(false);
   const [modifiers_open, setModifiersOpen] = useState(false);
+  const [filters_open, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -215,6 +217,12 @@ export function SongSelectScreen({
     if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
   };
 
+  const selectMode = (mode: number | null) => {
+    chart_selector.selectMode(mode);
+    setScrollTop(0);
+    if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
+  };
+
   const moveSelection = (offset: number) => {
     if (!filtered_songs.length) return;
     const selected_index = filtered_songs.findIndex((song) => song.id === selection.selected_song_id);
@@ -265,7 +273,7 @@ export function SongSelectScreen({
       <section className="library-toolbar" aria-label="Chart library controls">
          <label className="collection-button"><span><small>COLLECTION</small><strong>{selection.selected_location_id === null ? "All songs" : selection.locations.find((location) => location.id === selection.selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selection.selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{selection.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
         <button className="toolbar-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>Title</strong></span></button>
-        <button className="toolbar-button"><Icon name="filter" /><span><small>FILTERS</small><strong>None</strong></span></button>
+        <button className="toolbar-button" aria-haspopup="dialog" aria-expanded={filters_open} onClick={() => setFiltersOpen(true)}><Icon name="filter" /><span><small>FILTERS</small><strong>{selection.selected_mode === null ? "None" : mode_names[selection.selected_mode]}</strong></span></button>
         <label className="chart-search"><Icon name="search" /><input value={selection.query} onChange={(event) => { chart_selector.setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /><kbd>CTRL K</kbd></label>
       </section>
 
@@ -311,6 +319,7 @@ export function SongSelectScreen({
       </footer>
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
+      {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
     </main>
   );
 }

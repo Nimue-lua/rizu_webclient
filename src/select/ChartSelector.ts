@@ -8,6 +8,7 @@ export interface ChartSelectorSnapshot {
   selected_location_id: number | null;
   selected_song_id: string | null;
   selected_chart_id: string | null;
+  selected_mode: number | null;
   query: string;
   error: string | null;
 }
@@ -25,6 +26,7 @@ export class ChartSelector {
     selected_location_id: null,
     selected_song_id: null,
     selected_chart_id: null,
+    selected_mode: null,
     query: "",
     error: null,
   };
@@ -65,6 +67,11 @@ export class ChartSelector {
     this.ensureSelection(true);
   }
 
+  selectMode(mode: number | null): void {
+    this.update({ selected_mode: mode });
+    this.ensureSelection();
+  }
+
   selectSong(song_id: string): void {
     const song = this.getSongs().find((candidate) => candidate.id === song_id);
     if (!song) return;
@@ -88,10 +95,12 @@ export class ChartSelector {
   }
 
   getSongs(): ChartfileSetView[] {
-    const { selected_location_id, songs } = this.snapshot;
-    if (selected_location_id === null) return [...songs];
+    const { selected_location_id, selected_mode, songs } = this.snapshot;
     return songs.flatMap((song) => {
-      const charts = song.charts.filter((chart) => chart.location_id === selected_location_id);
+      const charts = song.charts.filter((chart) =>
+        (selected_location_id === null || chart.location_id === selected_location_id) &&
+        (selected_mode === null || chart.mode === selected_mode)
+      );
       return charts.length ? [{ ...song, charts }] : [];
     });
   }
