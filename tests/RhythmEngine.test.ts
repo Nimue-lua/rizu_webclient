@@ -164,3 +164,24 @@ test("positions hold endpoints independently across scroll changes", () => {
   assertClose(engine.visible_notes[0]?.start_dt, -0.09);
   assertClose(engine.visible_notes[0]?.end_dt, 1.41);
 });
+
+test("keeps hit windows constant in real time at changed music rates", () => {
+  const fast = new RhythmEngine(createChart([{ column: 1, absolute_time: 1, weight: 0 }]), "earliest", 2);
+  fast.press(0, 1 + 0.112 * 2);
+  assert.equal(fast.note_states[0], NoteState.Passed);
+  assertClose(fast.logic_events[0]?.delta_time, 0.112);
+
+  const slow = new RhythmEngine(createChart([{ column: 1, absolute_time: 1, weight: 0 }]), "earliest", 0.5);
+  slow.press(0, 1 + 0.112 * 0.5);
+  assert.equal(slow.note_states[0], NoteState.Passed);
+  assertClose(slow.logic_events[0]?.delta_time, 0.112);
+});
+
+test("scales miss deadlines into chart time at changed music rates", () => {
+  const engine = new RhythmEngine(createChart([{ column: 1, absolute_time: 1, weight: 0 }]), "earliest", 2);
+  engine.update(1.2, 1, 1);
+  assert.equal(engine.note_states[0], NoteState.Clear);
+  engine.update(1.224 + 1e-6, 1, 1);
+  assert.equal(engine.note_states[0], NoteState.Missed);
+  assertClose(engine.logic_events[0]?.delta_time, 0.112);
+});

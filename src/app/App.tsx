@@ -9,11 +9,13 @@ import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import type { HitRegistration } from "../gameplay/RhythmEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
+import { ReplayBase } from "../replay/ReplayBase";
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
+const MUSIC_RATE_KEY = "rizu.music-rate";
 const gameplay_loader = new HttpGameplayLoader();
 const chart_selector = new ChartSelector(new SqliteLibrary());
 
@@ -37,6 +39,13 @@ export function App() {
   });
   const [hit_registration, setHitRegistration] = useState<HitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
+  const [replay_base, setReplayBase] = useState(() => {
+    const replay_base = new ReplayBase();
+    const stored_setting = localStorage.getItem(MUSIC_RATE_KEY);
+    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
+    if (Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 4) replay_base.rate = stored_value;
+    return replay_base;
+  });
 
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
@@ -51,6 +60,17 @@ export function App() {
   const changeHitRegistration = (value: HitRegistration) => {
     localStorage.setItem(HIT_REGISTRATION_KEY, value);
     setHitRegistration(value);
+  };
+
+  const changeMusicRate = (value: number) => {
+    const rate = Math.round(value * 1000) / 1000;
+    localStorage.setItem(MUSIC_RATE_KEY, String(rate));
+    setReplayBase((current) => {
+      const next = new ReplayBase();
+      next.importReplayBase(current.exportReplayBase());
+      next.rate = rate;
+      return next;
+    });
   };
 
   const beginLoading = (chart_id: string, chart_input_bindings: readonly (string | null)[]) => {
@@ -99,6 +119,7 @@ export function App() {
           assets={assets}
           master_volume={master_volume}
           scroll_speed={scroll_speed}
+          replay_base={replay_base}
           input_bindings={input_bindings}
           hit_registration={hit_registration}
           onFinish={(gameplay_score) => {
@@ -129,10 +150,10 @@ export function App() {
           <SongSelectScreen
             chart_selector={chart_selector}
             master_volume={master_volume}
-            scroll_speed={scroll_speed}
+            music_rate={replay_base.rate}
             onPlay={beginLoading}
             onSettings={() => setSettingsOpen(true)}
-            onScrollSpeedChange={changeScrollSpeed}
+            onMusicRateChange={changeMusicRate}
           />
           {settings_open && (
             <SettingsScreen

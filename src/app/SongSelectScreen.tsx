@@ -79,8 +79,8 @@ interface SongSelectScreenProps {
   onPlay: (chart_id: string, input_bindings: readonly (string | null)[]) => void;
   onSettings: () => void;
   master_volume: number;
-  scroll_speed: number;
-  onScrollSpeedChange: (scroll_speed: number) => void;
+  music_rate: number;
+  onMusicRateChange: (music_rate: number) => void;
 }
 
 const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
@@ -112,8 +112,8 @@ export function SongSelectScreen({
   onPlay,
   onSettings,
   master_volume,
-  scroll_speed,
-  onScrollSpeedChange,
+  music_rate,
+  onMusicRateChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const audio_ref = useRef<HTMLAudioElement>(null);
@@ -224,7 +224,7 @@ export function SongSelectScreen({
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(now).replace(",", "");
   const session_duration = formatSessionDuration(Math.floor((now.getTime() - SESSION_STARTED_AT) / 1_000));
-  const speed_progress = (scroll_speed - 0.05) / 2.95;
+  const speed_progress = (music_rate - 0.25) / 3.75;
   const speed_style = {
     "--rate-angle": `${speed_progress * 270}deg`,
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
@@ -292,7 +292,7 @@ export function SongSelectScreen({
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
         <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="0.05" max="3" step="0.05" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>VISUAL</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
+        <div className="play-controls"><div className="play-modifiers"><strong>MUSIC SPEED</strong><label className="rate-control"><output htmlFor="music-rate">{music_rate.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>RATE</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
     </main>

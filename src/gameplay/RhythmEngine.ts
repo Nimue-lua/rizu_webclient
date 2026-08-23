@@ -43,8 +43,9 @@ export class RhythmEngine {
   private readonly timings;
   private readonly score_engine: ScoreEngine;
   private readonly hit_registration: HitRegistration;
+  private readonly music_rate: number;
 
-  constructor(chart: Chart, hit_registration: HitRegistration = "earliest") {
+  constructor(chart: Chart, hit_registration: HitRegistration = "earliest", music_rate = 1) {
     this.chart = chart;
     this.linked_notes = this.linkNotes(chart.notes);
     this.note_states = new Uint8Array(this.linked_notes.length);
@@ -53,6 +54,7 @@ export class RhythmEngine {
     this.timings = createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
     this.score_engine = new ScoreEngine([new BaseComboScore(), new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
     this.hit_registration = hit_registration;
+    this.music_rate = music_rate;
   }
 
   get score(): ScoreResult {
@@ -114,7 +116,7 @@ export class RhythmEngine {
     for (const index of lane) {
       const note = this.linked_notes[index]!;
       if (!isActive(this.note_states[index] as NoteState, note.end !== undefined)) continue;
-      const minimum = note.start.absolute_time + this.timings.long_note_start.miss[0];
+      const minimum = note.start.absolute_time + this.timings.long_note_start.miss[0] * this.music_rate;
       if (minimum > song_time + TIME_EPSILON) {
         if (!included_future_note) candidates.push(index);
         included_future_note = true;
@@ -130,15 +132,15 @@ export class RhythmEngine {
     const state = this.note_states[index] as NoteState;
     if (!note.end) {
       if (!pressed || state !== NoteState.Clear) return;
-      const result = classifyTiming(this.timings.short_note, song_time - note.start.absolute_time);
+      const result = classifyTiming(this.timings.short_note, (song_time - note.start.absolute_time) / this.music_rate);
       if (result === "too early") this.switchState(index, NoteState.Clear, song_time, this.timings.short_note, note.start.absolute_time);
       else if (result === "early" || result === "late") this.switchState(index, NoteState.Missed, song_time, this.timings.short_note, note.start.absolute_time);
       else if (result === "exactly") this.switchState(index, NoteState.Passed, song_time, this.timings.short_note, note.start.absolute_time);
       return;
     }
 
-    const start_result = classifyTiming(this.timings.long_note_start, song_time - note.start.absolute_time);
-    const end_result = classifyTiming(this.timings.long_note_end, song_time - note.end.absolute_time);
+    const start_result = classifyTiming(this.timings.long_note_start, (song_time - note.start.absolute_time) / this.music_rate);
+    const end_result = classifyTiming(this.timings.long_note_end, (song_time - note.end.absolute_time) / this.music_rate);
     if (pressed) {
       if (state === NoteState.Clear) {
         if (start_result === "too early") this.switchState(index, NoteState.Clear, song_time, this.timings.long_note_start, note.start.absolute_time);
@@ -168,11 +170,11 @@ export class RhythmEngine {
       let state = this.note_states[index] as NoteState;
       if (!isActive(state, note.end !== undefined)) continue;
       const start_window = note.end ? this.timings.long_note_start : this.timings.short_note;
-      if (state === NoteState.Clear && song_time > note.start.absolute_time + start_window.miss[1] + TIME_EPSILON) {
+      if (state === NoteState.Clear && song_time > note.start.absolute_time + start_window.miss[1] * this.music_rate + TIME_EPSILON) {
         this.switchState(index, note.end ? NoteState.StartMissed : NoteState.Missed, song_time, start_window, note.start.absolute_time);
         state = this.note_states[index] as NoteState;
       }
-      if (note.end && isActive(state, true) && song_time > note.end.absolute_time + this.timings.long_note_end.miss[1] + TIME_EPSILON) {
+      if (note.end && isActive(state, true) && song_time > note.end.absolute_time + this.timings.long_note_end.miss[1] * this.music_rate + TIME_EPSILON) {
         this.switchState(index, NoteState.EndMissed, song_time, this.timings.long_note_end, note.end.absolute_time);
       }
     }
@@ -184,8 +186,8 @@ export class RhythmEngine {
     const event: LogicEvent = {
       index,
       type: this.linked_notes[index]!.end ? "hold" : "tap",
-      time: Math.min(song_time, target_time + window.miss[1]),
-      delta_time: Math.min(song_time - target_time, window.miss[1]),
+      time: Math.min(song_time, target_time + window.miss[1] * this.music_rate),
+      delta_time: Math.min((song_time - target_time) / this.music_rate, window.miss[1]),
       old_state,
       new_state,
     };

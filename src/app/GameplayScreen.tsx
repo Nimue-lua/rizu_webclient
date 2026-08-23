@@ -3,17 +3,19 @@ import type { GameplayData } from "../library/GameplayLoader";
 import { GameplayRuntime } from "../gameplay/GameplayRuntime";
 import type { HitRegistration } from "../gameplay/RhythmEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
+import type { ReplayBase } from "../replay/ReplayBase";
 
 interface GameplayScreenProps {
   assets: GameplayData;
   master_volume: number;
   scroll_speed: number;
+  replay_base: ReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: HitRegistration;
   onFinish: (score: ScoreResult) => void;
 }
 
-export function GameplayScreen({ assets, master_volume, scroll_speed, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
+export function GameplayScreen({ assets, master_volume, scroll_speed, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const accuracy_ref = useRef<HTMLSpanElement>(null);
   const judge_ref = useRef<HTMLSpanElement>(null);
@@ -29,12 +31,12 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, input_bind
       return;
     }
 
-    const runtime = new GameplayRuntime(canvas, accuracy, judge, combo, assets, master_volume, scroll_speed,
+    const runtime = new GameplayRuntime(canvas, accuracy, judge, combo, assets, master_volume, scroll_speed, replay_base,
       input_bindings, hit_registration, onFinish);
     runtime.start();
 
     return () => runtime.destroy();
-  }, [assets, hit_registration, input_bindings, master_volume, onFinish, scroll_speed]);
+  }, [assets, hit_registration, input_bindings, master_volume, onFinish, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">

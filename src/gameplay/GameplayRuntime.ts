@@ -3,6 +3,7 @@ import { RhythmEngine, type HitRegistration } from "./RhythmEngine";
 import type { ScoreResult } from "./scoring/ScoreEngine";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 import { SpringValue } from "./SpringValue";
+import type { ReplayBase } from "../replay/ReplayBase";
 
 export class GameplayRuntime {
   private readonly accuracy_element: HTMLElement;
@@ -11,6 +12,7 @@ export class GameplayRuntime {
   private readonly data: GameplayData;
   private readonly master_volume: number;
   private readonly scroll_speed: number;
+  private readonly music_rate: number;
   private readonly finish: (score: ScoreResult) => void;
   private readonly rhythm_engine: RhythmEngine;
   private readonly renderer: WebGlGameplayRenderer;
@@ -27,7 +29,7 @@ export class GameplayRuntime {
 
   constructor(canvas: HTMLCanvasElement, accuracy_element: HTMLElement, judge_element: HTMLElement,
     combo_element: HTMLElement, data: GameplayData, master_volume: number,
-    scroll_speed: number, input_bindings: readonly (string | null)[], hit_registration: HitRegistration,
+    scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: HitRegistration,
     finish: (score: ScoreResult) => void) {
     this.accuracy_element = accuracy_element;
     this.judge_element = judge_element;
@@ -35,8 +37,9 @@ export class GameplayRuntime {
     this.data = data;
     this.master_volume = master_volume;
     this.scroll_speed = scroll_speed;
+    this.music_rate = replay_base.rate;
     this.finish = finish;
-    this.rhythm_engine = new RhythmEngine(data.chart, hit_registration);
+    this.rhythm_engine = new RhythmEngine(data.chart, hit_registration, this.music_rate);
     this.renderer = new WebGlGameplayRenderer(canvas);
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
   }
@@ -48,6 +51,7 @@ export class GameplayRuntime {
     const source = this.data.audio_context.createBufferSource();
     gain.gain.value = this.master_volume;
     source.buffer = this.data.audio_buffer;
+    source.playbackRate.value = this.music_rate;
     source.connect(gain).connect(this.data.audio_context.destination);
     this.audio_start_time = this.data.audio_context.currentTime + 0.1;
     source.start(this.audio_start_time);
@@ -95,15 +99,16 @@ export class GameplayRuntime {
     const audio_time = context_time !== undefined && output_performance_time !== undefined && output_performance_time > 0
       ? context_time + (performance_time - output_performance_time) / 1000
       : this.data.audio_context.currentTime + (performance_time - performance.now()) / 1000;
-    return audio_time - this.audio_start_time;
+    return (audio_time - this.audio_start_time) * this.music_rate;
   }
 
   private readonly render = (timestamp: number) => {
     const delta_time = this.previous_frame_time === null ? 0 : (timestamp - this.previous_frame_time) / 1000;
     this.previous_frame_time = timestamp;
-    const range = this.renderer.getTimeRange(this.data.chart.column_count, this.scroll_speed);
+    const visual_scroll_speed = this.scroll_speed / this.music_rate;
+    const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
     this.rhythm_engine.update(this.getSongTime(timestamp), range.past, range.future);
-    this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, this.scroll_speed);
+    this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, visual_scroll_speed);
     const score = this.rhythm_engine.score;
     const target_accuracy = (score.accuracy ?? 0) * 100;
     this.accuracy_element.textContent = `${this.displayed_accuracy.update(target_accuracy, delta_time).toFixed(2)}%`;
