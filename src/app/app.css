@@ -127,7 +127,7 @@ svg { width: 22px; height: 22px; }
 .song-hero-chart strong { font-size: clamp(18px, 1.35vw, 26px); }
 .song-hero-chart span { color: #d8d4df; font-size: 14px; }
 .song-hero-metadata { position: absolute; right: 18px; bottom: 14px; left: 18px; text-shadow: 2px 2px var(--background); }
-.song-hero-metadata h1 { margin: 0; font-size: clamp(30px, 2.5vw, 48px); line-height: 1.08; }
+.song-hero-metadata h1 { margin: 0; font-size: clamp(30px, 2.5vw, 48px); line-height: 1.2; }
 .song-hero-metadata p { margin: 7px 0 0; color: var(--accent); font-size: clamp(17px, 1.25vw, 24px); font-weight: 700; }
 
 @keyframes song-hero-row-in {
@@ -310,7 +310,7 @@ svg { width: 22px; height: 22px; }
 .result-song-metadata { position: absolute; z-index: 1; right: 38px; bottom: 34px; left: 38px; display: flex; align-items: end; justify-content: space-between; gap: 48px; min-width: 0; font-family: "Zen Maru Gothic", sans-serif; text-shadow: 2px 2px var(--background); }
 .result-song-metadata > div { min-width: 0; }
 .result-song-metadata h2, .result-song-metadata p, .result-song-metadata strong { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; }
-.result-song-metadata h2 { font-size: clamp(30px, 2.5vw, 48px); line-height: 1.08; }
+.result-song-metadata h2 { font-size: clamp(30px, 2.5vw, 48px); line-height: 1.2; }
 .result-song-metadata p { margin-top: 7px; color: var(--accent); font-size: clamp(17px, 1.25vw, 24px); font-weight: 700; }
 .result-song-metadata strong { flex: 0 1 auto; max-width: 45%; font-size: clamp(18px, 1.35vw, 26px); }
 
