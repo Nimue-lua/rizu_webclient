@@ -73,7 +73,7 @@ export class GameplayRuntime {
     const audio_time = context_time !== undefined && output_performance_time !== undefined && output_performance_time > 0
       ? context_time + (performance_time - output_performance_time) / 1000
       : this.data.audio_context.currentTime + (performance_time - performance.now()) / 1000;
-    return (audio_time - this.audio_start_time) * 1000;
+    return audio_time - this.audio_start_time;
   }
 
   private readonly render = (timestamp: number) => {

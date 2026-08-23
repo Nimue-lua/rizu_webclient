@@ -1,5 +1,5 @@
 import type { Chart } from "../chart/Chart";
-import { parseOsuChart } from "../chart/format/osu/TinyParser";
+import { parseOsuChart } from "../chart/format/osu/OsuParser";
 
 export interface GameplayLocation {
   audio_url: string;

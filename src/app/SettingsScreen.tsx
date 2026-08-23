@@ -89,18 +89,18 @@ export function SettingsScreen({
           <h2>Gameplay</h2>
         </header>
         <label className="settings-control" htmlFor="settings-scroll-speed">
-          <span>Scroll speed <output htmlFor="settings-scroll-speed">{scroll_speed}px</output></span>
+          <span>Scroll speed <output htmlFor="settings-scroll-speed">{scroll_speed.toFixed(2)}x</output></span>
           <input
             id="settings-scroll-speed"
             type="range"
-            min="100"
-            max="4000"
-            step="100"
+            min="0.05"
+            max="3"
+            step="0.05"
             value={scroll_speed}
-            style={sliderStyle(scroll_speed, 100, 4000)}
+            style={sliderStyle(scroll_speed, 0.05, 3)}
             onChange={(event) => onScrollSpeedChange(Number(event.target.value))}
           />
-          <small>Distance notes travel each second.</small>
+          <small>Multiplies the visual-time scroll distance.</small>
         </label>
         </section>
       </main>

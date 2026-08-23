@@ -224,7 +224,7 @@ export function SongSelectScreen({
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(now).replace(",", "");
   const session_duration = formatSessionDuration(Math.floor((now.getTime() - SESSION_STARTED_AT) / 1_000));
-  const speed_progress = (scroll_speed - 100) / 3900;
+  const speed_progress = (scroll_speed - 0.05) / 2.95;
   const speed_style = {
     "--rate-angle": `${speed_progress * 270}deg`,
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
@@ -292,7 +292,7 @@ export function SongSelectScreen({
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
         <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed}</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="100" max="4000" step="100" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>CONST</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
+        <div className="play-controls"><div className="play-modifiers"><strong>SCROLL SPEED</strong><label className="rate-control"><output htmlFor="scroll-speed">{scroll_speed.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="scroll-speed" type="range" min="0.05" max="3" step="0.05" value={scroll_speed} aria-label="Scroll speed" onChange={(event) => onScrollSpeedChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>VISUAL</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
     </main>

@@ -29,7 +29,7 @@ export function App() {
   const [scroll_speed, setScrollSpeed] = useState(() => {
     const stored_setting = localStorage.getItem(SCROLL_SPEED_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    return Number.isFinite(stored_value) && stored_value >= 100 && stored_value <= 4000 ? stored_value : 1200;
+    return Number.isFinite(stored_value) && stored_value >= 0.05 && stored_value <= 3 ? stored_value : 1;
   });
 
   const changeMasterVolume = (value: number) => {

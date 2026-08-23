@@ -7,9 +7,9 @@ const vertex_shader_source = `#version 300 es
 in vec2 position;
 uniform vec2 center;
 uniform vec2 viewport_size;
-uniform float radius;
+uniform vec2 size;
 void main() {
-  vec2 pixel_position = center + position * radius;
+  vec2 pixel_position = center + position * size;
   vec2 clip_position = vec2(pixel_position.x / viewport_size.x * 2.0 - 1.0, 1.0 - pixel_position.y / viewport_size.y * 2.0);
   gl_Position = vec4(clip_position, 0.0, 1.0);
 }`;
@@ -51,7 +51,7 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
   return program;
 }
 
-function createGeometry(): { circle_count: number; ring_offset: number; ring_count: number; vertices: Float32Array } {
+function createGeometry(): { circle_count: number; ring_offset: number; ring_count: number; rectangle_offset: number; vertices: Float32Array } {
   const vertices: number[] = [0, 0];
   for (let index = 0; index <= CIRCLE_SEGMENTS; index += 1) {
     const angle = (index / CIRCLE_SEGMENTS) * Math.PI * 2;
@@ -64,7 +64,10 @@ function createGeometry(): { circle_count: number; ring_offset: number; ring_cou
     const y = Math.sin(angle);
     vertices.push(x, y, x * 0.82, y * 0.82);
   }
-  return { circle_count, ring_offset: circle_count, ring_count: (CIRCLE_SEGMENTS + 1) * 2, vertices: new Float32Array(vertices) };
+  const ring_count = (CIRCLE_SEGMENTS + 1) * 2;
+  const rectangle_offset = circle_count + ring_count;
+  vertices.push(-1, -1, 1, -1, -1, 1, 1, 1);
+  return { circle_count, ring_offset: circle_count, ring_count, rectangle_offset, vertices: new Float32Array(vertices) };
 }
 
 export class WebGlGameplayRenderer {
@@ -76,7 +79,7 @@ export class WebGlGameplayRenderer {
   private readonly vertex_buffer: WebGLBuffer;
   private readonly center: WebGLUniformLocation;
   private readonly viewport_size: WebGLUniformLocation;
-  private readonly radius: WebGLUniformLocation;
+  private readonly size: WebGLUniformLocation;
   private readonly shape_color: WebGLUniformLocation;
   private readonly geometry = createGeometry();
 
@@ -88,9 +91,9 @@ export class WebGlGameplayRenderer {
     const vertex_buffer = gl.createBuffer();
     const center = gl.getUniformLocation(program, "center");
     const viewport_size = gl.getUniformLocation(program, "viewport_size");
-    const radius = gl.getUniformLocation(program, "radius");
+    const size = gl.getUniformLocation(program, "size");
     const shape_color = gl.getUniformLocation(program, "shape_color");
-    if (!vertex_array || !vertex_buffer || !center || !viewport_size || !radius || !shape_color) {
+    if (!vertex_array || !vertex_buffer || !center || !viewport_size || !size || !shape_color) {
       gl.deleteProgram(program);
       throw new Error("Failed to create gameplay rendering resources");
     }
@@ -102,7 +105,7 @@ export class WebGlGameplayRenderer {
     this.vertex_buffer = vertex_buffer;
     this.center = center;
     this.viewport_size = viewport_size;
-    this.radius = radius;
+    this.size = size;
     this.shape_color = shape_color;
     gl.bindVertexArray(vertex_array);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
@@ -114,16 +117,16 @@ export class WebGlGameplayRenderer {
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
     const layout = this.getLayout(column_count);
-    const pixels_per_ms = scroll_speed / 1000;
+    const visual_seconds_per_pixel = 1 / (this.skin.logical_height * scroll_speed);
     return {
-      future: (layout.receptor_y + layout.note_radius) / pixels_per_ms,
-      past: (layout.height + layout.note_radius - layout.receptor_y) / pixels_per_ms,
+      future: (layout.receptor_y + layout.note_radius) * visual_seconds_per_pixel,
+      past: (layout.height + layout.note_radius - layout.receptor_y) * visual_seconds_per_pixel,
     };
   }
 
   draw(column_count: number, notes: readonly VisualNote[], scroll_speed: number): void {
     const layout = this.getLayout(column_count);
-    const pixels_per_ms = scroll_speed / 1000;
+    const pixels_per_visual_second = this.skin.logical_height * scroll_speed;
     const background = this.skin.background_color;
     this.gl.viewport(0, 0, layout.framebuffer_width, layout.framebuffer_height);
     this.gl.clearColor(...background);
@@ -135,10 +138,19 @@ export class WebGlGameplayRenderer {
     for (let column = 0; column < column_count; column += 1) {
       this.drawRing(layout.playfield_left + layout.note_radius + layout.column_width * column, layout.receptor_y, layout.note_radius);
     }
+    this.setColor(this.skin.long_note_body_color);
+    for (const note of notes) {
+      if (note.end_dt === undefined) continue;
+      const x = layout.playfield_left + layout.note_radius + layout.column_width * (note.column - 1);
+      const head_y = layout.receptor_y - note.start_dt * pixels_per_visual_second;
+      const tail_y = layout.receptor_y - note.end_dt * pixels_per_visual_second;
+      this.drawRectangle(x, (head_y + tail_y) / 2, layout.note_radius * 0.72, Math.abs(tail_y - head_y) / 2);
+      this.drawCircle(x, tail_y, layout.note_radius * 0.82);
+    }
     this.setColor(this.skin.note_color);
     for (const note of notes) {
       const x = layout.playfield_left + layout.note_radius + layout.column_width * (note.column - 1);
-      const y = layout.receptor_y - note.start_dt * pixels_per_ms;
+      const y = layout.receptor_y - note.start_dt * pixels_per_visual_second;
       this.drawCircle(x, y, layout.note_radius);
     }
   }
@@ -176,13 +188,19 @@ export class WebGlGameplayRenderer {
 
   private drawCircle(x: number, y: number, radius: number): void {
     this.gl.uniform2f(this.center, x, y);
-    this.gl.uniform1f(this.radius, radius);
+    this.gl.uniform2f(this.size, radius, radius);
     this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, this.geometry.circle_count);
   }
 
   private drawRing(x: number, y: number, radius: number): void {
     this.gl.uniform2f(this.center, x, y);
-    this.gl.uniform1f(this.radius, radius);
+    this.gl.uniform2f(this.size, radius, radius);
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, this.geometry.ring_offset, this.geometry.ring_count);
+  }
+
+  private drawRectangle(x: number, y: number, half_width: number, half_height: number): void {
+    this.gl.uniform2f(this.center, x, y);
+    this.gl.uniform2f(this.size, half_width, half_height);
+    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, this.geometry.rectangle_offset, 4);
   }
 }
