@@ -2,6 +2,7 @@ import type { Chart, Note } from "../chart/Chart";
 import { interpolateVisualPoint } from "../chart/VisualTimeline";
 import { NoteState, type LogicEvent } from "./LogicEvent";
 import { ScoreEngine, type ScoreResult } from "./scoring/ScoreEngine";
+import { BaseComboScore } from "./scoring/systems/BaseComboScore";
 import { OsuManiaV2Score } from "./scoring/systems/OsuManiaV2Score";
 import { createOsuManiaV2TimingValues } from "./timing/OsuManiaV2Timings";
 import { classifyTiming, type TimingResult, type TimingWindow } from "./timing/TimingValues";
@@ -50,7 +51,7 @@ export class RhythmEngine {
     this.lane_notes = Array.from({ length: chart.column_count }, () => []);
     this.linked_notes.forEach((note, index) => this.lane_notes[note.start.column - 1]?.push(index));
     this.timings = createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
-    this.score_engine = new ScoreEngine([new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
+    this.score_engine = new ScoreEngine([new BaseComboScore(), new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
     this.hit_registration = hit_registration;
   }
 

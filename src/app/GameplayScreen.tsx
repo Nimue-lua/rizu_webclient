@@ -15,17 +15,22 @@ interface GameplayScreenProps {
 
 export function GameplayScreen({ assets, master_volume, scroll_speed, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
-  const fps_ref = useRef<HTMLSpanElement>(null);
+  const accuracy_ref = useRef<HTMLSpanElement>(null);
+  const judge_ref = useRef<HTMLSpanElement>(null);
+  const combo_ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const canvas = canvas_ref.current;
-    const fps = fps_ref.current;
+    const accuracy = accuracy_ref.current;
+    const judge = judge_ref.current;
+    const combo = combo_ref.current;
 
-    if (!canvas || !fps) {
+    if (!canvas || !accuracy || !judge || !combo) {
       return;
     }
 
-    const runtime = new GameplayRuntime(canvas, fps, assets, master_volume, scroll_speed, input_bindings, hit_registration, onFinish);
+    const runtime = new GameplayRuntime(canvas, accuracy, judge, combo, assets, master_volume, scroll_speed,
+      input_bindings, hit_registration, onFinish);
     runtime.start();
 
     return () => runtime.destroy();
@@ -34,8 +39,11 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, input_bind
   return (
     <main className="gameplay-screen">
       <canvas ref={canvas_ref} />
-      <span ref={fps_ref} className="fps-counter">0 FPS</span>
-      <span className="gameplay-hint">Escape: results</span>
+      <span ref={accuracy_ref} className="gameplay-accuracy">0.00%</span>
+      <div className="gameplay-judgment">
+        <span ref={judge_ref} className="gameplay-judge" />
+        <span ref={combo_ref} className="gameplay-combo">0x</span>
+      </div>
     </main>
   );
 }
