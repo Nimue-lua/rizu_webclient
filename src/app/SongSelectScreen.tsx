@@ -76,7 +76,7 @@ function Icon({ name }: { name: IconName }) {
 
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
-  onPlay: (chart: Chartview, input_bindings: readonly (string | null)[]) => void;
+  onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onSettings: () => void;
   master_volume: number;
   music_rate: number;
@@ -265,7 +265,10 @@ export function SongSelectScreen({
   };
   const playChart = (chart: Chartview) => {
     audio_ref.current?.pause();
-    onPlay(chart, loadInputBindings(inputLayout(chart)));
+    onPlay(chart, loadInputBindings(inputLayout(chart)), {
+      title: selected_song?.title ?? "Unknown title",
+      artist: selected_song?.artist ?? "Unknown artist",
+    });
   };
   const moveRateDrag = (client_x: number) => {
     const drag = rate_drag_ref.current;

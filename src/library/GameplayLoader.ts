@@ -3,7 +3,11 @@ import { parseOsuChart } from "../chart/format/osu/OsuParser";
 
 export interface GameplayLocation {
   audio_url: string;
+  artist: string;
+  background_url: string | null;
+  chart_name: string;
   chart_url: string;
+  title: string;
 }
 
 export interface GameplayData {

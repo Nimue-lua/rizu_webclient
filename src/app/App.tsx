@@ -98,8 +98,15 @@ export function App() {
     });
   };
 
-  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[]) => {
-    setLoadingLocation({ audio_url: chart.audio_url, chart_url: chart.chart_url });
+  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => {
+    setLoadingLocation({
+      audio_url: chart.audio_url,
+      artist: song.artist,
+      background_url: chart.background_url,
+      chart_name: chart.name,
+      chart_url: chart.chart_url,
+      title: song.title,
+    });
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
     setScore(null);
@@ -168,7 +175,16 @@ export function App() {
         />
       );
     case "result":
-      return <ResultScreen score={score} onExit={leaveResults} />;
+      return (
+        <ResultScreen
+          score={score}
+          background_url={loading_location?.background_url ?? null}
+          title={loading_location?.title ?? "Unknown title"}
+          artist={loading_location?.artist ?? "Unknown artist"}
+          chart_name={loading_location?.chart_name ?? "Unknown chart"}
+          onExit={leaveResults}
+        />
+      );
     case "song-select":
       return (
         <>
