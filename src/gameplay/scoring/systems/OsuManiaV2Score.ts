@@ -1,14 +1,15 @@
 import { NoteState, type LogicEvent } from "../../LogicEvent";
 import { normalizeOsuOd } from "../../timing/OsuManiaV2Timings";
-import type { IAccuracySource, IJudgesSource } from "../ScoreSources";
+import type { IAccuracySource, IGradeSource, IJudgesSource } from "../ScoreSources";
 import type { ScoreSystem } from "../ScoreSystem";
 
 export const OSU_MANIA_V2_JUDGE_NAMES = ["perfect", "great", "good", "ok", "meh", "miss"] as const;
 export type OsuManiaV2Judge = typeof OSU_MANIA_V2_JUDGE_NAMES[number];
+export type OsuManiaV2Grade = "X" | "S" | "A" | "B" | "C" | "D";
 
 const JUDGE_WEIGHTS = [305, 300, 200, 100, 50, 0] as const;
 
-export class OsuManiaV2Score implements ScoreSystem, IAccuracySource, IJudgesSource {
+export class OsuManiaV2Score implements ScoreSystem, IAccuracySource, IGradeSource, IJudgesSource {
   readonly key: string;
   readonly judge_names = OSU_MANIA_V2_JUDGE_NAMES;
   private readonly windows: readonly number[];
@@ -52,6 +53,16 @@ export class OsuManiaV2Score implements ScoreSystem, IAccuracySource, IJudgesSou
       weighted_total += count * JUDGE_WEIGHTS[index]!;
     }
     return total === 0 ? 0 : weighted_total / (JUDGE_WEIGHTS[0] * total);
+  }
+
+  getGrade(): OsuManiaV2Grade {
+    const accuracy = this.getAccuracy();
+    if (accuracy === 1) return "X";
+    if (accuracy > 0.95) return "S";
+    if (accuracy > 0.9) return "A";
+    if (accuracy > 0.8) return "B";
+    if (accuracy > 0.7) return "C";
+    return "D";
   }
 
   getJudges(): readonly number[] {

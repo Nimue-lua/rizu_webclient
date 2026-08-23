@@ -42,7 +42,19 @@ test("scores release deltas after tail normalization", () => {
 test("exposes only capabilities implemented by selected systems", () => {
   const result = new ScoreEngine([new OsuManiaV2Score(5)]).getResult();
   assert.equal(result.accuracy, 0);
+  assert.equal(result.grade, "D");
   assert.deepEqual(result.judge_names, ["perfect", "great", "good", "ok", "meh", "miss"]);
   assert.equal(result.score, undefined);
   assert.equal(result.combo, undefined);
+});
+
+test("grades osu mania accuracy", () => {
+  const score = new ScoreEngine([new OsuManiaV2Score(5)]);
+  score.receive({ index: 0, type: "tap", time: 0, delta_time: 0,
+    old_state: NoteState.Clear, new_state: NoteState.Passed });
+  assert.equal(score.getResult().grade, "X");
+
+  score.receive({ index: 1, type: "tap", time: 0, delta_time: 0.03,
+    old_state: NoteState.Clear, new_state: NoteState.Passed });
+  assert.equal(score.getResult().grade, "S");
 });

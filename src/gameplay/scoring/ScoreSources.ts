@@ -6,6 +6,10 @@ export interface IAccuracySource {
   getAccuracy(): number;
 }
 
+export interface IGradeSource {
+  getGrade(): string;
+}
+
 export interface IComboSource {
   getCombo(): number;
   getMaxCombo(): number;
@@ -27,6 +31,10 @@ export function isScoreSource(value: object): value is IScoreSource {
 
 export function isAccuracySource(value: object): value is IAccuracySource {
   return hasMethod(value, "getAccuracy");
+}
+
+export function isGradeSource(value: object): value is IGradeSource {
+  return hasMethod(value, "getGrade");
 }
 
 export function isComboSource(value: object): value is IComboSource {
