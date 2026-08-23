@@ -70,6 +70,24 @@ test("holds stay active after the head and score their release", () => {
   assert.equal(engine.score.accuracy, 1);
 });
 
+test("no long notes converts hold heads to taps and ignores tails", () => {
+  const engine = new RhythmEngine(createChart([
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 2, weight: -1 },
+  ]), "earliest", 1, false, true);
+  engine.update(0.5, 2, 2);
+  assert.equal(engine.visible_notes[0]?.type, "short");
+  assert.equal(engine.visible_notes[0]?.end_dt, undefined);
+
+  engine.press(0, 1);
+  assert.equal(engine.note_states[0], NoteState.Passed);
+  assert.equal(engine.logic_events[0]?.type, "tap");
+  engine.release(0, 2);
+  engine.update(3, 2, 2);
+  assert.equal(engine.logic_events.length, 1);
+  assert.equal(engine.score.judges.perfect, 1);
+});
+
 test("early release can be recovered and creates the native three judgments", () => {
   const engine = new RhythmEngine(createChart([
     { column: 1, absolute_time: 1, weight: 1 },
@@ -163,6 +181,23 @@ test("positions hold endpoints independently across scroll changes", () => {
   assert.equal(engine.visible_notes.length, 1);
   assertClose(engine.visible_notes[0]?.start_dt, -0.09);
   assertClose(engine.visible_notes[0]?.end_dt, 1.41);
+});
+
+test("constant scroll positions notes by absolute time", () => {
+  const chart = {
+    ...createChart([{ column: 1, absolute_time: 2, weight: 0 }]),
+    visual_points: [
+      { absolute_time: 0, visual_time: 0, current_speed: 1, local_speed: 1, global_speed: 1 },
+      { absolute_time: 1.5, visual_time: 1.5, current_speed: 2, local_speed: 1, global_speed: 1 },
+    ],
+  };
+  const regular = new RhythmEngine(chart);
+  regular.update(1, 2, 2);
+  assertClose(regular.visible_notes[0]?.start_dt, 1.5);
+
+  const constant = new RhythmEngine(chart, "earliest", 1, true);
+  constant.update(1, 2, 2);
+  assertClose(constant.visible_notes[0]?.start_dt, 1);
 });
 
 test("keeps hit windows constant in real time at changed music rates", () => {

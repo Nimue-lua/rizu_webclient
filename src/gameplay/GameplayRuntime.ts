@@ -39,7 +39,7 @@ export class GameplayRuntime {
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
     this.finish = finish;
-    this.rhythm_engine = new RhythmEngine(data.chart, hit_registration, this.music_rate);
+    this.rhythm_engine = new RhythmEngine(data.chart, hit_registration, this.music_rate, replay_base.const, replay_base.tap_only);
     this.renderer = new WebGlGameplayRenderer(canvas);
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
   }

@@ -194,6 +194,7 @@ svg { width: 22px; height: 22px; }
 .loadout-controls button { --control-color: #639b3d; display: flex; align-items: center; gap: 9px; height: 46px; padding: 0 17px; background: linear-gradient(to bottom, color-mix(in srgb, var(--control-color) 34%, var(--elements)), color-mix(in srgb, var(--control-color) 16%, var(--elements))); box-shadow: inset 0 3px color-mix(in srgb, var(--control-color) 55%, var(--text)); font-size: 12px; font-weight: 700; }
 .loadout-controls svg { width: 19px; color: color-mix(in srgb, var(--control-color) 76%, var(--text)); }
 .loadout-controls .mutators { --control-color: #be4cc0; }
+.loadout-controls .mods.active { background: linear-gradient(to bottom, #659f44, #385f27); box-shadow: inset 0 3px #b7e38e, 0 0 16px #639b3d55; }
 .loadout-controls .inputs { --control-color: #8838ce; }
 .loadout-controls .skins { --control-color: #435fa7; }
 .loadout-controls b { min-width: 18px; padding: 2px 5px; background: #0d0c0f99; border-radius: 3px; }
@@ -205,9 +206,37 @@ svg { width: 22px; height: 22px; }
 .rate-knob { position: relative; width: 34px; height: 34px; background: conic-gradient(from 225deg, var(--accent) 0 var(--rate-angle), var(--outline) var(--rate-angle) 270deg, transparent 270deg); border-radius: 50%; }
 .rate-knob > span { position: absolute; inset: 4px; background: var(--panel); border: 1px solid var(--outline); border-radius: 50%; }
 .rate-knob > span::after { position: absolute; top: 50%; left: 50%; width: 2px; height: 10px; margin: -10px 0 0 -1px; transform: rotate(var(--rate-rotation)); transform-origin: 1px 10px; background: var(--text); content: ""; }
-.rate-knob input { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
-.modifier-flag { display: grid; grid-template-rows: 20px auto; width: 52px; height: 44px; padding: 3px 7px; place-items: center; background: linear-gradient(#93c56f, #639b3d 50%, #344d24); border-radius: 7px; font-size: 10px; font-weight: 700; }
-.modifier-flag svg { width: 24px; height: 18px; }
+.rate-knob input { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; touch-action: none; }
+.gameplay-modifiers-layer {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  padding: 36px;
+  place-items: center;
+  background: #0d0c0f91;
+  backdrop-filter: blur(6px);
+}
+
+.gameplay-modifiers-modal {
+  width: min(760px, calc(100% - 72px));
+  min-height: 300px;
+  padding: 54px 58px;
+  background: #211c2b;
+  border: 1px solid #ffffff0d;
+  border-radius: 22px;
+  box-shadow: 0 28px 90px #000b;
+}
+
+.gameplay-modifiers-modal h1 { margin: 0 0 54px; font-size: 38px; line-height: 1; }
+.modifier-checkbox-list { display: grid; gap: 24px; }
+.modifier-checkbox { position: relative; display: flex; align-items: center; gap: 20px; width: fit-content; cursor: pointer; }
+.modifier-checkbox input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.modifier-checkbox > span { width: 68px; height: 42px; background: #0d0c0f; border: 4px solid #0d0c0f; border-radius: 14px; box-shadow: inset 0 1px #ffffff0a; transition: background-color 120ms ease-out, box-shadow 120ms ease-out; }
+.modifier-checkbox input:checked + span { background: var(--accent); box-shadow: inset 0 1px #ffe1a466, 0 0 0 2px #d9a04f24; }
+.modifier-checkbox input:focus-visible + span { outline: 3px solid var(--text); outline-offset: 3px; }
+.modifier-checkbox strong { font-size: 19px; font-weight: 600; }
+.modifier-checkbox:hover > span { filter: brightness(1.12); }
 
 .gameplay-screen { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
 .gameplay-screen canvas { display: block; width: 100%; height: 100%; }

@@ -44,10 +44,12 @@ export class RhythmEngine {
   private readonly score_engine: ScoreEngine;
   private readonly hit_registration: HitRegistration;
   private readonly music_rate: number;
+  private readonly constant_scroll: boolean;
 
-  constructor(chart: Chart, hit_registration: HitRegistration = "earliest", music_rate = 1) {
+  constructor(chart: Chart, hit_registration: HitRegistration = "earliest", music_rate = 1,
+    constant_scroll = false, tap_only = false) {
     this.chart = chart;
-    this.linked_notes = this.linkNotes(chart.notes);
+    this.linked_notes = this.linkNotes(chart.notes, tap_only);
     this.note_states = new Uint8Array(this.linked_notes.length);
     this.lane_notes = Array.from({ length: chart.column_count }, () => []);
     this.linked_notes.forEach((note, index) => this.lane_notes[note.start.column - 1]?.push(index));
@@ -55,6 +57,7 @@ export class RhythmEngine {
     this.score_engine = new ScoreEngine([new BaseComboScore(), new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
     this.hit_registration = hit_registration;
     this.music_rate = music_rate;
+    this.constant_scroll = constant_scroll;
   }
 
   get score(): ScoreResult {
@@ -64,16 +67,20 @@ export class RhythmEngine {
   update(song_time: number, past_window: number, future_window: number): void {
     this.updateMisses(song_time);
     this.visible_notes.length = 0;
-    const current_point = interpolateVisualPoint(this.chart.visual_points, song_time);
+    const current_point = this.constant_scroll ? undefined : interpolateVisualPoint(this.chart.visual_points, song_time);
     for (let index = 0; index < this.linked_notes.length; index += 1) {
       const note = this.linked_notes[index]!;
       const state = this.note_states[index] as NoteState;
       if (note.end === undefined && !isActive(state, false)) continue;
       if (state === NoteState.EndPassed) continue;
-      const start_point = interpolateVisualPoint(this.chart.visual_points, note.start.absolute_time);
-      const end_point = note.end && interpolateVisualPoint(this.chart.visual_points, note.end.absolute_time);
-      let start_dt = (start_point.visual_time - current_point.visual_time) * current_point.global_speed * start_point.local_speed;
-      const end_dt = end_point && (end_point.visual_time - current_point.visual_time) * current_point.global_speed * end_point.local_speed;
+      const start_point = current_point && interpolateVisualPoint(this.chart.visual_points, note.start.absolute_time);
+      const end_point = current_point && note.end && interpolateVisualPoint(this.chart.visual_points, note.end.absolute_time);
+      let start_dt = start_point && current_point
+        ? (start_point.visual_time - current_point.visual_time) * current_point.global_speed * start_point.local_speed
+        : note.start.absolute_time - song_time;
+      const end_dt = note.end && (end_point && current_point
+        ? (end_point.visual_time - current_point.visual_time) * current_point.global_speed * end_point.local_speed
+        : note.end.absolute_time - song_time);
       if ((end_dt ?? start_dt) < -past_window || start_dt > future_window) continue;
       if (state === NoteState.StartPassedPressed) start_dt = Math.max(0, start_dt);
       this.visible_notes.push({
@@ -195,7 +202,7 @@ export class RhythmEngine {
     this.score_engine.receive(event);
   }
 
-  private linkNotes(notes: readonly Note[]): LinkedNote[] {
+  private linkNotes(notes: readonly Note[], tap_only: boolean): LinkedNote[] {
     const linked_notes: LinkedNote[] = [];
     const open_notes = Array.from({ length: this.chart.column_count }, () => [] as number[]);
     for (const note of notes) {
@@ -210,6 +217,9 @@ export class RhythmEngine {
       }
     }
     if (open_notes.some((column) => column.length > 0)) throw new Error("Hold start has no end");
+    if (tap_only) {
+      for (const note of linked_notes) delete note.end;
+    }
     linked_notes.sort((left, right) => left.start.absolute_time - right.start.absolute_time);
     return linked_notes;
   }

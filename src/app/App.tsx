@@ -16,6 +16,8 @@ const MASTER_VOLUME_KEY = "rizu.master-volume";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const MUSIC_RATE_KEY = "rizu.music-rate";
+const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
+const TAP_ONLY_KEY = "rizu.no-long-notes";
 const gameplay_loader = new HttpGameplayLoader();
 const chart_selector = new ChartSelector(new SqliteLibrary());
 
@@ -44,6 +46,8 @@ export function App() {
     const stored_setting = localStorage.getItem(MUSIC_RATE_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     if (Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 4) replay_base.rate = stored_value;
+    replay_base.const = localStorage.getItem(CONSTANT_SCROLL_KEY) === "true";
+    replay_base.tap_only = localStorage.getItem(TAP_ONLY_KEY) === "true";
     return replay_base;
   });
 
@@ -69,6 +73,26 @@ export function App() {
       const next = new ReplayBase();
       next.importReplayBase(current.exportReplayBase());
       next.rate = rate;
+      return next;
+    });
+  };
+
+  const changeConstantScroll = (value: boolean) => {
+    localStorage.setItem(CONSTANT_SCROLL_KEY, String(value));
+    setReplayBase((current) => {
+      const next = new ReplayBase();
+      next.importReplayBase(current.exportReplayBase());
+      next.const = value;
+      return next;
+    });
+  };
+
+  const changeTapOnly = (value: boolean) => {
+    localStorage.setItem(TAP_ONLY_KEY, String(value));
+    setReplayBase((current) => {
+      const next = new ReplayBase();
+      next.importReplayBase(current.exportReplayBase());
+      next.tap_only = value;
       return next;
     });
   };
@@ -151,9 +175,13 @@ export function App() {
             chart_selector={chart_selector}
             master_volume={master_volume}
             music_rate={replay_base.rate}
+            constant_scroll={replay_base.const}
+            tap_only={replay_base.tap_only}
             onPlay={beginLoading}
             onSettings={() => setSettingsOpen(true)}
             onMusicRateChange={changeMusicRate}
+            onConstantScrollChange={changeConstantScroll}
+            onTapOnlyChange={changeTapOnly}
           />
           {settings_open && (
             <SettingsScreen

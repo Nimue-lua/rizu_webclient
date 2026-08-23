@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
-  Activity,
   ArrowUpDown,
   Bell,
   ChevronDown,
@@ -31,19 +30,19 @@ import type { Chartview } from "../library/views";
 import { PreviewClient } from "../preview/PreviewClient";
 import type { ChartSelector } from "../select/ChartSelector";
 import { InputBindingsModal } from "./InputBindingsModal";
+import { GameplayModifiersModal } from "./GameplayModifiersModal";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
 const BACKGROUND_DEBOUNCE_MS = 200;
 const SESSION_STARTED_AT = Date.now();
 
-type IconName = "activity" | "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
+type IconName = "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
   "chevron-right" | "clock" | "download" | "file" | "filter" | "globe" | "keyboard" |
   "metronome" | "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" |
   "settings" | "terminal" | "trophy" | "undo" | "zap";
 
 const icons: Record<IconName, LucideIcon> = {
-  activity: Activity,
   "arrow-up-down": ArrowUpDown,
   bell: Bell,
   "chevron-down": ChevronDown,
@@ -80,7 +79,11 @@ interface SongSelectScreenProps {
   onSettings: () => void;
   master_volume: number;
   music_rate: number;
+  constant_scroll: boolean;
+  tap_only: boolean;
   onMusicRateChange: (music_rate: number) => void;
+  onConstantScrollChange: (constant_scroll: boolean) => void;
+  onTapOnlyChange: (tap_only: boolean) => void;
 }
 
 const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
@@ -113,10 +116,15 @@ export function SongSelectScreen({
   onSettings,
   master_volume,
   music_rate,
+  constant_scroll,
+  tap_only,
   onMusicRateChange,
+  onConstantScrollChange,
+  onTapOnlyChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const audio_ref = useRef<HTMLAudioElement>(null);
+  const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
   const [scroll_top, setScrollTop] = useState(0);
   const [viewport_height, setViewportHeight] = useState(0);
@@ -125,6 +133,7 @@ export function SongSelectScreen({
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
   const [input_bindings_open, setInputBindingsOpen] = useState(false);
+  const [modifiers_open, setModifiersOpen] = useState(false);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -231,12 +240,18 @@ export function SongSelectScreen({
   } as CSSProperties;
   const hero_loaded = background_url === null || background_url === loaded_background_url;
   const playChart = (chart: Chartview) => onPlay(chart.id, loadInputBindings(inputLayout(chart)));
+  const moveRateDrag = (client_x: number) => {
+    const drag = rate_drag_ref.current;
+    if (!drag) return;
+    const value = drag.start_rate + (client_x - drag.start_x) / 360 * 3.75;
+    onMusicRateChange(Math.min(4, Math.max(0.25, Math.round(value / 0.05) * 0.05)));
+  };
 
   return (
     <main className="song-select-screen">
       <audio ref={audio_ref} autoPlay />
       <header className="song-select-header">
-        <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU</span></div>
+        <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT</span></div>
         <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status"><b>1</b> ONLINE</span></div>
         <nav className="header-actions" aria-label="Account and settings">
           <div className="player-info"><span><strong>Username</strong><small><b>12,450</b> PP</small></span><i /></div>
@@ -291,10 +306,11 @@ export function SongSelectScreen({
 
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
-        <nav className="loadout-controls" aria-label="Loadout"><button className="mods"><Icon name="puzzle" /><span>MODS</span></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>MUSIC SPEED</strong><label className="rate-control"><output htmlFor="music-rate">{music_rate.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} /></span></label><span className="modifier-flag"><Icon name="activity" /><small>RATE</small></span></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
+        <nav className="loadout-controls" aria-label="Loadout"><button className={`mods${constant_scroll || tap_only ? " active" : ""}`} aria-haspopup="dialog" aria-expanded={modifiers_open} onClick={() => setModifiersOpen(true)}><Icon name="puzzle" /><span>MODS</span><b>{Number(constant_scroll) + Number(tap_only)}</b></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
+        <div className="play-controls"><div className="play-modifiers"><strong>MUSIC SPEED</strong><label className="rate-control"><output htmlFor="music-rate">{music_rate.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); rate_drag_ref.current = { pointer_id: event.pointerId, start_x: event.clientX, start_rate: music_rate }; }} onPointerMove={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) moveRateDrag(event.clientX); }} onPointerUp={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} onPointerCancel={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} /></span></label></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
+      {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
     </main>
   );
 }
