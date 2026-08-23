@@ -11,6 +11,12 @@ import { SongSelectScreen } from "./SongSelectScreen";
 import type { HitRegistration } from "../gameplay/RhythmEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
 import { ReplayBase } from "../replay/ReplayBase";
+import {
+  loadNoteSkinSelections,
+  saveNoteSkinSelections,
+  selectedNoteSkin,
+  type NoteSkinSelections,
+} from "../gameplay/renderer/NoteSkinSelection";
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -34,6 +40,7 @@ export function App() {
   const [loading_location, setLoadingLocation] = useState<GameplayLocation | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
+  const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
   const [master_volume, setMasterVolume] = useState(() => {
     const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
@@ -103,6 +110,7 @@ export function App() {
   };
 
   const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => {
+    const note_skin = selectedNoteSkin(chart.mode === 3 ? "mania" : String(chart.mode), chart.keys ?? 0, note_skin_selections);
     setLoadingLocation({
       audio_url: chart.audio_url,
       artist: song.artist,
@@ -113,12 +121,21 @@ export function App() {
       difficulty: chart.difficulty,
       duration_seconds: chart.duration_seconds,
       long_note_ratio: chart.long_note_ratio,
+      note_skin_url: note_skin?.url ?? null,
       title: song.title,
     });
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
     setScore(null);
     setScreen("loading");
+  };
+
+  const changeNoteSkinSelection = (key: string, skin_id: string | undefined) => {
+    setNoteSkinSelections((current) => {
+      const next: NoteSkinSelections = { ...current, [key]: skin_id ?? "" };
+      saveNoteSkinSelections(next);
+      return next;
+    });
   };
 
   const cancelLoading = () => {
@@ -214,11 +231,13 @@ export function App() {
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}
             tap_only={replay_base.tap_only}
+            note_skin_selections={note_skin_selections}
             onPlay={beginLoading}
             onSettings={() => setSettingsOpen(true)}
             onMusicRateChange={changeMusicRate}
             onConstantScrollChange={changeConstantScroll}
             onTapOnlyChange={changeTapOnly}
+            onNoteSkinSelectionChange={changeNoteSkinSelection}
           />
           {settings_open && (
             <SettingsScreen

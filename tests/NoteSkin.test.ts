@@ -7,6 +7,7 @@ test("parses a note skin config with optional layout and sprite fields", () => {
     mode: "mania",
     columnCount: 2,
     columnSize: [48, 64],
+    gap: 3,
     align: 0.25,
     hitPosition: 400,
     comboPosition: 300,
@@ -18,6 +19,7 @@ test("parses a note skin config with optional layout and sprite fields", () => {
     mode: "mania",
     columnCount: 2,
     columnSize: [48, 64],
+    gap: 3,
     align: 0.25,
     hitPosition: 400,
     comboPosition: 300,
@@ -46,6 +48,7 @@ test("applies layout defaults and leaves missing per-column textures empty", () 
     mode: "mania",
     columnCount: 4,
     columnSize: [64, 60, 60, 60],
+    gap: 0,
     align: 0.5,
     hitPosition: 380,
     comboPosition: 200,
@@ -63,4 +66,5 @@ test("validates supplied layout and sprite values", () => {
   assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, columnSize: [-1] }), /columnSize/);
   assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, shortNotes: [42] }), /shortNotes/);
   assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, align: 2 }), /align/);
+  assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, gap: -1 }), /gap/);
 });

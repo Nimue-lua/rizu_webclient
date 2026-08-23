@@ -272,6 +272,34 @@ svg { width: 22px; height: 22px; }
 .gamemode-filter-list label { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--elements); border-radius: 5px; cursor: pointer; text-transform: capitalize; }
 .gamemode-filter-list input { width: 20px; height: 20px; accent-color: var(--accent); }
 
+.note-skins-layer { position: absolute; z-index: 30; inset: 0; display: grid; padding: 36px; place-items: center; background: #0d0c0fa3; backdrop-filter: blur(7px); }
+.note-skins-modal { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(760px, calc(100% - 72px)); max-height: min(820px, calc(100% - 72px)); overflow: hidden; background: #211c2b; border: 1px solid #ffffff0d; border-radius: 22px; box-shadow: 0 28px 90px #000b; }
+.note-skins-modal > header { display: flex; align-items: end; justify-content: space-between; gap: 36px; padding: 42px 48px 30px; border-bottom: 1px solid #ffffff0d; }
+.note-skins-modal > header span { color: #6e91ed; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+.note-skins-modal h1 { margin: 8px 0 0; font-size: 38px; line-height: 1; }
+.note-skins-modal > header p { max-width: 280px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; text-align: right; }
+.note-skin-list { display: grid; gap: 7px; padding: 20px 28px; overflow-y: auto; scrollbar-color: var(--outline) transparent; }
+.note-skin-list label { display: grid; grid-template-columns: 1fr 280px; align-items: center; min-height: 57px; padding: 8px 12px 8px 20px; background: #292235; border: 1px solid transparent; border-radius: 8px; }
+.note-skin-list label.current { background: linear-gradient(90deg, #435fa733, #292235 70%); border-color: #6e91ed66; box-shadow: inset 3px 0 #6e91ed; }
+.note-skin-list label > span { display: flex; align-items: baseline; gap: 14px; }
+.note-skin-list strong { font-size: 21px; }
+.note-skin-list small { color: #7898ed; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.note-skin-list select, .settings-control select { width: 100%; height: 39px; padding: 0 34px 0 12px; color: var(--text); appearance: none; background: #17131f url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23b6bfd6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; border: 1px solid #504966; border-radius: 6px; font: inherit; cursor: pointer; }
+.note-skin-list select:focus-visible { border-color: #7898ed; outline: 2px solid #7898ed55; }
+.note-skins-modal > footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 48px; background: #292235; }
+.note-skins-modal > footer span { color: var(--muted); font-size: 13px; }
+.note-skins-modal > footer button { min-width: 120px; padding: 12px 22px; background: #435fa7; border-radius: 6px; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
+
+@media (max-width: 640px) {
+  .note-skins-layer { padding: 16px; }
+  .note-skins-modal { width: 100%; max-height: calc(100% - 32px); }
+  .note-skins-modal > header { align-items: start; padding: 30px 26px 22px; }
+  .note-skins-modal > header p { display: none; }
+  .note-skin-list { padding: 14px; }
+  .note-skin-list label { grid-template-columns: 90px 1fr; padding-left: 14px; }
+  .note-skins-modal > footer { padding: 18px 26px; }
+}
+
 .gameplay-screen, .gameplay-screen * { cursor: none; }
 .gameplay-screen { position: relative; width: 100vw; height: 100vh; overflow: hidden; touch-action: none; }
 .gameplay-screen canvas { display: block; width: 100%; height: 100%; }
@@ -434,7 +462,7 @@ svg { width: 22px; height: 22px; }
 .input-bindings-modal h1 span { white-space: nowrap; }
 .input-bindings-modal > p { margin: 34px 0 0; color: #b6bfd6; font-size: 18px; text-align: center; }
 .input-binding-list { display: flex; align-items: center; justify-content: center; gap: 14px; min-width: 0; padding: 44px 0 30px; }
-.input-binding-list > div { display: grid; flex: 1 1 112px; min-width: 0; max-width: 112px; gap: 12px; color: #b6bfd6; font-size: 20px; font-weight: 700; text-align: center; }
-.input-binding-list button { height: 112px; padding: 8px; overflow: hidden; color: var(--text); background: #1e1928; border: 3px solid #504966; border-radius: 8px; font-size: 20px; text-overflow: ellipsis; white-space: nowrap; }
-.input-binding-list button:hover, .input-binding-list button.listening { border-color: #9d59df; background: #2c2339; filter: none; }
-.input-binding-list button.listening { box-shadow: 0 0 0 4px #9d59df30; }
+.input-binding-list > div { display: grid; flex: 1 1 112px; min-width: 0; max-width: 112px; gap: 12px; color: var(--column-color); font-size: 20px; font-weight: 700; text-align: center; }
+.input-binding-list button { height: 112px; padding: 8px; overflow: hidden; color: var(--text); background: color-mix(in srgb, var(--column-color) 12%, #1e1928); border: 3px solid color-mix(in srgb, var(--column-color) 62%, #504966); border-radius: 8px; font-size: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.input-binding-list button:hover, .input-binding-list button.listening { border-color: var(--column-color); background: color-mix(in srgb, var(--column-color) 22%, #2c2339); filter: none; }
+.input-binding-list button.listening { box-shadow: 0 0 0 4px color-mix(in srgb, var(--column-color) 25%, transparent); }

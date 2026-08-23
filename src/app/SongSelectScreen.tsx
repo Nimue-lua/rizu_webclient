@@ -31,6 +31,8 @@ import type { ChartSelector } from "../select/ChartSelector";
 import { InputBindingsModal } from "./InputBindingsModal";
 import { GameplayModifiersModal } from "./GameplayModifiersModal";
 import { GamemodeFiltersModal } from "./GamemodeFiltersModal";
+import type { NoteSkinSelections } from "../gameplay/renderer/NoteSkinSelection";
+import { NoteSkinsModal } from "./NoteSkinsModal";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
@@ -82,9 +84,11 @@ interface SongSelectScreenProps {
   music_rate: number;
   constant_scroll: boolean;
   tap_only: boolean;
+  note_skin_selections: NoteSkinSelections;
   onMusicRateChange: (music_rate: number) => void;
   onConstantScrollChange: (constant_scroll: boolean) => void;
   onTapOnlyChange: (tap_only: boolean) => void;
+  onNoteSkinSelectionChange: (key: string, skin_id: string | undefined) => void;
 }
 
 const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
@@ -119,9 +123,11 @@ export function SongSelectScreen({
   music_rate,
   constant_scroll,
   tap_only,
+  note_skin_selections,
   onMusicRateChange,
   onConstantScrollChange,
   onTapOnlyChange,
+  onNoteSkinSelectionChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const audio_ref = useRef<HTMLAudioElement>(null);
@@ -138,6 +144,7 @@ export function SongSelectScreen({
   const [input_bindings_open, setInputBindingsOpen] = useState(false);
   const [modifiers_open, setModifiersOpen] = useState(false);
   const [filters_open, setFiltersOpen] = useState(false);
+  const [skins_open, setSkinsOpen] = useState(false);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -336,12 +343,13 @@ export function SongSelectScreen({
 
       <footer className="song-select-footer">
         <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
-        <nav className="loadout-controls" aria-label="Loadout"><button className={`mods${constant_scroll || tap_only ? " active" : ""}`} aria-haspopup="dialog" aria-expanded={modifiers_open} onClick={() => setModifiersOpen(true)}><Icon name="puzzle" /><span>MODS</span><b>{Number(constant_scroll) + Number(tap_only)}</b></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins"><Icon name="paintbrush" /><span>SKINS</span></button></nav>
+        <nav className="loadout-controls" aria-label="Loadout"><button className={`mods${constant_scroll || tap_only ? " active" : ""}`} aria-haspopup="dialog" aria-expanded={modifiers_open} onClick={() => setModifiersOpen(true)}><Icon name="puzzle" /><span>MODS</span><b>{Number(constant_scroll) + Number(tap_only)}</b></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins" aria-haspopup="dialog" aria-expanded={skins_open} onClick={() => setSkinsOpen(true)}><Icon name="paintbrush" /><span>SKINS</span></button></nav>
         <div className="play-controls"><div className="play-modifiers"><strong>MUSIC SPEED</strong><label className="rate-control"><output htmlFor="music-rate">{music_rate.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); rate_drag_ref.current = { pointer_id: event.pointerId, start_x: event.clientX, start_rate: music_rate }; }} onPointerMove={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) moveRateDrag(event.clientX); }} onPointerUp={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} onPointerCancel={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} /></span></label></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
       </footer>
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
+      {skins_open && <NoteSkinsModal selections={note_skin_selections} selected_column_count={selected_chart?.mode === 3 ? selected_chart.keys : null} onSelectionChange={onNoteSkinSelectionChange} onExit={() => setSkinsOpen(false)} />}
     </main>
   );
 }

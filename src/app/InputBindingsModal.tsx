@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { Chartview } from "../library/views";
 import {
   inputCodeLabel,
@@ -6,6 +6,7 @@ import {
   loadInputBindings,
   saveInputBindings,
 } from "../gameplay/InputBindings";
+import { getColumnColors } from "../gameplay/ColumnColors";
 
 interface InputBindingsModalProps {
   chart: Chartview;
@@ -16,6 +17,7 @@ export function InputBindingsModal({ chart, onExit }: InputBindingsModalProps) {
   const layout = inputLayout(chart);
   const [bindings, setBindings] = useState(() => loadInputBindings(layout));
   const [listening_index, setListeningIndex] = useState<number | null>(null);
+  const colors = getColumnColors(layout.count);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -62,7 +64,9 @@ export function InputBindingsModal({ chart, onExit }: InputBindingsModalProps) {
         <h1 id="input-bindings-title">Input Bindings <span>- {layout.name}</span></h1>
         <div className="input-binding-list">
           {bindings.map((binding, index) => (
-            <div key={index}>
+            <div key={index} style={{
+              "--column-color": `rgb(${colors[index]!.slice(0, 3).map((channel) => Math.round(channel * 255)).join(" ")})`,
+            } as CSSProperties}>
               <span>{index + 1}K</span>
               <button
                 autoFocus={index === 0}

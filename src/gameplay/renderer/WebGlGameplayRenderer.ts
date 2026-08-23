@@ -1,13 +1,12 @@
 import { NoteState, type VisualNote } from "../RhythmEngine";
+import { getColumnColors } from "../ColumnColors";
 import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinFrame } from "./NoteSkin";
 
 const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
-const RECEPTOR_COLOR = [0.3, 0.75, 1, 1] as const;
-const NOTE_COLOR = [1, 1, 1, 1] as const;
-const LONG_NOTE_COLOR = [0.65, 0.85, 1, 0.8] as const;
-const FALLBACK_COLUMN_GAP = 2;
-const FALLBACK_COLUMN_WIDTH = 60;
+const FALLBACK_COLUMN_GAP = 0;
+const FALLBACK_COLUMN_WIDTH = 40;
 const FALLBACK_HIT_POSITION = 420;
+const FALLBACK_NOTE_HEIGHT = 24;
 const VERTEX_FLOATS = 8;
 
 export function getLongNoteBrightness(state: NoteState): number {
@@ -156,7 +155,7 @@ export class WebGlGameplayRenderer {
     gl.uniform2f(this.viewport_size, layout.width, layout.height);
     this.vertices = [];
     if (this.skin) this.drawSkinned(layout, notes, pixels_per_visual_second, pressed_columns);
-    else this.drawFallback(layout, notes, pixels_per_visual_second, pressed_columns);
+    else this.drawFallback(layout, notes, pixels_per_visual_second);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW);
     gl.uniform1i(this.textured, this.skin ? 1 : 0);
@@ -224,13 +223,13 @@ export class WebGlGameplayRenderer {
     return frame ? frame.sourceSize.h * layout.column_width[column]! / frame.sourceSize.w : 0;
   }
 
-  private drawFallback(layout: Layout, notes: readonly VisualNote[], speed: number,
-    pressed_columns: ArrayLike<number>): void {
+  private drawFallback(layout: Layout, notes: readonly VisualNote[], speed: number): void {
+    const colors = getColumnColors(layout.column_width.length);
     for (let column = 0; column < layout.column_width.length; column += 1) {
       const x = layout.playfield_left + layout.column_left[column]!;
-      const height = Math.min(20, layout.column_width[column]! * 0.4);
-      if (pressed_columns[column]) this.addQuad(x + 2, layout.receptor_y, layout.column_width[column]! - 4, height, RECEPTOR_COLOR);
-      this.addFrame(x + 2, layout.receptor_y, layout.column_width[column]! - 4, height, RECEPTOR_COLOR, 3);
+      const thickness = 3;
+      this.addQuad(x, layout.receptor_y + FALLBACK_NOTE_HEIGHT - thickness * 0.5,
+        layout.column_width[column]!, thickness, colors[column]!);
     }
     for (const note of notes) {
       if (note.end_dt === undefined) continue;
@@ -240,8 +239,9 @@ export class WebGlGameplayRenderer {
       const head_y = Math.min(layout.receptor_y, layout.receptor_y - note.start_dt * speed);
       const tail_y = Math.min(layout.receptor_y, layout.receptor_y - note.end_dt * speed);
       const brightness = getLongNoteBrightness(note.state);
-      this.addQuad(x + width * 0.14, tail_y, width * 0.72, Math.max(0, head_y - tail_y),
-        [LONG_NOTE_COLOR[0] * brightness, LONG_NOTE_COLOR[1] * brightness, LONG_NOTE_COLOR[2] * brightness, LONG_NOTE_COLOR[3]]);
+      const color = colors[column]!;
+      this.addQuad(x, tail_y, width, Math.max(0, head_y - tail_y),
+        [color[0] * brightness, color[1] * brightness, color[2] * brightness, 0.8]);
     }
     for (const note of notes) {
       const column = note.column - 1;
@@ -249,17 +249,10 @@ export class WebGlGameplayRenderer {
       const width = layout.column_width[column]!;
       const y = layout.receptor_y - note.start_dt * speed;
       const brightness = note.end_dt === undefined ? 1 : getLongNoteBrightness(note.state);
-      this.addQuad(x + 2, y, width - 4, Math.min(20, width * 0.4),
-        [NOTE_COLOR[0] * brightness, NOTE_COLOR[1] * brightness, NOTE_COLOR[2] * brightness, NOTE_COLOR[3]]);
+      const color = colors[column]!;
+      this.addQuad(x, y, width, FALLBACK_NOTE_HEIGHT,
+        [color[0] * brightness, color[1] * brightness, color[2] * brightness, color[3]]);
     }
-  }
-
-  private addFrame(x: number, y: number, width: number, height: number,
-    color: readonly [number, number, number, number], thickness: number): void {
-    this.addQuad(x, y, width, thickness, color);
-    this.addQuad(x, y + height - thickness, width, thickness, color);
-    this.addQuad(x, y + thickness, thickness, height - thickness * 2, color);
-    this.addQuad(x + width - thickness, y + thickness, thickness, height - thickness * 2, color);
   }
 
   private addQuad(x: number, y: number, width: number, height: number,

@@ -12,6 +12,7 @@ export interface GameplayLocation {
   difficulty: number;
   duration_seconds: number;
   long_note_ratio: number;
+  note_skin_url: string | null;
   title: string;
 }
 
@@ -37,10 +38,10 @@ export class HttpGameplayLoader implements GameplayLoader {
     const [audio_data, chart_data, bundled_skin] = await Promise.all([
       fetchAsset(location.audio_url, signal),
       fetchAsset(location.chart_url, signal),
-      loadNoteSkinZip("/skins/circles.zip", signal).catch((error: unknown) => {
+      location.note_skin_url ? loadNoteSkinZip(location.note_skin_url, signal).catch((error: unknown) => {
         console.warn("Could not load bundled note skin; using fallback", error);
         return undefined;
-      }),
+      }) : Promise.resolve(undefined),
     ]);
     const [audio_buffer, chart] = await Promise.all([
       audio_context.decodeAudioData(audio_data),
