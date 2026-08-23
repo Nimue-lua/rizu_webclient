@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameplayData } from "../src/library/GameplayLoader";
-import { getAudioStartDelay } from "../src/gameplay/GameplayRuntime";
+import { getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/GameplayRuntime";
 
 function createData(note_times: readonly number[]): GameplayData {
   return {
@@ -27,4 +27,10 @@ test("accounts for playback rate when scheduling the lead-in", () => {
 test("keeps the audio scheduling margin when the chart already has enough lead-in", () => {
   assert.equal(getAudioStartDelay(createData([2]), 1), 0.1);
   assert.equal(getAudioStartDelay(createData([]), 1), 0.1);
+});
+
+test("ends 1.2 real seconds after the last note", () => {
+  assert.equal(getGameplayEndTime(createData([1, 5, 3]), 1), 6.2);
+  assert.equal(getGameplayEndTime(createData([1, 5, 3]), 2), 7.4);
+  assert.equal(getGameplayEndTime(createData([1, 5, 3]), 0.5), 5.6);
 });

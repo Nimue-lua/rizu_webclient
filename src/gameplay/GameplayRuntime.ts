@@ -7,11 +7,17 @@ import type { ReplayBase } from "../replay/ReplayBase";
 
 const AUDIO_SCHEDULE_MARGIN = 0.1;
 const FIRST_NOTE_LEAD_IN = 1.2;
+const RESULT_DELAY = 1.2;
 
 export function getAudioStartDelay(data: GameplayData, music_rate: number): number {
   const first_note_time = data.chart.notes.reduce((first, note) => note.weight >= 0 ? Math.min(first, note.absolute_time) : first, Infinity);
   if (!Number.isFinite(first_note_time)) return AUDIO_SCHEDULE_MARGIN;
   return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN - first_note_time / music_rate);
+}
+
+export function getGameplayEndTime(data: GameplayData, music_rate: number): number {
+  const last_note_time = data.chart.notes.reduce((last, note) => Math.max(last, note.absolute_time), -Infinity);
+  return last_note_time + RESULT_DELAY * music_rate;
 }
 
 export class GameplayRuntime {
@@ -30,6 +36,7 @@ export class GameplayRuntime {
   private animation_frame: number | null = null;
   private audio_source: AudioBufferSourceNode | null = null;
   private audio_start_time = 0;
+  private finished = false;
   private readonly displayed_accuracy = new SpringValue(0);
   private readonly combo_offset = new SpringValue(0, 14);
   private previous_frame_time: number | null = null;
@@ -83,7 +90,7 @@ export class GameplayRuntime {
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.repeat) return;
     if (event.code === "Escape") {
-      this.finish(this.rhythm_engine.score);
+      this.finishGameplay();
       return;
     }
     const column = this.key_columns.get(event.code);
@@ -111,12 +118,19 @@ export class GameplayRuntime {
     return (audio_time - this.audio_start_time) * this.music_rate;
   }
 
+  private readonly finishGameplay = () => {
+    if (this.finished) return;
+    this.finished = true;
+    this.finish(this.rhythm_engine.score);
+  };
+
   private readonly render = (timestamp: number) => {
     const delta_time = this.previous_frame_time === null ? 0 : (timestamp - this.previous_frame_time) / 1000;
     this.previous_frame_time = timestamp;
     const visual_scroll_speed = this.scroll_speed / this.music_rate;
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
-    this.rhythm_engine.update(this.getSongTime(timestamp), range.past, range.future);
+    const song_time = this.getSongTime(timestamp);
+    this.rhythm_engine.update(song_time, range.past, range.future);
     this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, visual_scroll_speed);
     const score = this.rhythm_engine.score;
     const target_accuracy = (score.accuracy ?? 0) * 100;
@@ -132,6 +146,10 @@ export class GameplayRuntime {
     this.combo_element.textContent = `${combo}x`;
     this.combo_element.style.transform = `translateY(${this.combo_offset.update(0, delta_time).toFixed(2)}px)`;
     this.previous_combo = combo;
+    if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
+      this.finishGameplay();
+      return;
+    }
     this.animation_frame = requestAnimationFrame(this.render);
   };
 }
