@@ -31,10 +31,11 @@ export class SqliteLibrary implements Library {
         name: String(name),
       }));
       const statement = database.prepare(`
-        SELECT songs.id AS song_id, songs.title, songs.artist, songs.background_preview_path,
+        SELECT songs.id AS song_id, songs.title, songs.artist,
           charts.id, charts.location_id, charts.name, charts.creator, charts.mode, charts.keys,
           charts.duration_seconds, charts.note_count, charts.long_note_ratio,
-          charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty, charts.format
+          charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty, charts.format,
+          charts.background_preview_path
         FROM songs
         JOIN charts ON charts.song_id = songs.id
         ORDER BY songs.title COLLATE NOCASE, songs.artist COLLATE NOCASE, songs.id,
@@ -50,7 +51,6 @@ export class SqliteLibrary implements Library {
           let song = songs_by_id.get(song_id);
           if (!song) {
             song = {
-              background_url: assetUrl(row.background_preview_path),
               charts: [],
               id: song_id,
               title: String(row.title),
@@ -60,6 +60,7 @@ export class SqliteLibrary implements Library {
             songs_by_id.set(song_id, song);
           }
           const chart: Chartview = {
+            background_url: assetUrl(row.background_preview_path),
             bpm_avg: Number(row.bpm_avg),
             bpm_max: Number(row.bpm_max),
             bpm_min: Number(row.bpm_min),

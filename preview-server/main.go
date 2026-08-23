@@ -63,7 +63,7 @@ type previewSession struct {
 	track        *webrtc.TrackLocalStaticRTP
 	mu           sync.Mutex
 	cancelSource context.CancelFunc
-	songID       string
+	audioPath    string
 	sourceID     uint64
 	sequence     uint16
 	timestamp    uint32
@@ -124,9 +124,8 @@ func (s *server) chart(response http.ResponseWriter, request *http.Request) {
 	var audioPath string
 	var chartPath string
 	err := s.db.QueryRow(`
-		SELECT songs.audio_path, charts.chart_path
+		SELECT charts.audio_path, charts.chart_path
 		FROM charts
-		JOIN songs ON songs.id = charts.song_id
 		WHERE charts.id = ?
 	`, request.PathValue("chartID")).Scan(&audioPath, &chartPath)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -267,15 +266,13 @@ func (s *previewSession) sendResponse(channel *webrtc.DataChannel, response prev
 }
 
 func (s *previewSession) selectPreview(chartID string, startSeconds float64) error {
-	var songID string
 	var audioPath string
 	var previewSeconds float64
 	err := s.server.db.QueryRow(`
-		SELECT songs.id, songs.audio_path, songs.preview_seconds
+		SELECT charts.audio_path, charts.preview_seconds
 		FROM charts
-		JOIN songs ON songs.id = charts.song_id
 		WHERE charts.id = ?
-	`, chartID).Scan(&songID, &audioPath, &previewSeconds)
+	`, chartID).Scan(&audioPath, &previewSeconds)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("chart %s was not found", chartID)
 	}
@@ -303,14 +300,14 @@ func (s *previewSession) selectPreview(chartID string, startSeconds float64) err
 	}
 
 	s.mu.Lock()
-	if s.songID == songID {
+	if s.audioPath == audioPath {
 		s.mu.Unlock()
 		return nil
 	}
 	if s.cancelSource != nil {
 		s.cancelSource()
 	}
-	s.songID = songID
+	s.audioPath = audioPath
 	s.sourceID++
 	sourceID := s.sourceID
 	context, cancel := context.WithCancel(context.Background())

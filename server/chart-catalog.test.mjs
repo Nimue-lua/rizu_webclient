@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -116,6 +116,90 @@ CircleSize:4
       });
       assert.equal(client.prepare("SELECT location_id FROM charts").get()?.location_id, 1);
       assert.equal(server.prepare("SELECT chart_path FROM charts").get()?.chart_path, "charts/Collection One/Chart One/chart.osu");
+    } finally {
+      client.close();
+      server.close();
+    }
+  } finally {
+    await rm(temporary_directory, { recursive: true, force: true });
+  }
+});
+
+test("stores audio and backgrounds for every chart in a set", async () => {
+  const temporary_directory = await mkdtemp(path.join(os.tmpdir(), "rizu-catalog-media-"));
+  const charts_directory = path.join(temporary_directory, "public", "charts");
+  const chart_directory = path.join(charts_directory, "Collection", "Song");
+  const client_database = path.join(temporary_directory, "client.sqlite");
+  const server_database = path.join(temporary_directory, "server.sqlite");
+  const ffmpeg_path = path.join(temporary_directory, "fake-ffmpeg");
+
+  try {
+    await mkdir(chart_directory, { recursive: true });
+    await writeFile(ffmpeg_path, "#!/bin/sh\nfor output; do :; done\n: > \"$output\"\n");
+    await chmod(ffmpeg_path, 0o700);
+
+    for (const [id, version, audio, background] of [
+      ["101", "Easy", "Easy.ogg", "Easy.png"],
+      ["102", "Hard", "Hard.ogg", "Hard.png"],
+      ["103", "Normal", "Easy.ogg", "Easy.png"],
+    ]) {
+      await writeFile(path.join(chart_directory, audio), "audio");
+      await writeFile(path.join(chart_directory, background), "background");
+      await writeFile(path.join(chart_directory, `${version}.osu`), `osu file format v14
+[General]
+AudioFilename: ${audio}
+PreviewTime: ${id}00
+Mode: 3
+[Metadata]
+Title:Multi Media Song
+Artist:Artist
+Creator:Mapper
+Version:${version}
+BeatmapID:${id}
+BeatmapSetID:100
+[Difficulty]
+CircleSize:4
+[Events]
+//Background and Video events
+0,0,"${background}",0,0
+[HitObjects]
+64,192,1000,1,0,0:0:0:0:
+`);
+    }
+
+    await cacheCharts({
+      charts_directory,
+      client_database,
+      server_database,
+      schema_directory: path.dirname(fileURLToPath(import.meta.url)),
+      ffmpeg_path,
+    });
+
+    const client = new DatabaseSync(client_database, { readOnly: true });
+    const server = new DatabaseSync(server_database, { readOnly: true });
+    try {
+      assert.deepEqual(server.prepare("SELECT id, audio_path, background_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row })), [{
+        id: "101",
+        audio_path: "charts/Collection/Song/Easy.ogg",
+        background_path: "charts/Collection/Song/Easy.png",
+        preview_seconds: 10.1,
+      }, {
+        id: "102",
+        audio_path: "charts/Collection/Song/Hard.ogg",
+        background_path: "charts/Collection/Song/Hard.png",
+        preview_seconds: 10.2,
+      }, {
+        id: "103",
+        audio_path: "charts/Collection/Song/Easy.ogg",
+        background_path: "charts/Collection/Song/Easy.png",
+        preview_seconds: 10.3,
+      }]);
+      const previews = client.prepare("SELECT id, background_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
+      assert.equal(previews.length, 3);
+      assert.match(previews[0]?.background_preview_path, /^chart-previews\/[a-f0-9]{24}\.webp$/);
+      assert.match(previews[1]?.background_preview_path, /^chart-previews\/[a-f0-9]{24}\.webp$/);
+      assert.notEqual(previews[0]?.background_preview_path, previews[1]?.background_preview_path);
+      assert.equal(previews[0]?.background_preview_path, previews[2]?.background_preview_path);
     } finally {
       client.close();
       server.close();

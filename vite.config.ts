@@ -12,9 +12,8 @@ function encodeAssetUrl(...segments: string[]) {
 
 function getChart(database: DatabaseSync, chart_id: string) {
   const chart = database.prepare(`
-    SELECT songs.audio_path, charts.chart_path
+    SELECT charts.audio_path, charts.chart_path
     FROM charts
-    JOIN songs ON songs.id = charts.song_id
     WHERE charts.id = ?
   `).get(chart_id) as { audio_path: string; chart_path: string } | undefined;
 

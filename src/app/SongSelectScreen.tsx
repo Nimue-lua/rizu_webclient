@@ -186,10 +186,10 @@ export function SongSelectScreen({
   useEffect(() => {
     setLoadedBackgroundUrl(null);
     const timer = window.setTimeout(() => {
-      setBackgroundUrl(selected_song?.background_url ?? null);
+      setBackgroundUrl(selected_chart?.background_url ?? null);
     }, BACKGROUND_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [selected_song?.background_url]);
+  }, [selected_chart?.background_url]);
 
   const first_index = Math.max(0, Math.floor(scroll_top / ROW_HEIGHT) - OVERSCAN);
   const visible_count = Math.ceil(viewport_height / ROW_HEIGHT) + OVERSCAN * 2;

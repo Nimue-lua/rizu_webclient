@@ -31,10 +31,8 @@ func TestChart(t *testing.T) {
 	}
 	defer database.Close()
 	if _, err := database.Exec(`
-		CREATE TABLE songs (id TEXT, audio_path TEXT);
-		CREATE TABLE charts (id TEXT, song_id TEXT, chart_path TEXT);
-		INSERT INTO songs VALUES ('song', 'charts/a song/audio.ogg');
-		INSERT INTO charts VALUES ('chart', 'song', 'charts/a song/chart [hard].osu');
+		CREATE TABLE charts (id TEXT, song_id TEXT, chart_path TEXT, audio_path TEXT);
+		INSERT INTO charts VALUES ('chart', 'song', 'charts/a song/chart [hard].osu', 'charts/a song/audio.ogg');
 	`); err != nil {
 		t.Fatal(err)
 	}
@@ -70,8 +68,7 @@ func TestSelectPreviewRejectsUnknownChart(t *testing.T) {
 	}
 	defer database.Close()
 	if _, err := database.Exec(`
-		CREATE TABLE songs (id TEXT, audio_path TEXT, preview_seconds REAL);
-		CREATE TABLE charts (id TEXT, song_id TEXT);
+		CREATE TABLE charts (id TEXT, song_id TEXT, audio_path TEXT, preview_seconds REAL);
 	`); err != nil {
 		t.Fatal(err)
 	}
@@ -88,10 +85,8 @@ func TestSelectPreviewRejectsPathOutsidePublicDirectory(t *testing.T) {
 	}
 	defer database.Close()
 	if _, err := database.Exec(`
-		CREATE TABLE songs (id TEXT, audio_path TEXT, preview_seconds REAL);
-		CREATE TABLE charts (id TEXT, song_id TEXT);
-		INSERT INTO songs VALUES ('song', '../outside.ogg', 0);
-		INSERT INTO charts VALUES ('chart', 'song');
+		CREATE TABLE charts (id TEXT, song_id TEXT, audio_path TEXT, preview_seconds REAL);
+		INSERT INTO charts VALUES ('chart', 'song', '../outside.ogg', 0);
 	`); err != nil {
 		t.Fatal(err)
 	}
@@ -104,17 +99,49 @@ func TestSelectPreviewRejectsPathOutsidePublicDirectory(t *testing.T) {
 	}
 }
 
-func TestSelectPreviewDoesNotReloadSameSong(t *testing.T) {
+func TestSelectPreviewReloadsDifferentChartAudioInSameSong(t *testing.T) {
 	database, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close()
 	if _, err := database.Exec(`
-		CREATE TABLE songs (id TEXT, audio_path TEXT, preview_seconds REAL);
-		CREATE TABLE charts (id TEXT, song_id TEXT);
-		INSERT INTO songs VALUES ('song', 'audio.ogg', 10);
-		INSERT INTO charts VALUES ('easy', 'song'), ('hard', 'song');
+		CREATE TABLE charts (id TEXT, song_id TEXT, audio_path TEXT, preview_seconds REAL);
+		INSERT INTO charts VALUES ('easy', 'song', 'easy.ogg', 10), ('hard', 'song', 'hard.ogg', 20);
+	`); err != nil {
+		t.Fatal(err)
+	}
+	publicPath := t.TempDir()
+	for _, name := range []string{"easy.ogg", "hard.ogg"} {
+		if err := os.WriteFile(filepath.Join(publicPath, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := &previewSession{server: &server{
+		config: config{publicPath: publicPath, ffmpegPath: "false"},
+		db:     database,
+	}}
+	if err := session.selectPreview("easy", 0); err != nil {
+		t.Fatal(err)
+	}
+	firstSourceID := session.sourceID
+	if err := session.selectPreview("hard", 0); err != nil {
+		t.Fatal(err)
+	}
+	if session.sourceID == firstSourceID {
+		t.Fatal("different chart audio did not start a new source")
+	}
+}
+
+func TestSelectPreviewDoesNotReloadSharedChartAudio(t *testing.T) {
+	database, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.Exec(`
+		CREATE TABLE charts (id TEXT, song_id TEXT, audio_path TEXT, preview_seconds REAL);
+		INSERT INTO charts VALUES ('easy', 'song', 'audio.ogg', 10), ('hard', 'song', 'audio.ogg', 20);
 	`); err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +161,7 @@ func TestSelectPreviewDoesNotReloadSameSong(t *testing.T) {
 		t.Fatal(err)
 	}
 	if session.sourceID != firstSourceID {
-		t.Fatalf("same song started a new source: %d to %d", firstSourceID, session.sourceID)
+		t.Fatalf("shared audio started a new source: %d to %d", firstSourceID, session.sourceID)
 	}
 }
 

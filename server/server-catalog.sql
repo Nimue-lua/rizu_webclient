@@ -1,4 +1,4 @@
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;
 
 CREATE TABLE catalog (
 	schema_version INTEGER NOT NULL,
@@ -9,10 +9,7 @@ CREATE TABLE catalog (
 CREATE TABLE songs (
 	id TEXT PRIMARY KEY,
 	title TEXT NOT NULL,
-	artist TEXT NOT NULL,
-	preview_seconds REAL NOT NULL,
-	audio_path TEXT NOT NULL,
-	background_path TEXT
+	artist TEXT NOT NULL
 );
 
 CREATE TABLE locations (
@@ -38,6 +35,9 @@ CREATE TABLE charts (
 	difficulty REAL NOT NULL,
 	format TEXT NOT NULL,
 	chart_path TEXT NOT NULL UNIQUE,
+	preview_seconds REAL NOT NULL,
+	audio_path TEXT NOT NULL,
+	background_path TEXT,
 	FOREIGN KEY (song_id) REFERENCES songs(id),
 	FOREIGN KEY (location_id) REFERENCES locations(id)
 );

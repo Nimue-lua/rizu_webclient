@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const execFileAsync = promisify(execFile);
 
 function readProperty(source, name) {
@@ -266,28 +266,27 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
           && await readableFile(path.join(folder_path, metadata.background_file))
           ? metadata.background_file
           : null;
-        const song = songs.get(metadata.song_id);
-        if (!song) {
-          let background_preview_path = null;
-          if (background_file) {
-            const source_path = path.join(folder_path, background_file);
-            const preview_file = `${metadata.song_id}.webp`;
-            await rm(`${source_path}.rizu-preview.webp`, { force: true });
-            await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
-            background_preview_path = path.posix.join("chart-previews", preview_file);
-          }
-          songs.set(metadata.song_id, {
-            ...metadata,
-            audio_path: path.posix.join("charts", location_name, folder, metadata.audio_file),
-            background_path: background_file ? path.posix.join("charts", location_name, folder, background_file) : null,
-            background_preview_path,
-          });
+        if (!songs.has(metadata.song_id)) {
+          songs.set(metadata.song_id, metadata);
+        }
+
+        let background_preview_path = null;
+        if (background_file) {
+          const source_path = path.join(folder_path, background_file);
+          const background_path = path.posix.join("charts", location_name, folder, background_file);
+          const preview_file = `${createHash("sha256").update(background_path).digest("hex").slice(0, 24)}.webp`;
+          await rm(`${source_path}.rizu-preview.webp`, { force: true });
+          await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
+          background_preview_path = path.posix.join("chart-previews", preview_file);
         }
 
         charts.push({
           ...metadata,
           location_id,
           chart_path: path.posix.join("charts", location_name, folder, chart_file),
+          audio_path: path.posix.join("charts", location_name, folder, metadata.audio_file),
+          background_path: background_file ? path.posix.join("charts", location_name, folder, background_file) : null,
+          background_preview_path,
         });
       }
     }
@@ -315,10 +314,10 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
 
     const insert_client_location = client_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
     const insert_server_location = server_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
-    const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    const insert_server_song = server_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?)");
-    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    const insert_server_chart = server_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?)");
+    const insert_server_song = server_db.prepare("INSERT INTO songs VALUES (?, ?, ?)");
+    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_server_chart = server_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     client_db.exec("BEGIN");
     server_db.exec("BEGIN");
@@ -327,13 +326,13 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
       insert_server_location.run(location.id, location.name, location.path);
     }
     for (const song of data.songs) {
-      insert_client_song.run(song.song_id, song.title, song.title_unicode, song.artist, song.artist_unicode, song.source, song.tags, song.preview_seconds, song.background_preview_path);
-      insert_server_song.run(song.song_id, song.title, song.artist, song.preview_seconds, song.audio_path, song.background_path);
+      insert_client_song.run(song.song_id, song.title, song.title_unicode, song.artist, song.artist_unicode, song.source, song.tags);
+      insert_server_song.run(song.song_id, song.title, song.artist);
     }
     for (const chart of data.charts) {
       const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty, chart.format];
-      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats);
-      insert_server_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, ...stats, chart.chart_path);
+      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats, chart.background_preview_path);
+      insert_server_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, ...stats, chart.chart_path, chart.preview_seconds, chart.audio_path, chart.background_path);
     }
     client_db.exec("COMMIT");
     server_db.exec("COMMIT");
