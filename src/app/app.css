@@ -278,10 +278,22 @@ svg { width: 22px; height: 22px; }
 .result-screen::after { position: absolute; z-index: -1; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"); opacity: .04; pointer-events: none; content: ""; }
 .result-bottom-gradient { position: absolute; z-index: 0; inset: 0; background: linear-gradient(to bottom, transparent 38%, #0d0c0f66 63%, #0d0c0ff2); pointer-events: none; }
 .result-panels { position: relative; z-index: 1; width: min(900px, calc(100vw - 40px)); height: 500px; }
-.result-side-panel { position: absolute; top: 95px; right: 0; width: 58%; height: 310px; background: var(--panel); border-radius: 0 40px 40px 0; box-shadow: 0 20px 50px #0005; }
-.result-circle-panel { position: absolute; top: 0; left: 0; display: grid; width: 500px; height: 500px; background: var(--panel); border-radius: 50%; box-shadow: 0 24px 65px #0007; place-items: center; }
+.result-side-panel { position: absolute; top: 95px; right: 0; display: grid; grid-template-rows: auto auto auto; align-content: center; gap: 20px; width: 58%; height: 310px; padding: 27px 28px 25px 150px; background: var(--panel); border-radius: 0 40px 40px 0; box-shadow: 0 20px 50px #0005; font-family: "Rubik", sans-serif; }
+.result-circle-panel { position: absolute; z-index: 1; top: 0; left: 0; display: grid; width: 500px; height: 500px; background: var(--panel); border-radius: 50%; box-shadow: 0 24px 65px #0007; place-items: center; }
 .judge-segments-canvas { display: block; width: 490px; height: 490px; border-radius: 50%; }
+.result-grade { position: absolute; bottom: calc(50% + 73px); font-family: "Rubik", sans-serif; font-size: 64px; font-weight: 400; line-height: 1; }
 .result-accuracy { position: absolute; font-family: "Rubik", sans-serif; font-size: 96px; font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1; }
+.result-misses { position: absolute; top: calc(50% + 73px); color: #ff6060; font-family: "Rubik", sans-serif; font-size: 64px; font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1; }
+.result-chart-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; color: var(--text); }
+.result-chart-meta > span { display: grid; grid-template-rows: 24px 36px; justify-items: center; gap: 4px; }
+.result-chart-meta svg { display: block; width: 24px; height: 24px; color: var(--muted); }
+.result-chart-meta em { height: 24px; color: var(--muted); font-size: 24px; font-style: normal; line-height: 1; }
+.result-chart-meta b { font-size: 36px; font-weight: 400; line-height: 1; }
+.result-play-meta { display: flex; align-items: center; justify-content: center; gap: 14px; font-variant-numeric: tabular-nums; }
+.result-play-meta > span { color: #ffb9bd; font-size: 36px; }
+.result-play-meta strong { color: #ee33d6; font-size: 64px; font-weight: 400; line-height: 1; }
+.result-play-meta small { align-self: center; margin-left: -8px; color: var(--muted); font-size: 16px; }
+.result-score-system { overflow: hidden; color: var(--muted); font-size: 24px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .result-song-metadata { position: absolute; z-index: 1; right: 38px; bottom: 34px; left: 38px; display: flex; align-items: end; justify-content: space-between; gap: 48px; min-width: 0; font-family: "Zen Maru Gothic", sans-serif; text-shadow: 2px 2px var(--background); }
 .result-song-metadata > div { min-width: 0; }
 .result-song-metadata h2, .result-song-metadata p, .result-song-metadata strong { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; }

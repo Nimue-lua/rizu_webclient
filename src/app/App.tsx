@@ -103,8 +103,12 @@ export function App() {
       audio_url: chart.audio_url,
       artist: song.artist,
       background_url: chart.background_url,
+      bpm: chart.bpm_avg,
       chart_name: chart.name,
       chart_url: chart.chart_url,
+      difficulty: chart.difficulty,
+      duration_seconds: chart.duration_seconds,
+      long_note_ratio: chart.long_note_ratio,
       title: song.title,
     });
     setInputBindings(chart_input_bindings);
@@ -182,6 +186,12 @@ export function App() {
           title={loading_location?.title ?? "Unknown title"}
           artist={loading_location?.artist ?? "Unknown artist"}
           chart_name={loading_location?.chart_name ?? "Unknown chart"}
+          duration_seconds={loading_location?.duration_seconds ?? 0}
+          long_note_ratio={loading_location?.long_note_ratio ?? 0}
+          bpm={loading_location?.bpm ?? 0}
+          music_rate={replay_base.rate}
+          difficulty={loading_location?.difficulty ?? 0}
+          overall_difficulty={assets?.chart.overall_difficulty ?? 5}
           onExit={leaveResults}
         />
       );

@@ -5,8 +5,12 @@ export interface GameplayLocation {
   audio_url: string;
   artist: string;
   background_url: string | null;
+  bpm: number;
   chart_name: string;
   chart_url: string;
+  difficulty: number;
+  duration_seconds: number;
+  long_note_ratio: number;
   title: string;
 }
 
