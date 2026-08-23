@@ -273,8 +273,11 @@ svg { width: 22px; height: 22px; }
 .gamemode-filter-list input { width: 20px; height: 20px; accent-color: var(--accent); }
 
 .gameplay-screen, .gameplay-screen * { cursor: none; }
-.gameplay-screen { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.gameplay-screen { position: relative; width: 100vw; height: 100vh; overflow: hidden; touch-action: none; }
 .gameplay-screen canvas { display: block; width: 100%; height: 100%; }
+.gameplay-touch-zones { position: absolute; z-index: 1; inset: 0; display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; touch-action: none; }
+.gameplay-touch-zones button { width: 100%; height: 100%; padding: 0; background: transparent; border-radius: 0; touch-action: none; }
+.gameplay-touch-zones button:hover, .gameplay-touch-zones button:active { filter: none; }
 .gameplay-accuracy { position: absolute; top: 1rem; right: 1rem; width: 7ch; color: #fff; font-family: "Rubik", sans-serif; font-feature-settings: "tnum" 1; font-size: 32px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; text-align: right; text-shadow: 0 1px 4px #000; }
 .gameplay-judgment { position: absolute; top: calc(50% + 10px); left: 50%; display: grid; min-width: 220px; gap: 5px; justify-items: center; pointer-events: none; transform: translate(-50%, -50%); font-family: "Rubik", sans-serif; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; font-weight: 700; text-shadow: 0 2px 7px #000; }
 .gameplay-judge { min-height: 42px; color: #fff; font-size: 36px; line-height: 1; text-transform: uppercase; }

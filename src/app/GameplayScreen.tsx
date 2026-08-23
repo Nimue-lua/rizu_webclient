@@ -20,6 +20,7 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, replay_bas
   const accuracy_ref = useRef<HTMLSpanElement>(null);
   const judge_ref = useRef<HTMLSpanElement>(null);
   const combo_ref = useRef<HTMLSpanElement>(null);
+  const runtime_ref = useRef<GameplayRuntime>(null);
 
   useEffect(() => {
     const canvas = canvas_ref.current;
@@ -33,14 +34,42 @@ export function GameplayScreen({ assets, master_volume, scroll_speed, replay_bas
 
     const runtime = new GameplayRuntime(canvas, accuracy, judge, combo, assets, master_volume, scroll_speed, replay_base,
       input_bindings, hit_registration, onFinish);
+    runtime_ref.current = runtime;
     runtime.start();
 
-    return () => runtime.destroy();
+    return () => {
+      runtime_ref.current = null;
+      runtime.destroy();
+    };
   }, [assets, hit_registration, input_bindings, master_volume, onFinish, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">
       <canvas ref={canvas_ref} />
+      <div className="gameplay-touch-zones" aria-label="Gameplay touch controls">
+        {Array.from({ length: assets.chart.column_count }, (_, column) => (
+          <button
+            key={column}
+            type="button"
+            tabIndex={-1}
+            aria-label={`Column ${column + 1}`}
+            onContextMenu={(event) => event.preventDefault()}
+            onPointerDown={(event) => {
+              if (event.pointerType === "mouse") return;
+              event.preventDefault();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              runtime_ref.current?.pressPointer(event.pointerId, column, event.timeStamp);
+            }}
+            onPointerUp={(event) => {
+              if (event.pointerType === "mouse") return;
+              event.preventDefault();
+              runtime_ref.current?.releasePointer(event.pointerId, event.timeStamp);
+            }}
+            onPointerCancel={(event) => runtime_ref.current?.releasePointer(event.pointerId, event.timeStamp)}
+            onLostPointerCapture={(event) => runtime_ref.current?.releasePointer(event.pointerId, event.timeStamp)}
+          />
+        ))}
+      </div>
       <span ref={accuracy_ref} className="gameplay-accuracy">0.00%</span>
       <div className="gameplay-judgment">
         <span ref={judge_ref} className="gameplay-judge" />

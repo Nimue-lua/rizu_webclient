@@ -33,6 +33,7 @@ export class GameplayRuntime {
   private readonly renderer: WebGlGameplayRenderer;
   private readonly key_columns: ReadonlyMap<string, number>;
   private readonly key_catches = new Map<string, number>();
+  private readonly pointer_catches = new Map<number, number>();
   private animation_frame: number | null = null;
   private audio_source: AudioBufferSourceNode | null = null;
   private audio_start_time = 0;
@@ -87,6 +88,19 @@ export class GameplayRuntime {
     this.renderer.destroy();
   }
 
+  pressPointer(pointer_id: number, column: number, performance_time: number): void {
+    if (this.pointer_catches.has(pointer_id)) return;
+    const note_index = this.rhythm_engine.press(column, this.getSongTime(performance_time));
+    if (note_index !== undefined) this.pointer_catches.set(pointer_id, note_index);
+  }
+
+  releasePointer(pointer_id: number, performance_time: number): void {
+    const note_index = this.pointer_catches.get(pointer_id);
+    if (note_index === undefined) return;
+    this.rhythm_engine.release(note_index, this.getSongTime(performance_time));
+    this.pointer_catches.delete(pointer_id);
+  }
+
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.repeat) return;
     if (event.code === "Escape") {
@@ -123,7 +137,11 @@ export class GameplayRuntime {
     for (const note_index of this.key_catches.values()) {
       this.rhythm_engine.release(note_index, song_time);
     }
+    for (const note_index of this.pointer_catches.values()) {
+      this.rhythm_engine.release(note_index, song_time);
+    }
     this.key_catches.clear();
+    this.pointer_catches.clear();
     this.rhythm_engine.update(getGameplayEndTime(this.data, this.music_rate), 0, 0);
     this.finishGameplay();
   }
