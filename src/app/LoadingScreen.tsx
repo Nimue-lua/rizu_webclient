@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import type { GameplayData, GameplayLoader } from "../library/GameplayLoader";
+import type { GameplayData, GameplayLoader, GameplayLocation } from "../library/GameplayLoader";
 
 interface LoadingScreenProps {
   gameplay_loader: GameplayLoader;
-  chart_id: string;
+  location: GameplayLocation;
   audio_context: AudioContext;
   onCancel: () => void;
   onLoaded: (assets: GameplayData) => void;
@@ -11,7 +11,7 @@ interface LoadingScreenProps {
 
 export function LoadingScreen({
   gameplay_loader,
-  chart_id,
+  location,
   audio_context,
   onCancel,
   onLoaded,
@@ -22,12 +22,7 @@ export function LoadingScreen({
     const abort_controller = new AbortController();
 
     void gameplay_loader
-      .getLocation(chart_id, abort_controller.signal)
-      .then((reference) => gameplay_loader.load(
-        reference,
-        audio_context,
-        abort_controller.signal,
-      ))
+      .load(location, audio_context, abort_controller.signal)
       .then((assets) => {
         if (!abort_controller.signal.aborted) {
           onLoaded(assets);
@@ -40,7 +35,7 @@ export function LoadingScreen({
       });
 
     return () => abort_controller.abort();
-  }, [audio_context, gameplay_loader, onLoaded, chart_id]);
+  }, [audio_context, gameplay_loader, location, onLoaded]);
 
   return (
     <main className="screen loading-screen">

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { HttpGameplayLoader, type GameplayData } from "../library/GameplayLoader";
+import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
 import { SqliteLibrary } from "../library/Library";
+import type { Chartview } from "../library/views";
 import { ChartSelector } from "../select/ChartSelector";
 import { GameplayScreen } from "./GameplayScreen";
 import { LoadingScreen } from "./LoadingScreen";
@@ -26,7 +27,7 @@ export function App() {
   const [settings_open, setSettingsOpen] = useState(false);
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<GameplayData | null>(null);
-  const [loading_chart_id, setLoadingChartId] = useState<string | null>(null);
+  const [loading_location, setLoadingLocation] = useState<GameplayLocation | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [master_volume, setMasterVolume] = useState(() => {
@@ -97,8 +98,8 @@ export function App() {
     });
   };
 
-  const beginLoading = (chart_id: string, chart_input_bindings: readonly (string | null)[]) => {
-    setLoadingChartId(chart_id);
+  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[]) => {
+    setLoadingLocation({ audio_url: chart.audio_url, chart_url: chart.chart_url });
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
     setScore(null);
@@ -111,7 +112,7 @@ export function App() {
     }
 
     setAudioContext(null);
-    setLoadingChartId(null);
+    setLoadingLocation(null);
     setScreen("song-select");
   };
 
@@ -128,7 +129,7 @@ export function App() {
     setAssets(null);
     setScore(null);
     setAudioContext(null);
-    setLoadingChartId(null);
+    setLoadingLocation(null);
     setScreen("song-select");
   };
 
@@ -153,14 +154,14 @@ export function App() {
         />
       );
     case "loading":
-      if (!audio_context || !loading_chart_id) {
+      if (!audio_context || !loading_location) {
         throw new Error("Gameplay loading is not initialized");
       }
 
       return (
         <LoadingScreen
           gameplay_loader={gameplay_loader}
-          chart_id={loading_chart_id}
+          location={loading_location}
           audio_context={audio_context}
           onCancel={cancelLoading}
           onLoaded={finishLoading}
@@ -173,7 +174,6 @@ export function App() {
         <>
           <SongSelectScreen
             chart_selector={chart_selector}
-            master_volume={master_volume}
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}
             tap_only={replay_base.tap_only}

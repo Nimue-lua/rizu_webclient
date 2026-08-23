@@ -145,6 +145,15 @@ async function readableFile(file_path) {
   }
 }
 
+async function directoryExists(directory_path) {
+  try {
+    return (await stat(directory_path)).isDirectory();
+  } catch (reason) {
+    if (reason && typeof reason === "object" && "code" in reason && reason.code === "ENOENT") return false;
+    throw reason;
+  }
+}
+
 async function generateBackgroundPreview(source_path, preview_path, ffmpeg_path) {
   try {
     const [source_stat, preview_stat] = await Promise.all([stat(source_path), stat(preview_path)]);
@@ -218,7 +227,7 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
   let skipped = 0;
   const location_names = [];
   for (const entry of await readdir(charts_directory, { withFileTypes: true })) {
-    if (entry.isDirectory() || (entry.isSymbolicLink() && (await stat(path.join(charts_directory, entry.name))).isDirectory())) {
+    if (entry.isDirectory() || (entry.isSymbolicLink() && await directoryExists(path.join(charts_directory, entry.name)))) {
       location_names.push(entry.name);
     }
   }
@@ -235,7 +244,7 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
 
     const folders = [];
     for (const entry of await readdir(location_directory, { withFileTypes: true })) {
-      if (entry.isDirectory() || (entry.isSymbolicLink() && (await stat(path.join(location_directory, entry.name))).isDirectory())) {
+      if (entry.isDirectory() || (entry.isSymbolicLink() && await directoryExists(path.join(location_directory, entry.name)))) {
         folders.push(entry.name);
       }
     }
@@ -295,7 +304,7 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
   return { locations, songs: [...songs.values()], charts, skipped };
 }
 
-function writeDatabases(client_path, server_path, client_schema, server_schema, data, generated_at) {
+function writeDatabases(client_path, client_schema, data, generated_at) {
   const version_hash = createHash("sha256");
   version_hash.update(JSON.stringify(data.locations));
   version_hash.update("\0");
@@ -304,41 +313,29 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
   version_hash.update(JSON.stringify(data.charts));
   const version = version_hash.digest("hex");
   const client_db = new DatabaseSync(client_path);
-  const server_db = new DatabaseSync(server_path);
 
   try {
     client_db.exec(client_schema);
-    server_db.exec(server_schema);
     client_db.prepare("INSERT INTO catalog VALUES (?, ?, ?)").run(SCHEMA_VERSION, version, generated_at);
-    server_db.prepare("INSERT INTO catalog VALUES (?, ?, ?)").run(SCHEMA_VERSION, version, generated_at);
 
     const insert_client_location = client_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
-    const insert_server_location = server_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
     const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insert_server_song = server_db.prepare("INSERT INTO songs VALUES (?, ?, ?)");
-    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    const insert_server_chart = server_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     client_db.exec("BEGIN");
-    server_db.exec("BEGIN");
     for (const location of data.locations) {
       insert_client_location.run(location.id, location.name, location.path);
-      insert_server_location.run(location.id, location.name, location.path);
     }
     for (const song of data.songs) {
       insert_client_song.run(song.song_id, song.title, song.title_unicode, song.artist, song.artist_unicode, song.source, song.tags);
-      insert_server_song.run(song.song_id, song.title, song.artist);
     }
     for (const chart of data.charts) {
       const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty, chart.format];
-      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats, chart.background_preview_path);
-      insert_server_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, ...stats, chart.chart_path, chart.preview_seconds, chart.audio_path, chart.background_path);
+      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats, chart.chart_path, chart.audio_path, chart.preview_seconds, chart.background_preview_path);
     }
     client_db.exec("COMMIT");
-    server_db.exec("COMMIT");
   } finally {
     client_db.close();
-    server_db.close();
   }
 
   return version;
@@ -347,29 +344,25 @@ function writeDatabases(client_path, server_path, client_schema, server_schema, 
 export async function cacheCharts({
   charts_directory,
   client_database,
-  server_database,
   schema_directory,
   background_previews_directory = path.join(path.dirname(charts_directory), "chart-previews"),
   ffmpeg_path = "ffmpeg",
 }) {
   const client_temp = `${client_database}.tmp`;
-  const server_temp = `${server_database}.tmp`;
   await mkdir(background_previews_directory, { recursive: true });
-  await Promise.all([rm(client_temp, { force: true }), rm(server_temp, { force: true })]);
+  await rm(client_temp, { force: true });
 
   try {
-    const [data, client_schema, server_schema] = await Promise.all([
+    const [data, client_schema] = await Promise.all([
       scanCharts(charts_directory, background_previews_directory, ffmpeg_path),
       readFile(path.join(schema_directory, "client-catalog.sql"), "utf8"),
-      readFile(path.join(schema_directory, "server-catalog.sql"), "utf8"),
     ]);
     const generated_at = Math.floor(Date.now() / 1000);
-    const version = writeDatabases(client_temp, server_temp, client_schema, server_schema, data, generated_at);
+    const version = writeDatabases(client_temp, client_schema, data, generated_at);
     await rename(client_temp, client_database);
-    await rename(server_temp, server_database);
     return { ...data, version };
   } catch (reason) {
-    await Promise.all([rm(client_temp, { force: true }), rm(server_temp, { force: true })]);
+    await rm(client_temp, { force: true });
     throw reason;
   }
 }

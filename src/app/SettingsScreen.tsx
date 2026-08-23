@@ -86,7 +86,7 @@ export function SettingsScreen({
             style={sliderStyle(master_volume_percent, 0, 100)}
             onChange={(event) => onMasterVolumeChange(Number(event.target.value) / 100)}
           />
-          <small>Controls preview and gameplay audio.</small>
+          <small>Controls gameplay audio.</small>
         </label>
 
         <header className="settings-heading settings-heading-spaced" id="gameplay-settings">

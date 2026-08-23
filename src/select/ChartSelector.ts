@@ -1,6 +1,5 @@
 import type { Library } from "../library/Library";
 import type { ChartfileSetView, Chartview, LibraryView, Location } from "../library/views";
-import type { PreviewClient } from "../preview/PreviewClient";
 
 export interface ChartSelectorSnapshot {
   locations: readonly Location[];
@@ -18,8 +17,6 @@ type Listener = () => void;
 export class ChartSelector {
   private readonly library: Library;
   private readonly listeners = new Set<Listener>();
-  private preview_client: PreviewClient | null = null;
-  private preview_timer: number | null = null;
   private snapshot: ChartSelectorSnapshot = {
     locations: [],
     songs: [],
@@ -52,11 +49,6 @@ export class ChartSelector {
     }
   }
 
-  setPreviewClient(preview_client: PreviewClient | null): void {
-    this.preview_client = preview_client;
-    if (preview_client && this.snapshot.selected_chart_id) this.schedulePreview(this.snapshot.selected_chart_id);
-  }
-
   setQuery(query: string): void {
     this.update({ query });
     this.ensureSelection();
@@ -82,7 +74,6 @@ export class ChartSelector {
   selectChart(chart_id: string | null): void {
     if (chart_id === this.snapshot.selected_chart_id) return;
     this.update({ selected_chart_id: chart_id });
-    if (chart_id) this.schedulePreview(chart_id);
   }
 
   scrollLevel(direction: number): void {
@@ -123,9 +114,7 @@ export class ChartSelector {
   }
 
   destroy(): void {
-    if (this.preview_timer !== null) window.clearTimeout(this.preview_timer);
     this.listeners.clear();
-    this.preview_client = null;
   }
 
   private applyLibrary(library: LibraryView): void {
@@ -139,15 +128,6 @@ export class ChartSelector {
     const song = current ?? songs[0];
     const chart = song?.charts.find((candidate) => candidate.id === this.snapshot.selected_chart_id) ?? song?.charts.at(-1);
     this.update({ selected_song_id: song?.id ?? null, selected_chart_id: chart?.id ?? null });
-    if (chart) this.schedulePreview(chart.id);
-  }
-
-  private schedulePreview(chart_id: string): void {
-    if (this.preview_timer !== null) window.clearTimeout(this.preview_timer);
-    this.preview_timer = window.setTimeout(() => {
-      this.preview_client?.select({ chart_id });
-      this.preview_timer = null;
-    }, 200);
   }
 
   private update(change: Partial<ChartSelectorSnapshot>): void {

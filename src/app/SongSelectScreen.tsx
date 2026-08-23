@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
 import type { Chartview } from "../library/views";
-import { PreviewClient } from "../preview/PreviewClient";
 import type { ChartSelector } from "../select/ChartSelector";
 import { InputBindingsModal } from "./InputBindingsModal";
 import { GameplayModifiersModal } from "./GameplayModifiersModal";
@@ -76,9 +75,8 @@ function Icon({ name }: { name: IconName }) {
 
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
-  onPlay: (chart_id: string, input_bindings: readonly (string | null)[]) => void;
+  onPlay: (chart: Chartview, input_bindings: readonly (string | null)[]) => void;
   onSettings: () => void;
-  master_volume: number;
   music_rate: number;
   constant_scroll: boolean;
   tap_only: boolean;
@@ -115,7 +113,6 @@ export function SongSelectScreen({
   chart_selector,
   onPlay,
   onSettings,
-  master_volume,
   music_rate,
   constant_scroll,
   tap_only,
@@ -124,7 +121,6 @@ export function SongSelectScreen({
   onTapOnlyChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
-  const audio_ref = useRef<HTMLAudioElement>(null);
   const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
   const [scroll_top, setScrollTop] = useState(0);
@@ -153,26 +149,6 @@ export function SongSelectScreen({
     const timer = window.setInterval(() => setNow(new Date()), 1_000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const audio = audio_ref.current;
-    if (!audio) return;
-    const abort_controller = new AbortController();
-    const preview_client = new PreviewClient();
-    chart_selector.setPreviewClient(preview_client);
-    void preview_client.connect(audio, abort_controller.signal).catch((reason: unknown) => {
-      if (!abort_controller.signal.aborted) console.error("Preview connection failed", reason);
-    });
-    return () => {
-      abort_controller.abort();
-      preview_client.close();
-      chart_selector.setPreviewClient(null);
-    };
-  }, [chart_selector]);
-
-  useEffect(() => {
-    if (audio_ref.current) audio_ref.current.volume = master_volume;
-  }, [master_volume]);
 
   useEffect(() => {
     const abort_controller = new AbortController();
@@ -207,7 +183,6 @@ export function SongSelectScreen({
   const visible_songs = filtered_songs.slice(first_index, first_index + visible_count);
 
   const selectSong = (song_id: string) => {
-    void audio_ref.current?.play().catch(() => undefined);
     chart_selector.selectSong(song_id);
   };
 
@@ -247,7 +222,7 @@ export function SongSelectScreen({
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
   const hero_loaded = background_url === null || background_url === loaded_background_url;
-  const playChart = (chart: Chartview) => onPlay(chart.id, loadInputBindings(inputLayout(chart)));
+  const playChart = (chart: Chartview) => onPlay(chart, loadInputBindings(inputLayout(chart)));
   const moveRateDrag = (client_x: number) => {
     const drag = rate_drag_ref.current;
     if (!drag) return;
@@ -257,7 +232,6 @@ export function SongSelectScreen({
 
   return (
     <main className="song-select-screen">
-      <audio ref={audio_ref} autoPlay />
       <header className="song-select-header">
         <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT</span></div>
         <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status"><b>1</b> ONLINE</span></div>

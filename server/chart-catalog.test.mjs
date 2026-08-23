@@ -67,7 +67,6 @@ test("caches chart collections as locations", async () => {
   const charts_directory = path.join(temporary_directory, "public", "charts");
   const chart_directory = path.join(charts_directory, "Collection One", "Chart One");
   const client_database = path.join(temporary_directory, "client.sqlite");
-  const server_database = path.join(temporary_directory, "server.sqlite");
 
   try {
     await mkdir(chart_directory, { recursive: true });
@@ -94,7 +93,6 @@ CircleSize:4
     const result = await cacheCharts({
       charts_directory,
       client_database,
-      server_database,
       schema_directory: path.dirname(fileURLToPath(import.meta.url)),
     });
 
@@ -107,18 +105,19 @@ CircleSize:4
     assert.equal(result.charts[0]?.chart_path, "charts/Collection One/Chart One/chart.osu");
 
     const client = new DatabaseSync(client_database, { readOnly: true });
-    const server = new DatabaseSync(server_database, { readOnly: true });
     try {
       assert.deepEqual({ ...client.prepare("SELECT * FROM locations").get() }, {
         id: 1,
         name: "Collection One",
         path: "charts/Collection One",
       });
-      assert.equal(client.prepare("SELECT location_id FROM charts").get()?.location_id, 1);
-      assert.equal(server.prepare("SELECT chart_path FROM charts").get()?.chart_path, "charts/Collection One/Chart One/chart.osu");
+      assert.deepEqual({ ...client.prepare("SELECT location_id, chart_path, audio_path FROM charts").get() }, {
+        location_id: 1,
+        chart_path: "charts/Collection One/Chart One/chart.osu",
+        audio_path: "charts/Collection One/Chart One/song.ogg",
+      });
     } finally {
       client.close();
-      server.close();
     }
   } finally {
     await rm(temporary_directory, { recursive: true, force: true });
@@ -130,7 +129,6 @@ test("stores audio and backgrounds for every chart in a set", async () => {
   const charts_directory = path.join(temporary_directory, "public", "charts");
   const chart_directory = path.join(charts_directory, "Collection", "Song");
   const client_database = path.join(temporary_directory, "client.sqlite");
-  const server_database = path.join(temporary_directory, "server.sqlite");
   const ffmpeg_path = path.join(temporary_directory, "fake-ffmpeg");
 
   try {
@@ -170,28 +168,26 @@ CircleSize:4
     await cacheCharts({
       charts_directory,
       client_database,
-      server_database,
       schema_directory: path.dirname(fileURLToPath(import.meta.url)),
       ffmpeg_path,
     });
 
     const client = new DatabaseSync(client_database, { readOnly: true });
-    const server = new DatabaseSync(server_database, { readOnly: true });
     try {
-      assert.deepEqual(server.prepare("SELECT id, audio_path, background_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row })), [{
+      assert.deepEqual(client.prepare("SELECT id, audio_path, chart_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row })), [{
         id: "101",
         audio_path: "charts/Collection/Song/Easy.ogg",
-        background_path: "charts/Collection/Song/Easy.png",
+        chart_path: "charts/Collection/Song/Easy.osu",
         preview_seconds: 10.1,
       }, {
         id: "102",
         audio_path: "charts/Collection/Song/Hard.ogg",
-        background_path: "charts/Collection/Song/Hard.png",
+        chart_path: "charts/Collection/Song/Hard.osu",
         preview_seconds: 10.2,
       }, {
         id: "103",
         audio_path: "charts/Collection/Song/Easy.ogg",
-        background_path: "charts/Collection/Song/Easy.png",
+        chart_path: "charts/Collection/Song/Normal.osu",
         preview_seconds: 10.3,
       }]);
       const previews = client.prepare("SELECT id, background_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
@@ -202,7 +198,6 @@ CircleSize:4
       assert.equal(previews[0]?.background_preview_path, previews[2]?.background_preview_path);
     } finally {
       client.close();
-      server.close();
     }
   } finally {
     await rm(temporary_directory, { recursive: true, force: true });

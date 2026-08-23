@@ -9,7 +9,7 @@ The web client is a browser-based Rizu client focused initially on keyboard VSRG
 The first version should provide:
 
 - A locally cached, searchable song catalog.
-- Keyboard-driven song selection with rapidly switching audio previews.
+- Keyboard-driven song selection.
 - Downloaded chart and audio assets for gameplay.
 - Local, deterministic input judgment and replay recording.
 - High-refresh-rate gameplay rendered independently from the application UI.
@@ -24,7 +24,6 @@ The first version does not need feature parity with the native client, mobile ga
 - Vite for the development server and production build.
 - WebGL2 for gameplay rendering.
 - Web Audio API for gameplay audio and the authoritative song clock.
-- WebRTC for one persistent server-to-client song-select preview stream.
 - HTTP for the catalog, charts, gameplay audio, images, and result submission.
 - IndexedDB for catalog data, catalog version information, settings, and selected cached assets.
 - Web Workers for expensive catalog indexing, filtering, chart parsing, and decompression when profiling shows that main-thread work is visible.
@@ -35,7 +34,6 @@ Dependencies should remain deliberate and limited. A package should solve a demo
 
 - Opening the client should show the locally cached library immediately when one is available, then synchronize catalog updates in the background.
 - Song-list navigation should remain responsive with tens of thousands of entries.
-- Moving selection should ask the server to switch the persistent preview stream. A short delay or a fragment of the previous song is acceptable.
 - Confirming a chart should display a loading state until its complete gameplay audio and chart data are available locally.
 - Gameplay should not depend on network availability after loading has completed.
 - Dropped render frames must not alter judgment timing or cause the gameplay clock to drift.
@@ -65,37 +63,13 @@ Dependencies should remain deliberate and limited. A package should solve a demo
 - Playback is scheduled against `AudioContext.currentTime`.
 - Song time is derived from the audio clock and the scheduled start time, with the configured gameplay offset applied.
 - Judgment is performed locally against timestamps converted to the same clock domain.
-- Gameplay must never use the WebRTC preview track as its timing source.
 - Browser-reported latency may inform defaults, but manual calibration remains required because hardware and operating-system latency are not fully observable.
-
-### ADR: Persistent WebRTC Preview Stream
-
-- Song select keeps one WebRTC connection alive for its session.
-- A reliable data channel carries preview selection commands.
-- One server-to-client audio track carries the current preview.
-- Selecting a song sends its stable song ID and desired preview position. The server switches the source behind the existing track.
-- Song changes must not renegotiate the connection or replace the audio track.
-- Immediate cancellation is not required. Buffered audio from the previous selection and reduced preview quality are acceptable.
-- The server should prefer pre-encoded preview media compatible with the transmitted codec to avoid per-client transcoding.
-- Preview failures must not block song navigation or gameplay loading. The client should remain usable in silence and may reconnect in the background.
-
-Example control message:
-
-```json
-{
-  "type": "select_preview",
-  "requestId": 1842,
-  "songId": "91234",
-  "startSeconds": 48.5
-}
-```
 
 ### ADR: Gameplay Assets Use HTTP
 
 - Confirming a chart fetches the chart, complete gameplay audio, and required visual assets over HTTP.
 - Existing requests should be reused or cached where possible.
 - Gameplay starts only after required assets are locally available and the audio clock can be scheduled reliably.
-- The preview stream should be muted or paused while gameplay is active, but its connection may remain alive.
 - Scores and replays are submitted only after gameplay; server round trips are never part of hit judgment.
 
 ### ADR: Versioned Local Catalog
@@ -112,7 +86,7 @@ Example control message:
 - React must not mount one element per song.
 - Song lists render only visible rows plus a small overscan region.
 - Selection is tracked by stable ID, not only by an array index, so catalog and filter updates can restore it.
-- Rapid navigation may collapse obsolete metadata or image requests, but each committed selection should update the preview command promptly.
+- Rapid navigation may collapse obsolete metadata or image requests.
 - A list virtualization dependency may be added if the custom implementation becomes a maintenance burden.
 
 ## Gameplay Runtime
@@ -148,7 +122,6 @@ webclient/
 │   ├── app/           # React shell, screens, and application lifecycle
 │   ├── catalog/       # IndexedDB catalog, synchronization, search
 │   ├── select/        # Selection state and virtualized song list
-│   ├── preview/       # WebRTC signaling, data channel, and audio track
 │   ├── gameplay/      # Imperative timing, input, scoring, and session runtime
 │   │   └── renderer/  # WebGL2 rendering
 │   ├── replay/        # Replay representation and submission
@@ -167,7 +140,7 @@ These are ownership boundaries rather than a requirement to create every directo
 - Optimize measured bottlenecks rather than adding concurrency or caching speculatively.
 - Keep the main thread free of large synchronous catalog operations while gameplay is active.
 - Avoid allocating transient objects for every visible note on every frame.
-- Avoid React renders caused by high-frequency gameplay or preview timing state.
+- Avoid React renders caused by high-frequency gameplay timing state.
 - Measure input event arrival, judgment processing, render duration, frame pacing, audio scheduling, and asset loading separately.
 - A sub-millisecond JavaScript handler duration is not equivalent to sub-millisecond end-to-end input latency; keyboard polling, browser scheduling, display refresh, audio buffering, and hardware remain part of the path.
 - Prefer stable frame pacing and stable offsets over misleading minimum-latency measurements.
@@ -175,7 +148,6 @@ These are ownership boundaries rather than a requirement to create every directo
 ## Error Handling
 
 - A stale or unavailable server must not prevent use of an already cached catalog.
-- WebRTC disconnects should transition preview to silence and retry without interrupting navigation.
 - Gameplay asset failures should return the player to song select with an actionable error.
 - Unsupported WebGL2 or Web Audio environments should fail at startup with a clear compatibility message.
 - Catalog and asset schemas must be versioned so incompatible cached data can be identified and rebuilt safely.
@@ -185,24 +157,23 @@ These are ownership boundaries rather than a requirement to create every directo
 - The server is authoritative for account state, catalog publication, and accepted score records.
 - The client is necessarily untrusted. Submitted scores should include a replay and sufficient metadata for validation, while acknowledging that a browser client cannot provide strong anti-cheat guarantees.
 - Catalog text and remote metadata must be rendered as text, not injected as HTML.
-- Asset and signaling authorization should use short-lived credentials or the existing authenticated web session rather than credentials embedded in URLs or source code.
+- Asset authorization should use short-lived credentials or the existing authenticated web session rather than credentials embedded in URLs or source code.
 
 ## Initial Milestones
 
 1. Create the Vite, React, and strict TypeScript application shell.
 2. Load a mock catalog from IndexedDB and render a keyboard-navigable virtualized song list.
-3. Establish one persistent WebRTC preview connection and switch songs through the data channel.
-4. Download one chart and audio file over HTTP and start it with a scheduled Web Audio clock.
-5. Implement a minimal keyboard VSRG runtime with local judgment and WebGL2 rendering.
-6. Add calibration, replay recording, results, and score submission.
-7. Profile frame pacing and input-to-judgment timing before adding further abstractions.
+3. Download one chart and audio file over HTTP and start it with a scheduled Web Audio clock.
+4. Implement a minimal keyboard VSRG runtime with local judgment and WebGL2 rendering.
+5. Add calibration, replay recording, results, and score submission.
+6. Profile frame pacing and input-to-judgment timing before adding further abstractions.
 
 ## Future Work and Open Questions
 
 - Decide the catalog snapshot and incremental-update wire formats.
 - Decide whether chart conversion happens on the server or in a browser worker.
 - Define the replay format and the degree of server-side replay validation.
-- Determine the preview service implementation and how it integrates with the existing OpenResty server for authentication and signaling.
+- Evaluate short HTTP audio previews after the gameplay asset path is stable.
 - Measure whether encoded full-song playback can provide sufficiently reliable timing with lower memory use than fully decoded `AudioBuffer` playback.
 - Evaluate service-worker asset caching and offline play only after the basic online flow is stable.
 - Add WebGPU, `OffscreenCanvas`, `SharedArrayBuffer`, or WASM only when profiling identifies a problem they directly solve.

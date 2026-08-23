@@ -20,7 +20,6 @@ const result = await cacheCharts({
   charts_directory,
   background_previews_directory: readOption("--background-previews", path.join(path.dirname(charts_directory), "chart-previews")),
   client_database: readOption("--client-database", path.join(root_directory, "public/catalog.sqlite")),
-  server_database: readOption("--server-database", path.join(server_directory, "catalog.sqlite")),
   schema_directory: server_directory,
   ffmpeg_path: readValue("--ffmpeg", "ffmpeg"),
 });

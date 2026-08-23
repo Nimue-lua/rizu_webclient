@@ -13,7 +13,6 @@ export interface GameplayData {
 }
 
 export interface GameplayLoader {
-  getLocation(chart_id: string, signal: AbortSignal): Promise<GameplayLocation>;
   load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData>;
 }
 
@@ -24,19 +23,6 @@ async function fetchAsset(url: string, signal: AbortSignal): Promise<ArrayBuffer
 }
 
 export class HttpGameplayLoader implements GameplayLoader {
-  async getLocation(chart_id: string, signal: AbortSignal): Promise<GameplayLocation> {
-    const response = await fetch(`/api/charts/${encodeURIComponent(chart_id)}`, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to load the selected chart: ${response.status} ${response.statusText}`);
-    }
-    const value: unknown = await response.json();
-    if (!value || typeof value !== "object" || !("audio_url" in value) || !("chart_url" in value) ||
-      typeof value.audio_url !== "string" || typeof value.chart_url !== "string") {
-      throw new Error("Selected chart has an invalid asset location");
-    }
-    return { audio_url: value.audio_url, chart_url: value.chart_url };
-  }
-
   async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData> {
     const [audio_data, chart_data] = await Promise.all([
       fetchAsset(location.audio_url, signal),
