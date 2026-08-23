@@ -18,6 +18,14 @@ npm run deploy
 
 This runs the frontend checks, builds the application, refreshes the previews and client catalog, checks VPS disk space, uploads changed files, activates the release, validates and reloads the checked-in Nginx configuration, and verifies the public endpoints.
 
+To deploy only a new frontend build, run:
+
+```bash
+npm run deploy -- --code-only
+```
+
+Code-only deployment preserves the active catalog, chart previews, audio previews, and gameplay assets. It does not run `cache:charts`, upload chart files, or replace the Nginx configuration.
+
 The defaults can be overridden without editing the script:
 
 ```bash
