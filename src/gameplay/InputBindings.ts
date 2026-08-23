@@ -1,4 +1,4 @@
-import type { CatalogChart } from "../catalog/CatalogProvider";
+import type { ChartInput } from "../chart/Chart";
 
 const INPUT_BINDINGS_STORAGE_PREFIX = "rizu.input-bindings";
 
@@ -26,7 +26,7 @@ export interface InputLayout {
   name: string;
 }
 
-export function inputLayout(chart: CatalogChart): InputLayout {
+export function inputLayout(chart: ChartInput): InputLayout {
   if (chart.mode === 3) {
     const count = chart.keys ?? 4;
     return { count, mode: chart.mode, name: `${count}K` };

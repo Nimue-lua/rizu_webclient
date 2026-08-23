@@ -10,7 +10,7 @@
     "dev:preview": "go -C preview-server run . -catalog ../server/catalog.sqlite -public ../public",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
-    "test": "node --test server/*.test.mjs",
+    "test": "node --test server/*.test.mjs && tsx --test tests/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/sql.js": "^1.4.11"
+    "@types/sql.js": "^1.4.11",
+    "tsx": "^4.23.12"
   }
 }

@@ -68,6 +68,7 @@ export class PreviewClient {
     this.connection?.close();
     this.channel = null;
     this.connection = null;
+    this.pending_command = null;
   }
 
   private flushSelection(): void {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CatalogChart } from "../catalog/CatalogProvider";
+import type { Chartview } from "../library/views";
 import {
   inputCodeLabel,
   inputLayout,
@@ -8,7 +8,7 @@ import {
 } from "../gameplay/InputBindings";
 
 interface InputBindingsModalProps {
-  chart: CatalogChart;
+  chart: Chartview;
   onExit: () => void;
 }
 

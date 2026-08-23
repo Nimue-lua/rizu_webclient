@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
   Activity,
   ArrowUpDown,
@@ -26,14 +26,15 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { CatalogChart, CatalogLocation, CatalogProvider, CatalogSong } from "../catalog/CatalogProvider";
 import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
+import type { Chartview } from "../library/views";
 import { PreviewClient } from "../preview/PreviewClient";
+import type { ChartSelector } from "../select/ChartSelector";
 import { InputBindingsModal } from "./InputBindingsModal";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
-const PREVIEW_DEBOUNCE_MS = 200;
+const BACKGROUND_DEBOUNCE_MS = 200;
 const SESSION_STARTED_AT = Date.now();
 
 type IconName = "activity" | "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
@@ -74,11 +75,9 @@ function Icon({ name }: { name: IconName }) {
 }
 
 interface SongSelectScreenProps {
-  catalog_provider: CatalogProvider;
-  selected_song_id: string | null;
+  chart_selector: ChartSelector;
   onPlay: (chart_id: string, input_bindings: readonly (string | null)[]) => void;
   onSettings: () => void;
-  onSongSelect: (song_id: string) => void;
   master_volume: number;
   scroll_speed: number;
   onScrollSpeedChange: (scroll_speed: number) => void;
@@ -86,7 +85,7 @@ interface SongSelectScreenProps {
 
 const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
 
-function chartMode(chart: CatalogChart): string {
+function chartMode(chart: Chartview): string {
   const mode = mode_names[chart.mode] ?? "UNKNOWN";
   return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K ${mode}` : mode;
 }
@@ -108,34 +107,20 @@ function difficultyColor(difficulty: number): string {
   return `hsl(${hue} 92% 52%)`;
 }
 
-function chartsInLocation(song: CatalogSong, location_id: number | null): CatalogChart[] {
-  return location_id === null
-    ? song.charts
-    : song.charts.filter((chart) => chart.location_id === location_id);
-}
-
 export function SongSelectScreen({
-  catalog_provider,
-  selected_song_id,
+  chart_selector,
   onPlay,
   onSettings,
-  onSongSelect,
   master_volume,
   scroll_speed,
   onScrollSpeedChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const audio_ref = useRef<HTMLAudioElement>(null);
-  const preview_client_ref = useRef<PreviewClient | null>(null);
-  const [songs, setSongs] = useState<CatalogSong[]>([]);
-  const [locations, setLocations] = useState<CatalogLocation[]>([]);
-  const [selected_location_id, setSelectedLocationId] = useState<number | null>(null);
-  const [selected_chart_id, setSelectedChartId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
   const [scroll_top, setScrollTop] = useState(0);
   const [viewport_height, setViewportHeight] = useState(0);
   const [score_source, setScoreSource] = useState<"local" | "online">("online");
-  const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
@@ -163,52 +148,26 @@ export function SongSelectScreen({
     if (!audio) return;
     const abort_controller = new AbortController();
     const preview_client = new PreviewClient();
-    preview_client_ref.current = preview_client;
+    chart_selector.setPreviewClient(preview_client);
     void preview_client.connect(audio, abort_controller.signal).catch((reason: unknown) => {
       if (!abort_controller.signal.aborted) console.error("Preview connection failed", reason);
     });
     return () => {
       abort_controller.abort();
       preview_client.close();
-      preview_client_ref.current = null;
+      chart_selector.setPreviewClient(null);
     };
-  }, []);
+  }, [chart_selector]);
 
   useEffect(() => {
     if (audio_ref.current) audio_ref.current.volume = master_volume;
   }, [master_volume]);
 
   useEffect(() => {
-    if (!selected_chart_id) return;
-    const timer = window.setTimeout(() => {
-      preview_client_ref.current?.select({ chart_id: selected_chart_id });
-    }, PREVIEW_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [selected_chart_id]);
-
-  useEffect(() => {
     const abort_controller = new AbortController();
-    void catalog_provider.getLibrary(abort_controller.signal).then((library) => {
-      setLocations(library.locations);
-      setSongs(library.songs);
-      if (!library.songs.some((song) => song.id === selected_song_id) && library.songs[0]) {
-        onSongSelect(library.songs[0].id);
-      }
-    }).catch((reason: unknown) => {
-      if (!abort_controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Failed to load song catalog");
-    });
+    void chart_selector.load(abort_controller.signal);
     return () => abort_controller.abort();
-  }, [catalog_provider, onSongSelect]);
-
-  useEffect(() => {
-    const available_songs = songs.filter((song) => chartsInLocation(song, selected_location_id).length > 0);
-    const song = available_songs.find((candidate) => candidate.id === selected_song_id) ?? available_songs[0];
-    const charts = song ? chartsInLocation(song, selected_location_id) : [];
-    if (!charts.some((chart) => chart.id === selected_chart_id)) {
-      setSelectedChartId(charts.at(-1)?.id ?? null);
-      if (song && song.id !== selected_song_id) onSongSelect(song.id);
-    }
-  }, [onSongSelect, selected_chart_id, selected_location_id, selected_song_id, songs]);
+  }, [chart_selector]);
 
   useEffect(() => {
     const viewport = viewport_ref.current;
@@ -220,25 +179,15 @@ export function SongSelectScreen({
     return () => observer.disconnect();
   }, []);
 
-  const songs_in_location = selected_location_id === null
-    ? songs
-    : songs.flatMap((song) => {
-      const charts = chartsInLocation(song, selected_location_id);
-      return charts.length > 0 ? [{ ...song, charts }] : [];
-    });
-  const normalized_query = query.trim().toLocaleLowerCase();
-  const filtered_songs = normalized_query
-    ? songs_in_location.filter((song) => `${song.title}\n${song.artist}\n${song.charts.map((chart) => `${chart.name} ${chart.creator}`).join("\n")}`.toLocaleLowerCase().includes(normalized_query))
-    : songs_in_location;
-  const selected_song = songs_in_location.find((song) => song.id === selected_song_id) ?? filtered_songs[0] ?? songs_in_location[0];
-  const selected_chart = selected_song?.charts.find((chart) => chart.id === selected_chart_id)
-    ?? selected_song?.charts.at(-1);
+  const filtered_songs = chart_selector.getFilteredSongs();
+  const selected_song = chart_selector.getSelectedSong();
+  const selected_chart = chart_selector.getSelectedChart();
 
   useEffect(() => {
     setLoadedBackgroundUrl(null);
     const timer = window.setTimeout(() => {
       setBackgroundUrl(selected_song?.background_url ?? null);
-    }, PREVIEW_DEBOUNCE_MS);
+    }, BACKGROUND_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [selected_song?.background_url]);
 
@@ -248,33 +197,22 @@ export function SongSelectScreen({
 
   const selectSong = (song_id: string) => {
     void audio_ref.current?.play().catch(() => undefined);
-    const song = songs.find((candidate) => candidate.id === song_id);
-    setSelectedChartId(song ? chartsInLocation(song, selected_location_id).at(-1)?.id ?? null : null);
-    onSongSelect(song_id);
+    chart_selector.selectSong(song_id);
   };
 
   const selectLocation = (location_id: number | null) => {
-    setSelectedLocationId(location_id);
-    setQuery("");
+    chart_selector.selectLocation(location_id);
     setScrollTop(0);
     if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
-    const first_song = location_id === null
-      ? songs[0]
-      : songs.find((song) => song.charts.some((chart) => chart.location_id === location_id));
-    if (first_song) {
-      const charts = chartsInLocation(first_song, location_id);
-      setSelectedChartId(charts.at(-1)?.id ?? null);
-      onSongSelect(first_song.id);
-    }
   };
 
   const moveSelection = (offset: number) => {
     if (!filtered_songs.length) return;
-    const selected_index = filtered_songs.findIndex((song) => song.id === selected_song_id);
+    const selected_index = filtered_songs.findIndex((song) => song.id === selection.selected_song_id);
     const next_index = Math.min(Math.max((selected_index < 0 ? 0 : selected_index) + offset, 0), filtered_songs.length - 1);
     const next_song = filtered_songs[next_index];
     if (!next_song) return;
-    selectSong(next_song.id);
+    chart_selector.scrollLevel(offset);
     const viewport = viewport_ref.current;
     if (!viewport) return;
     const row_top = next_index * ROW_HEIGHT;
@@ -292,7 +230,7 @@ export function SongSelectScreen({
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
   const hero_loaded = background_url === null || background_url === loaded_background_url;
-  const playChart = (chart: CatalogChart) => onPlay(chart.id, loadInputBindings(inputLayout(chart)));
+  const playChart = (chart: Chartview) => onPlay(chart.id, loadInputBindings(inputLayout(chart)));
 
   return (
     <main className="song-select-screen">
@@ -310,10 +248,10 @@ export function SongSelectScreen({
       </header>
 
       <section className="library-toolbar" aria-label="Chart library controls">
-        <label className="collection-button"><span><small>COLLECTION</small><strong>{selected_location_id === null ? "All songs" : locations.find((location) => location.id === selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
+         <label className="collection-button"><span><small>COLLECTION</small><strong>{selection.selected_location_id === null ? "All songs" : selection.locations.find((location) => location.id === selection.selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selection.selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{selection.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
         <button className="toolbar-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>Title</strong></span></button>
         <button className="toolbar-button"><Icon name="filter" /><span><small>FILTERS</small><strong>None</strong></span></button>
-        <label className="chart-search"><Icon name="search" /><input value={query} onChange={(event) => { setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /><kbd>CTRL K</kbd></label>
+        <label className="chart-search"><Icon name="search" /><input value={selection.query} onChange={(event) => { chart_selector.setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /><kbd>CTRL K</kbd></label>
       </section>
 
       <section className="song-select-content">
@@ -339,14 +277,14 @@ export function SongSelectScreen({
           </section>
           <section className="chart-browser" aria-label="Chart browser">
             <div className="difficulty-strip"><button aria-label="Previous difficulties"><Icon name="chevron-left" /></button><div>
-              {selected_song?.charts.map((chart) => <button className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => setSelectedChartId(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
+              {selected_song?.charts.map((chart) => <button className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => chart_selector.selectChart(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
             </div><button aria-label="Next difficulties"><Icon name="chevron-right" /></button></div>
-            {error ? <p className="song-library-error">{error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
+            {selection.error ? <p className="song-library-error">{selection.error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
               if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
               if (event.key === "Enter" && selected_chart) playChart(selected_chart);
             }}><div className="chart-list-space" style={{ height: filtered_songs.length * ROW_HEIGHT }}>
-               {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selected_song_id} className={`chart-row${song.id === selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && playChart(hardest_chart)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
-            </div>{filtered_songs.length === 0 && <p className="empty-library">{query ? `No songs match “${query}”` : "No songs in this collection"}</p>}</div>}
+               {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selection.selected_song_id} className={`chart-row${song.id === selection.selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && playChart(hardest_chart)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
+            </div>{filtered_songs.length === 0 && <p className="empty-library">{selection.query ? `No songs match “${selection.query}”` : "No songs in this collection"}</p>}</div>}
           </section>
         </div>
       </section>

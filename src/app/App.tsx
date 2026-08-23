@@ -1,10 +1,7 @@
 import { useState } from "react";
-import {
-  HttpGameplayAssetProvider,
-  type LoadedGameplayAssets,
-} from "../assets/GameplayAssetProvider";
-import { HttpChartCatalogProvider } from "../assets/ChartCatalogProvider";
-import { SqliteCatalogProvider } from "../catalog/CatalogProvider";
+import { HttpGameplayLoader, type GameplayData } from "../library/GameplayLoader";
+import { SqliteLibrary } from "../library/Library";
+import { ChartSelector } from "../select/ChartSelector";
 import { GameplayScreen } from "./GameplayScreen";
 import { LoadingScreen } from "./LoadingScreen";
 import { ResultScreen } from "./ResultScreen";
@@ -14,16 +11,14 @@ import { SongSelectScreen } from "./SongSelectScreen";
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
-const asset_provider = new HttpGameplayAssetProvider();
-const catalog_provider = new HttpChartCatalogProvider();
-const song_catalog_provider = new SqliteCatalogProvider();
+const gameplay_loader = new HttpGameplayLoader();
+const chart_selector = new ChartSelector(new SqliteLibrary());
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("song-select");
   const [settings_open, setSettingsOpen] = useState(false);
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
-  const [assets, setAssets] = useState<LoadedGameplayAssets | null>(null);
-  const [selected_song_id, setSelectedSongId] = useState<string | null>(null);
+  const [assets, setAssets] = useState<GameplayData | null>(null);
   const [loading_chart_id, setLoadingChartId] = useState<string | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [master_volume, setMasterVolume] = useState(() => {
@@ -64,7 +59,7 @@ export function App() {
     setScreen("song-select");
   };
 
-  const finishLoading = (loaded_assets: LoadedGameplayAssets) => {
+  const finishLoading = (loaded_assets: GameplayData) => {
     setAssets(loaded_assets);
     setScreen("gameplay");
   };
@@ -102,8 +97,7 @@ export function App() {
 
       return (
         <LoadingScreen
-          asset_provider={asset_provider}
-          catalog_provider={catalog_provider}
+          gameplay_loader={gameplay_loader}
           chart_id={loading_chart_id}
           audio_context={audio_context}
           onCancel={cancelLoading}
@@ -116,13 +110,11 @@ export function App() {
       return (
         <>
           <SongSelectScreen
-            catalog_provider={song_catalog_provider}
-            selected_song_id={selected_song_id}
+            chart_selector={chart_selector}
             master_volume={master_volume}
             scroll_speed={scroll_speed}
             onPlay={beginLoading}
             onSettings={() => setSettingsOpen(true)}
-            onSongSelect={setSelectedSongId}
             onScrollSpeedChange={changeScrollSpeed}
           />
           {settings_open && (

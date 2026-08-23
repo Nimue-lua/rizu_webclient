@@ -1,43 +1,9 @@
 import initSqlJs from "sql.js";
 import sql_wasm_url from "sql.js/dist/sql-wasm.wasm?url";
+import type { ChartfileSetView, Chartview, LibraryView } from "./views";
 
-export interface CatalogChart {
-  bpm_avg: number;
-  bpm_max: number;
-  bpm_min: number;
-  creator: string;
-  difficulty: number;
-  duration_seconds: number;
-  format: string;
-  id: string;
-  keys: number | null;
-  long_note_ratio: number;
-  location_id: number;
-  mode: number;
-  name: string;
-  note_count: number;
-}
-
-export interface CatalogSong {
-  background_url: string | null;
-  charts: CatalogChart[];
-  id: string;
-  title: string;
-  artist: string;
-}
-
-export interface CatalogLocation {
-  id: number;
-  name: string;
-}
-
-export interface CatalogLibrary {
-  locations: CatalogLocation[];
-  songs: CatalogSong[];
-}
-
-export interface CatalogProvider {
-  getLibrary(signal: AbortSignal): Promise<CatalogLibrary>;
+export interface Library {
+  load(signal: AbortSignal): Promise<LibraryView>;
 }
 
 function assetUrl(asset_path: unknown): string | null {
@@ -45,8 +11,8 @@ function assetUrl(asset_path: unknown): string | null {
   return `/${asset_path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-export class SqliteCatalogProvider implements CatalogProvider {
-  async getLibrary(signal: AbortSignal): Promise<CatalogLibrary> {
+export class SqliteLibrary implements Library {
+  async load(signal: AbortSignal): Promise<LibraryView> {
     const [sql, response] = await Promise.all([
       initSqlJs({ locateFile: () => sql_wasm_url }),
       fetch("/catalog.sqlite", { signal }),
@@ -74,8 +40,8 @@ export class SqliteCatalogProvider implements CatalogProvider {
         ORDER BY songs.title COLLATE NOCASE, songs.artist COLLATE NOCASE, songs.id,
           charts.difficulty, charts.name COLLATE NOCASE, charts.id
       `);
-      const songs: CatalogSong[] = [];
-      const songs_by_id = new Map<string, CatalogSong>();
+      const songs: ChartfileSetView[] = [];
+      const songs_by_id = new Map<string, ChartfileSetView>();
 
       try {
         while (statement.step()) {
@@ -93,7 +59,7 @@ export class SqliteCatalogProvider implements CatalogProvider {
             songs.push(song);
             songs_by_id.set(song_id, song);
           }
-          song.charts.push({
+          const chart: Chartview = {
             bpm_avg: Number(row.bpm_avg),
             bpm_max: Number(row.bpm_max),
             bpm_min: Number(row.bpm_min),
@@ -108,7 +74,8 @@ export class SqliteCatalogProvider implements CatalogProvider {
             mode: Number(row.mode),
             name: String(row.name),
             note_count: Number(row.note_count),
-          });
+          };
+          song.charts.push(chart);
         }
       } finally {
         statement.free();

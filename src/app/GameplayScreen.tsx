@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
-import type { LoadedGameplayAssets } from "../assets/GameplayAssetProvider";
+import type { GameplayData } from "../library/GameplayLoader";
 import { GameplayRuntime } from "../gameplay/GameplayRuntime";
 
 interface GameplayScreenProps {
-  assets: LoadedGameplayAssets;
+  assets: GameplayData;
   master_volume: number;
   scroll_speed: number;
   input_bindings: readonly (string | null)[];
