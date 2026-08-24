@@ -4,7 +4,9 @@ import type { ScoreResult } from "./scoring/ScoreEngine";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 import { SpringValue } from "./SpringValue";
 import type { ReplayBase } from "../replay/ReplayBase";
-import { applyMusicOffset, getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
+import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
+import { AudioGameplayClock } from "./AudioGameplayClock";
+import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -33,13 +35,13 @@ function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
 
 export class ManiaGameplayRuntime {
   private readonly data: ManiaGameplayData;
-  private readonly master_volume: number;
-  private readonly music_offset: number;
   private readonly scroll_speed: number;
   private readonly music_rate: number;
   private readonly finish: (score: ScoreResult) => void;
   private readonly rules_engine: ManiaRulesEngine;
   private readonly renderer: ManiaRenderer;
+  private readonly playback: WebAudioPlayback;
+  private readonly clock: AudioGameplayClock;
   private readonly dependencies: ManiaGameplayRuntimeDependencies;
   private readonly key_columns: ReadonlyMap<string, number>;
   private readonly key_catches = new Map<string, number>();
@@ -48,9 +50,6 @@ export class ManiaGameplayRuntime {
   private readonly pointer_columns = new Map<number, number>();
   private readonly pressed_columns: Uint16Array;
   private animation_frame: number | null = null;
-  private audio_source: AudioBufferSourceNode | null = null;
-  private audio_gain: GainNode | null = null;
-  private audio_start_time = 0;
   private finished = false;
   private destroyed = false;
   private readonly displayed_accuracy = new SpringValue(0);
@@ -62,14 +61,25 @@ export class ManiaGameplayRuntime {
     scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
     finish: (score: ScoreResult) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.data = data;
-    this.master_volume = master_volume;
-    this.music_offset = music_offset;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
     this.finish = finish;
     this.dependencies = dependencies;
     this.rules_engine = new ManiaRulesEngine(data.chart, hit_registration, this.music_rate, replay_base.const, replay_base.tap_only);
     this.renderer = dependencies.create_renderer(canvas, data);
+    this.playback = new WebAudioPlayback({
+      audio_context: data.audio_context,
+      audio_buffer: data.audio_buffer,
+      volume: master_volume,
+      rate: this.music_rate,
+      performance_now: dependencies.performance_now,
+    });
+    this.clock = new AudioGameplayClock({
+      rate: this.music_rate,
+      music_offset_ms: music_offset,
+      performance_now: dependencies.performance_now,
+      sample_audio_position: () => this.playback.samplePosition(),
+    });
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
     this.pressed_columns = new Uint16Array(data.chart.column_count);
   }
@@ -77,17 +87,9 @@ export class ManiaGameplayRuntime {
   start(): void {
     this.dependencies.event_target.addEventListener("keydown", this.handleKeyDown as EventListener);
     this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
-    const gain = this.data.audio_context.createGain();
-    const source = this.data.audio_context.createBufferSource();
-    gain.gain.value = this.master_volume;
-    source.buffer = this.data.audio_buffer;
-    source.playbackRate.value = this.music_rate;
-    source.connect(gain).connect(this.data.audio_context.destination);
-    this.audio_start_time = this.data.audio_context.currentTime + getAudioStartDelay(this.data, this.music_rate);
-    source.start(this.audio_start_time);
-    this.audio_source = source;
-    this.audio_gain = gain;
-    void this.data.audio_context.resume();
+    const lead_in = getAudioStartDelay(this.data, this.music_rate);
+    this.playback.start(lead_in);
+    this.clock.start(lead_in);
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   }
 
@@ -97,11 +99,7 @@ export class ManiaGameplayRuntime {
     this.dependencies.event_target.removeEventListener("keydown", this.handleKeyDown as EventListener);
     this.dependencies.event_target.removeEventListener("keyup", this.handleKeyUp as EventListener);
     if (this.animation_frame !== null) this.dependencies.cancel_animation_frame(this.animation_frame);
-    if (this.audio_source) {
-      this.audio_source.stop();
-      this.audio_source.disconnect();
-    }
-    this.audio_gain?.disconnect();
+    this.playback.destroy();
     this.renderer.destroy();
   }
 
@@ -109,7 +107,7 @@ export class ManiaGameplayRuntime {
     if (this.pointer_columns.has(pointer_id)) return;
     this.pointer_columns.set(pointer_id, column);
     this.pressed_columns[column]! += 1;
-    const note_index = this.rules_engine.press(column, this.getSongTime(performance_time));
+    const note_index = this.rules_engine.press(column, this.clock.timeAt(performance_time).corrected);
     if (note_index !== undefined) this.pointer_catches.set(pointer_id, note_index);
   }
 
@@ -120,13 +118,13 @@ export class ManiaGameplayRuntime {
     this.pressed_columns[column]! -= 1;
     const note_index = this.pointer_catches.get(pointer_id);
     this.pointer_catches.delete(pointer_id);
-    if (note_index !== undefined) this.rules_engine.release(note_index, this.getSongTime(performance_time));
+    if (note_index !== undefined) this.rules_engine.release(note_index, this.clock.timeAt(performance_time).corrected);
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.repeat) return;
     if (event.code === "Escape") {
-      this.abortGameplay(this.getSongTime(event.timeStamp));
+      this.abortGameplay(this.clock.timeAt(event.timeStamp).corrected);
       return;
     }
     const column = this.key_columns.get(event.code);
@@ -134,7 +132,7 @@ export class ManiaGameplayRuntime {
     event.preventDefault();
     this.pressed_keys.add(event.code);
     this.pressed_columns[column]! += 1;
-    const note_index = this.rules_engine.press(column, this.getSongTime(event.timeStamp));
+    const note_index = this.rules_engine.press(column, this.clock.timeAt(event.timeStamp).corrected);
     if (note_index !== undefined) this.key_catches.set(event.code, note_index);
   };
 
@@ -145,18 +143,8 @@ export class ManiaGameplayRuntime {
     this.pressed_columns[column]! -= 1;
     const note_index = this.key_catches.get(event.code);
     this.key_catches.delete(event.code);
-    if (note_index !== undefined) this.rules_engine.release(note_index, this.getSongTime(event.timeStamp));
+    if (note_index !== undefined) this.rules_engine.release(note_index, this.clock.timeAt(event.timeStamp).corrected);
   };
-
-  private getSongTime(performance_time: number): number {
-    const output_timestamp = this.data.audio_context.getOutputTimestamp();
-    const context_time = output_timestamp.contextTime;
-    const output_performance_time = output_timestamp.performanceTime;
-    const audio_time = context_time !== undefined && output_performance_time !== undefined && output_performance_time > 0
-      ? context_time + (performance_time - output_performance_time) / 1000
-      : this.data.audio_context.currentTime + (performance_time - this.dependencies.performance_now()) / 1000;
-    return applyMusicOffset((audio_time - this.audio_start_time) * this.music_rate, this.music_rate, this.music_offset);
-  }
 
   private abortGameplay(song_time: number): void {
     if (this.finished) return;
@@ -186,7 +174,7 @@ export class ManiaGameplayRuntime {
     this.previous_frame_time = timestamp;
     const visual_scroll_speed = this.scroll_speed / this.music_rate;
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
-    const song_time = this.getSongTime(timestamp);
+    const song_time = this.clock.timeAt(timestamp).monotonic;
     this.rules_engine.update(song_time, range.past, range.future);
     const score = this.rules_engine.score;
     const target_accuracy = (score.accuracy ?? 0) * 100;

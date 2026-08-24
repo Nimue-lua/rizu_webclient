@@ -18,7 +18,3 @@ export function getGameplayEndTime(data: GameplayData, music_rate: number): numb
     : data.chart.end_time;
   return last_note_time + RESULT_DELAY * music_rate;
 }
-
-export function applyMusicOffset(song_time: number, music_rate: number, music_offset: number): number {
-  return song_time + music_offset / 1000 * music_rate;
-}
