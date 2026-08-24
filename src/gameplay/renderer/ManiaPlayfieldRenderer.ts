@@ -18,7 +18,7 @@ export interface ManiaHudState {
 }
 export type QuadWriter = (x: number, y: number, width: number, height: number,
   color: readonly [number, number, number, number], sprite: NoteSkinSprite, flip_y?: boolean,
-  pass?: NoteRenderPass) => void;
+  pass?: NoteRenderPass, rotate_ccw?: boolean) => void;
 
 export function getLongNoteBrightness(state: NoteState): number {
   if (state === NoteState.StartMissedPressed) return 0.75;
@@ -69,6 +69,8 @@ export class ManiaPlayfieldRenderer {
     const speed = NOTE_SKIN_LOGICAL_HEIGHT * scroll_speed;
     const config = this.skin.config;
     this.addStageSides(layout, write);
+    this.addHpBar(layout, write);
+    this.addColumnLines(layout, write);
     this.addStageHint(layout, write);
     for (let column = 0; column < config.columnCount; column += 1) {
       const receptors = pressed_columns[column] ? config.receptorPressed : config.receptorReleased;
@@ -115,6 +117,38 @@ export class ManiaPlayfieldRenderer {
     }
     this.addStageBottom(layout, write);
     if (hud) this.addHud(layout, hud, write);
+  }
+
+  private addColumnLines(layout: ManiaLayout, write: QuadWriter): void {
+    const sprite = this.skin.sprites.__white;
+    if (!sprite) return;
+    const config = this.skin.config;
+    const line_top = config.upsideDown ? layout.receptorY : 0;
+    const line_height = config.hitPosition;
+    for (let column = 0; column < config.columnCount; column += 1) {
+      const left_width = config.columnLineWidths[column] ?? 2;
+      if (left_width > 0) write(layout.columnLeft[column]!, line_top, left_width * 0.4625, line_height,
+        config.columnLineColor, sprite);
+    }
+    const right_width = config.columnLineWidths[config.columnCount] ?? 2;
+    if (right_width > 0) {
+      const right = layout.columnLeft.at(-1)! + layout.columnWidth.at(-1)! - 0.1;
+      write(right, line_top, right_width * 0.4625, line_height, config.columnLineColor, sprite);
+    }
+  }
+
+  private addHpBar(layout: ManiaLayout, write: QuadWriter): void {
+    const config = this.skin.config;
+    const right = layout.columnLeft.at(-1)! + layout.columnWidth.at(-1)!;
+    const add = (name: string | undefined, x: number, bottom: number) => {
+      const sprite = name ? this.skin.sprites[name] : undefined;
+      if (!sprite) return;
+      const width = sprite.sourceSize.h * 0.4375;
+      const height = sprite.sourceSize.w * 0.4375;
+      write(x, bottom - height, width, height, [1, 1, 1, 1], sprite, false, undefined, true);
+    };
+    add(config.hpBackground, right + 1, NOTE_SKIN_LOGICAL_HEIGHT);
+    add(config.hpFill, right + 6.6, 474.8);
   }
 
   private addHud(layout: ManiaLayout, hud: ManiaHudState, write: QuadWriter): void {

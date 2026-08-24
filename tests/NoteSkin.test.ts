@@ -24,6 +24,7 @@ test("maps the matching osu mania section to playfield geometry and sprites", ()
   assert.equal(config.columnStart, 281);
   assert.deepEqual(config.columnWidths, [73, 74, 75, 76]);
   assert.deepEqual(config.columnSpacing, [1, 2, 3]);
+  assert.deepEqual(config.columnLineWidths, [2, 2, 2, 2, 2]);
   assert.equal(config.hitPosition, 445);
   assert.equal(config.judgePosition, 125);
   assert.equal(config.comboPosition, 100);

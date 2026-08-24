@@ -143,8 +143,9 @@ export class WebGlGameplayRenderer {
     gl.uniform1i(this.sampler, 0);
     const commands: DrawCommand[] = [];
     this.playfield.draw(layout, notes, scroll_speed, pressed_columns,
-      (x, y, width, height, color, sprite, flip_y, pass) => {
-        commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false, pass });
+      (x, y, width, height, color, sprite, flip_y, pass, rotate_ccw) => {
+        commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
+          rotateCounterClockwise: rotate_ccw ?? false, pass });
       }, hud);
     this.submitCommands(commands);
   }
@@ -180,12 +181,17 @@ export class WebGlGameplayRenderer {
     const vertices: number[] = [];
     for (const command of commands) {
       if (command.width <= 0 || command.height <= 0) continue;
-      const top_v = command.flipY ? 1 : 0;
-      const bottom_v = command.flipY ? 0 : 1;
-      for (const [px, py, u, v] of [[command.x, command.y, 0, top_v],
-        [command.x + command.width, command.y, 1, top_v], [command.x, command.y + command.height, 0, bottom_v],
-        [command.x, command.y + command.height, 0, bottom_v], [command.x + command.width, command.y, 1, top_v],
-        [command.x + command.width, command.y + command.height, 1, bottom_v]]) {
+      let top_left = [0, command.flipY ? 1 : 0];
+      let top_right = [1, command.flipY ? 1 : 0];
+      let bottom_left = [0, command.flipY ? 0 : 1];
+      let bottom_right = [1, command.flipY ? 0 : 1];
+      if (command.rotateCounterClockwise) {
+        [top_left, top_right, bottom_left, bottom_right] = [top_right, bottom_right, top_left, bottom_left];
+      }
+      for (const [px, py, u, v] of [[command.x, command.y, ...top_left],
+        [command.x + command.width, command.y, ...top_right], [command.x, command.y + command.height, ...bottom_left],
+        [command.x, command.y + command.height, ...bottom_left], [command.x + command.width, command.y, ...top_right],
+        [command.x + command.width, command.y + command.height, ...bottom_right]]) {
         vertices.push(px, py, u, v, ...command.color);
       }
     }
@@ -225,5 +231,6 @@ interface DrawCommand {
   color: readonly [number, number, number, number];
   sprite: NoteSkinSprite;
   flipY: boolean;
+  rotateCounterClockwise: boolean;
   pass?: NoteRenderPass;
 }

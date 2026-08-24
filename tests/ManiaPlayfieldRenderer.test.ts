@@ -4,7 +4,8 @@ import { ManiaPlayfieldRenderer } from "../src/gameplay/renderer/ManiaPlayfieldR
 import type { NoteSkin } from "../src/gameplay/renderer/NoteSkin";
 import { NoteState } from "../src/gameplay/RhythmEngine";
 
-function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0, 0], upside_down = false) {
+function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0, 0], upside_down = false,
+  column_line_widths: readonly number[] = [0, 0, 0, 0, 0]) {
   return new ManiaPlayfieldRenderer({
     config: {
       mode: "mania",
@@ -12,6 +13,8 @@ function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0,
       columnStart: 281,
       columnWidths: [73, 73, 73, 73],
       columnSpacing: column_spacing,
+      columnLineWidths: column_line_widths,
+      columnLineColor: [1, 1, 1, 1],
       hitPosition: 445,
       comboPosition: 100,
       judgePosition: 125,
@@ -29,7 +32,13 @@ function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0,
       receptorFlipY: [upside_down, upside_down, upside_down, upside_down],
       judgments: {}, scoreGlyphs: {}, comboGlyphs: {}, scoreOverlap: 0, comboOverlap: 0,
     },
-    sprites: with_frame ? {
+    sprites: {
+      __white: {
+        image: {} as ImageBitmap,
+        sourceSize: { w: 1, h: 1 },
+        pixelSize: { w: 1, h: 1 },
+      },
+      ...(with_frame ? {
       k: {
         image: {} as ImageBitmap,
         sourceSize: { w: 156.5, h: 384 },
@@ -40,7 +49,8 @@ function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0,
         sourceSize: { w: 100, h: 20 },
         pixelSize: { w: 100, h: 20 },
       },
-    } : {},
+      } : {}),
+    },
   } satisfies NoteSkin);
 }
 
@@ -52,6 +62,8 @@ function stageRenderer(upside_down = false) {
       columnStart: 100,
       columnWidths: [50, 50],
       columnSpacing: [4],
+      columnLineWidths: [0, 0, 0],
+      columnLineColor: [1, 1, 1, 1],
       hitPosition: 400,
       comboPosition: 100,
       judgePosition: 125,
@@ -85,6 +97,15 @@ test("uses osu's left-aligned ColumnStart when it fits", () => {
   assert.equal(layout.columnLeft[0], 281);
   assert.equal(layout.columnLeft[3], 500);
   assert.equal(layout.receptorY, 445);
+});
+
+test("draws enabled column lines to the hit position", () => {
+  const playfield = renderer(false, [0, 0, 0], false, [2, 0, 0, 0, 2]);
+  const quads: Parameters<Parameters<typeof playfield.draw>[4]>[] = [];
+  playfield.draw(playfield.getLayout(854), [], 1, [], (...quad) => quads.push(quad));
+  assert.deepEqual(quads.map((quad) => quad.slice(0, 4)), [
+    [281, 0, 0.925, 445], [572.9, 0, 0.925, 445],
+  ]);
 });
 
 test("scales and clamps the playfield to narrow viewports", () => {

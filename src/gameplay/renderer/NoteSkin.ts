@@ -8,6 +8,8 @@ export interface NoteSkinConfig {
   columnStart: number;
   columnWidths: readonly number[];
   columnSpacing: readonly number[];
+  columnLineWidths: readonly number[];
+  columnLineColor: readonly [number, number, number, number];
   hitPosition: number;
   comboPosition: number;
   judgePosition: number;
@@ -32,6 +34,8 @@ export interface NoteSkinConfig {
   comboGlyphs: Readonly<Record<string, string>>;
   scoreOverlap: number;
   comboOverlap: number;
+  hpBackground?: string;
+  hpFill?: string;
 }
 
 export interface NoteSkinSprite {

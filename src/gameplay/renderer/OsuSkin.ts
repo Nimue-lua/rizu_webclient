@@ -63,6 +63,13 @@ function numberList(section: SkinIniSection, key: string, length: number, fallba
   });
 }
 
+function colorValue(section: SkinIniSection, key: string,
+  fallback: readonly [number, number, number, number]): [number, number, number, number] {
+  const values = section[key]?.split(",").map((value) => Number(value.trim())) ?? [];
+  if (values.length < 3 || values.some((value) => !Number.isFinite(value))) return [...fallback];
+  return [values[0]! / 255, values[1]! / 255, values[2]! / 255, (values[3] ?? 255) / 255];
+}
+
 export function osuManiaColumnType(column: number, column_count: number, special_style: number): "1" | "2" | "S" {
   let key = column + 1;
   if (special_style === 1) {
@@ -94,6 +101,8 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
   const columnWidths = numberList(section, "ColumnWidth", column_count, 30);
   const columnSpacing = numberList(section, "ColumnSpacing", Math.max(0, column_count - 1), 0)
     .map((spacing, index) => Math.max(spacing, -columnWidths[index + 1]!));
+  const columnLineWidths = numberList(section, "ColumnLineWidth", column_count + 1, 2)
+    .map((width) => width > 0 && width < 2 ? 2 : width);
   const spriteList = (key: (column: number) => string, suffix: string) =>
     Array.from({ length: column_count }, (_, column) => section[key(column)]?.replace(/\\/g, "/") ??
       `mania-${key(column).startsWith("Key") ? "key" : "note"}${osuManiaColumnType(column, column_count, special_style)}${suffix}`);
@@ -104,6 +113,8 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
     columnStart: numberValue(section, "ColumnStart", 136),
     columnWidths,
     columnSpacing,
+    columnLineWidths,
+    columnLineColor: colorValue(section, "ColourColumnLine", [1, 1, 1, 1]),
     hitPosition: numberValue(section, "HitPosition", 402),
     comboPosition: numberValue(section, "ComboPosition", 111),
     judgePosition: numberValue(section, "ScorePosition", 325),
@@ -129,6 +140,8 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
     comboGlyphs: {},
     scoreOverlap: numberValue(ini.sections.Fonts ?? {}, "ScoreOverlap", 0),
     comboOverlap: numberValue(ini.sections.Fonts ?? {}, "ComboOverlap", 0),
+    hpBackground: "scorebar-bg",
+    hpFill: "scorebar-colour",
   };
 }
 
@@ -240,6 +253,8 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     judgments: resolveJudgments(section, available, defaults),
     scoreGlyphs: resolveFontGlyphs(ini.sections.Fonts?.ScorePrefix ?? "score", available, defaults),
     comboGlyphs: resolveFontGlyphs(ini.sections.Fonts?.ComboPrefix ?? "score", available, defaults),
+    hpBackground: resolveOptional(config.hpBackground, "scorebar-bg", available, defaults),
+    hpFill: resolveAnimationFirst(config.hpFill, "scorebar-colour", available, defaults),
   };
   const names = [...new Set([
     ...resolved_config.shortNotes, ...resolved_config.longNoteHeads, ...resolved_config.longNoteBodies, ...resolved_config.longNoteTails,
@@ -248,6 +263,7 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
       .filter((name): name is string => name !== undefined),
     ...Object.values(resolved_config.judgments).flat(),
     ...Object.values(resolved_config.scoreGlyphs), ...Object.values(resolved_config.comboGlyphs),
+    ...[resolved_config.hpBackground, resolved_config.hpFill].filter((name): name is string => name !== undefined),
   ])];
   const decoded = await Promise.all(names.map(async (name) => {
     const normalized = name.replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
@@ -271,6 +287,11 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
       pixelSize: { w: source.width, h: source.height },
     };
   }
+  sprites.__white = {
+    image: await createImageBitmap(new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1)),
+    sourceSize: { w: 1, h: 1 },
+    pixelSize: { w: 1, h: 1 },
+  };
   return { config: resolved_config, sprites };
 }
 
@@ -313,5 +334,15 @@ function resolveOptional(name: string | undefined, fallback: string, available: 
   defaults: ReadonlyMap<string, SpriteFile>): string | undefined {
   if (name && available.has(normalizedSpriteName(name))) return name;
   if (available.has(normalizedSpriteName(fallback)) || defaults.has(normalizedSpriteName(fallback))) return fallback;
+  return undefined;
+}
+
+function resolveAnimationFirst(name: string | undefined, fallback: string, available: ReadonlyMap<string, SpriteFile>,
+  defaults: ReadonlyMap<string, SpriteFile>): string | undefined {
+  for (const source of [available, defaults]) {
+    for (const candidate of [name, name && `${name}-0`, fallback, `${fallback}-0`]) {
+      if (candidate && source.has(normalizedSpriteName(candidate))) return candidate;
+    }
+  }
   return undefined;
 }
