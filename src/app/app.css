@@ -160,11 +160,11 @@ svg { width: 22px; height: 22px; }
 .score-details b { margin-right: 12px; color: var(--text); font-weight: 400; }
 
 .chart-summary { display: grid; grid-template-columns: minmax(285px, auto) minmax(260px, 1fr); min-width: 0; overflow: hidden; padding: 6px; background: #1c1823; border: 1px solid #ffffff0c; border-radius: 6px; }
-.chart-difficulty { display: flex; align-items: center; min-width: 0; background: linear-gradient(105deg, #ff713b15, transparent 80%); border-left: 3px solid #ff7845; }
-.chart-mode { display: grid; grid-template: auto auto / auto auto; align-content: center; align-items: center; min-width: 154px; height: 100%; padding: 7px 14px 7px 11px; color: #ff9b5e; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
-.chart-mode span { grid-column: 1 / -1; }
-.chart-mode b { color: #ff8a4d; font-size: 29px; font-weight: 600; line-height: .9; }
-.chart-mode em { margin: 3px 0 0 5px; font-size: 10px; font-style: normal; }
+.chart-difficulty { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; padding: 7px 14px 7px 11px; background: linear-gradient(105deg, color-mix(in srgb, var(--difficulty-color) 8%, transparent), transparent 80%); border-left: 3px solid var(--difficulty-color); }
+.chart-rating { display: flex; align-items: center; }
+.chart-rating b { color: var(--difficulty-color); font-size: 36px; font-weight: 600; line-height: .9; }
+.chart-rating em { margin-left: 6px; color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; }
+.chart-mode { color: var(--text); font-size: 18px; font-weight: 400; white-space: nowrap; }
 .chart-patterns { display: grid; gap: 4px; min-width: 0; padding: 0 8px; color: #70bfd3; border-left: 1px solid #4a44608c; font-size: 11px; font-weight: 700; }
 .chart-metadata { display: grid; grid-template: repeat(2, 1fr) / repeat(3, minmax(62px, 1fr)); grid-auto-flow: column; align-items: center; min-width: 0; padding: 5px 0 5px 12px; border-left: 1px solid #4a44608c; }
 .chart-metadata > span { display: grid; grid-template-columns: 25px minmax(0, 1fr); align-items: center; min-width: 0; color: var(--muted); font-size: clamp(11px, .8vw, 15px); }
@@ -191,7 +191,7 @@ svg { width: 22px; height: 22px; }
 .chart-row small { padding-bottom: 3px; color: var(--muted); line-height: 1.25; }
 .chart-row > i { width: 30px; height: 30px; margin-left: 16px; background: linear-gradient(#a6b2cc, #4f5968); border-radius: 50%; box-shadow: inset 0 1px #ffffff45, 0 2px 5px #0006; }
 .chart-row > i.ranked { background: linear-gradient(#62caf0, #26659b); }
-.chart-row.selected { padding: 1px 13px 1px 17px; border: 3px solid var(--difficulty-color); }
+.chart-row.selected { padding: 1px 13px 1px 21px; border: 3px solid var(--difficulty-color); }
 .empty-library { position: sticky; top: 40%; color: var(--muted); text-align: center; }
 .song-library-error { margin: 0; padding: 1.5rem; }
 

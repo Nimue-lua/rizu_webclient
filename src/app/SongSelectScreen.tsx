@@ -98,6 +98,10 @@ function chartMode(chart: Chartview): string {
   return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K ${mode}` : mode;
 }
 
+function chartSummaryMode(chart: Chartview): string {
+  return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K` : mode_names[chart.mode] ?? "UNKNOWN";
+}
+
 function formatDuration(duration_seconds: number): string {
   const seconds = Math.round(duration_seconds);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -324,7 +328,7 @@ export function SongSelectScreen({
 
         <div className="song-select-column right-column">
           <section className="chart-summary" aria-label="Selected chart information">
-            <div className="chart-difficulty"><span className="chart-mode"><span>{selected_chart ? chartMode(selected_chart) : "NO CHART"}</span><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em>NPS</em></span></div>
+            <div className="chart-difficulty" style={{ "--difficulty-color": difficultyColor(selected_chart?.difficulty ?? 0) } as CSSProperties}><span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em>NPS</em></span><span className="chart-mode">{selected_chart ? chartSummaryMode(selected_chart) : "NO CHART"}</span></div>
             <div className="chart-metadata"><span><Icon name="clock" /><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span><span><Icon name="music" /><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span><span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><Icon name="metronome" /><b>{Math.round(selected_chart?.bpm_avg ?? 0)} BPM</b></span><span><strong>LN</strong><b className="accent">{Math.round((selected_chart?.long_note_ratio ?? 0) * 100)}%</b></span><span><Icon name="file" /><b>{selected_chart?.format.toUpperCase() ?? "-"}</b></span></div>
           </section>
           <section className="chart-browser" aria-label="Chart browser">
