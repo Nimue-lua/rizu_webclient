@@ -1,96 +1,64 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  expandAnyKeyNoteSkinConfig,
-  parseAnyKeyNoteSkinConfig,
-  parseNoteSkinConfig,
-} from "../src/gameplay/renderer/NoteSkin";
+  osuManiaColumnType,
+  parseOsuManiaConfig,
+  parseSkinIni,
+  resolveOsuManiaTail,
+} from "../src/gameplay/renderer/OsuSkin";
 
-test("parses a note skin config with optional layout and sprite fields", () => {
-  assert.deepEqual(parseNoteSkinConfig({
-    mode: "mania",
-    columnCount: 2,
-    columnSize: 48,
-    gap: 3,
-    align: 0.25,
-    hitPosition: 400,
-    comboPosition: 300,
-    judgePosition: 250,
-    shortNotes: ["left", "right"],
-    receptorReleased: ["idle-left", "idle-right"],
-    receptorPressed: ["down-left", "down-right"],
-  }), {
-    mode: "mania",
-    columnCount: 2,
-    columnSize: 48,
-    gap: 3,
-    align: 0.25,
-    hitPosition: 400,
-    comboPosition: 300,
-    judgePosition: 250,
-    shortNotes: ["left", "right"],
-    longNoteHeads: undefined,
-    longNoteBodies: undefined,
-    longNoteTails: undefined,
-    receptorReleased: ["idle-left", "idle-right"],
-    receptorPressed: ["down-left", "down-right"],
-  });
+const source = `\uFEFF[General]\nName: Test skin\n\n[Mania]\nKeys: 4\nColumnStart: 281\nColumnWidth: 73, 74, 75, 76\nColumnSpacing: 1, 2, 3 // comment\nHitPosition: 445\nScorePosition: 125\nComboPosition: 100\nKeyImage0: keys\\one\nKeyImage0D: keys/one-down\nNoteImage0: notes/one\nNoteImage0H: notes/one-head\nNoteImage0L: notes/one-body\nNoteImage0T: notes/one-tail\nKeyImage1: keys/two\nKeyImage1D: keys/two-down\nNoteImage1: notes/two\nNoteImage1H: notes/two-head\nNoteImage1L: notes/two-body\nNoteImage1T: notes/two-tail\nKeyImage2: keys/three\nKeyImage2D: keys/three-down\nNoteImage2: notes/three\nNoteImage2H: notes/three-head\nNoteImage2L: notes/three-body\nNoteImage2T: notes/three-tail\nKeyImage3: keys/four\nKeyImage3D: keys/four-down\nNoteImage3: notes/four\nNoteImage3H: notes/four-head\nNoteImage3L: notes/four-body\nNoteImage3T: notes/four-tail\n\n[Mania]\nKeys: 7\n`;
+
+test("parses repeated Mania sections, BOM, comments, and colon values", () => {
+  const ini = parseSkinIni(source.replace("Name: Test skin", "Name: Test: skin"));
+  assert.equal(ini.sections.General?.Name, "Test: skin");
+  assert.equal(ini.mania.length, 2);
+  assert.equal(ini.mania[0]?.ColumnSpacing, "1, 2, 3");
 });
 
-test("requires mode and columnCount", () => {
-  assert.throws(() => parseNoteSkinConfig({ columnCount: 4 }), /mode is required/);
-  assert.throws(() => parseNoteSkinConfig({ mode: "mania" }), /columnCount is required/);
+test("maps the matching osu mania section to playfield geometry and sprites", () => {
+  const config = parseOsuManiaConfig(parseSkinIni(source), 4);
+  assert.equal(config.mode, "mania");
+  assert.equal(config.columnCount, 4);
+  assert.equal(config.columnStart, 281);
+  assert.deepEqual(config.columnWidths, [73, 74, 75, 76]);
+  assert.deepEqual(config.columnSpacing, [1, 2, 3]);
+  assert.equal(config.hitPosition, 445);
+  assert.equal(config.judgePosition, 125);
+  assert.equal(config.comboPosition, 100);
+  assert.deepEqual(config.receptorReleased, ["keys/one", "keys/two", "keys/three", "keys/four"]);
+  assert.deepEqual(config.shortNotes, ["notes/one", "notes/two", "notes/three", "notes/four"]);
 });
 
-test("applies layout defaults and leaves missing per-column textures empty", () => {
-  assert.deepEqual(parseNoteSkinConfig({
-    mode: "mania",
-    columnCount: 4,
-    columnSize: 64,
-    shortNotes: ["note"],
-  }), {
-    mode: "mania",
-    columnCount: 4,
-    columnSize: 64,
-    gap: 0,
-    align: 0.5,
-    hitPosition: 380,
-    comboPosition: 200,
-    judgePosition: 250,
-    shortNotes: ["note", undefined, undefined, undefined],
-    longNoteHeads: undefined,
-    longNoteBodies: undefined,
-    longNoteTails: undefined,
-    receptorReleased: undefined,
-    receptorPressed: undefined,
-  });
-});
-
-test("validates supplied layout and sprite values", () => {
-  assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, columnSize: -1 }), /columnSize/);
-  assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, columnSize: [64] }), /columnSize/);
-  assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, shortNotes: [42] }), /shortNotes/);
-  assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, align: 2 }), /align/);
-  assert.throws(() => parseNoteSkinConfig({ mode: "mania", columnCount: 4, gap: -1 }), /gap/);
-});
-
-test("expands any-key sprites using the shared column color configuration", () => {
-  const config = expandAnyKeyNoteSkinConfig(parseAnyKeyNoteSkinConfig({
-    mode: "mania",
-    columnSize: 64,
-    shortNotes: { white: "note-white", pink: "note-pink", yellow: "note-yellow" },
-    receptorReleased: { white: "idle", pink: "idle", yellow: "idle-center" },
-  }), 7);
-
-  assert.equal(config.columnCount, 7);
-  assert.equal(config.columnSize, 64);
+test("uses native osu defaults when sprite mappings are absent", () => {
+  const ini = parseSkinIni(source);
+  assert.throws(() => parseOsuManiaConfig(ini, 6), /does not contain a 6K/);
+  const config = parseOsuManiaConfig(ini, 7);
   assert.deepEqual(config.shortNotes, [
-    "note-white", "note-pink", "note-white", "note-yellow", "note-white", "note-pink", "note-white",
+    "mania-note1", "mania-note2", "mania-note1", "mania-noteS", "mania-note1", "mania-note2", "mania-note1",
   ]);
-  assert.deepEqual(config.receptorReleased, ["idle", "idle", "idle", "idle-center", "idle", "idle", "idle"]);
+  assert.equal(config.longNoteHeads[0], "mania-note1H");
 });
 
-test("validates any-key sprite maps", () => {
-  assert.throws(() => parseAnyKeyNoteSkinConfig({ mode: "mania", shortNotes: ["note"] }), /shortNotes/);
-  assert.throws(() => parseAnyKeyNoteSkinConfig({ mode: "mania", shortNotes: { white: 42 } }), /shortNotes.white/);
+test("matches native osu mania column patterns and special styles", () => {
+  assert.deepEqual(Array.from({ length: 4 }, (_, column) => osuManiaColumnType(column, 4, 0)), ["2", "1", "1", "2"]);
+  assert.deepEqual(Array.from({ length: 5 }, (_, column) => osuManiaColumnType(column, 5, 0)), ["2", "1", "S", "1", "2"]);
+  assert.deepEqual(Array.from({ length: 4 }, (_, column) => osuManiaColumnType(column, 4, 1)), ["S", "1", "2", "1"]);
+});
+
+test("reads osu column spacing partially and ignores extra values", () => {
+  const config = parseOsuManiaConfig(parseSkinIni(source
+    .replace("ColumnSpacing: 1, 2, 3 // comment", "ColumnSpacing: 2,2,2,2")), 4);
+  assert.deepEqual(config.columnSpacing, [2, 2, 2]);
+
+  const partial = parseOsuManiaConfig(parseSkinIni(source
+    .replace("ColumnSpacing: 1, 2, 3 // comment", "ColumnSpacing: 2,invalid")), 4);
+  assert.deepEqual(partial.columnSpacing, [2, 0, 0]);
+});
+
+test("uses a custom LN head before the default tail when the configured tail is missing", () => {
+  assert.equal(resolveOsuManiaTail(
+    "mania-note2T", "Notes\\grayln", "Notes/grayln", "mania-note2T",
+    new Set(["notes/grayln"]), new Set(["mania-note2t"]),
+  ), "Notes/grayln");
 });

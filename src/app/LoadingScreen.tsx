@@ -30,6 +30,7 @@ export function LoadingScreen({
       })
       .catch((reason: unknown) => {
         if (!abort_controller.signal.aborted) {
+          console.error("Failed to load gameplay assets", reason);
           setError(reason instanceof Error ? reason.message : "Failed to load gameplay assets");
         }
       });

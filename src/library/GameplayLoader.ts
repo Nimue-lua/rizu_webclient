@@ -1,9 +1,6 @@
 import type { Chart } from "../chart/Chart";
 import { parseOsuChart } from "../chart/format/osu/OsuParser";
 import { loadNoteSkinZip, type NoteSkin } from "../gameplay/renderer/NoteSkin";
-import { note_skin_options } from "../gameplay/renderer/NoteSkinSelection";
-
-const DEFAULT_NOTE_SKIN_URL = note_skin_options[0]!.url;
 
 export interface GameplayLocation {
   audio_url: string;
@@ -48,7 +45,8 @@ async function fetchChart(url: string, signal: AbortSignal): Promise<string> {
 
 export class HttpGameplayLoader implements GameplayLoader {
   async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData> {
-    const skin_url = location.note_skin_url ?? DEFAULT_NOTE_SKIN_URL;
+    const skin_url = location.note_skin_url;
+    if (!skin_url) throw new Error("No note skin is selected for this key mode");
     const [audio_data, chart_source] = await Promise.all([
       fetchAsset(location.audio_url, signal),
       fetchChart(location.chart_url, signal),
@@ -57,17 +55,7 @@ export class HttpGameplayLoader implements GameplayLoader {
       audio_context.decodeAudioData(audio_data),
       Promise.resolve(parseOsuChart(chart_source)),
     ]);
-    const loaded_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal).catch((error: unknown) => {
-      if (skin_url === DEFAULT_NOTE_SKIN_URL) throw error;
-      console.warn("Could not load selected note skin; using default", error);
-      return undefined;
-    });
-    let note_skin = loaded_skin;
-    if (note_skin?.config.mode !== "mania") {
-      note_skin?.image.close();
-      note_skin = undefined;
-    }
-    if (!note_skin) note_skin = await loadNoteSkinZip(DEFAULT_NOTE_SKIN_URL, chart.column_count, signal);
+    const note_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal);
     return { audio_buffer, audio_context, chart, note_skin };
   }
 }

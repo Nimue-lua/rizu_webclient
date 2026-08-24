@@ -48,7 +48,13 @@ export default defineConfig({
     {
       name: "public-logo",
       buildStart() {
-        for (const fileName of ["rizu-logo.svg", "skins/DefaultCircles.zip"]) {
+        for (const fileName of ["rizu-logo.svg", "skins/skin.osk", "osu-defaults/LICENSE",
+          "osu-defaults/mania-key1@2x.png", "osu-defaults/mania-key1D@2x.png",
+          "osu-defaults/mania-key2@2x.png", "osu-defaults/mania-key2D@2x.png",
+          "osu-defaults/mania-keyS@2x.png", "osu-defaults/mania-keySD@2x.png",
+          "osu-defaults/mania-note1@2x.png", "osu-defaults/mania-note1L@2x.png", "osu-defaults/mania-note1T@2x.png",
+          "osu-defaults/mania-note2@2x.png", "osu-defaults/mania-note2L@2x.png", "osu-defaults/mania-note2T@2x.png",
+          "osu-defaults/mania-noteS@2x.png", "osu-defaults/mania-noteSL@2x.png", "osu-defaults/mania-noteST@2x.png"]) {
           this.emitFile({
             type: "asset",
             fileName,

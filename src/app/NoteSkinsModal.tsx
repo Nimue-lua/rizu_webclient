@@ -47,10 +47,11 @@ export function NoteSkinsModal({ selections, selected_column_count, onSelectionC
                 <span><strong>{column_count}K</strong>{selected_column_count === column_count && <small>SELECTED CHART</small>}</span>
                 <select
                   autoFocus={selected_column_count === column_count}
-                  value={selections[key] ?? compatible_skins[0]?.id ?? ""}
+                  value={selections[key] ?? ""}
                   onChange={(event) => onSelectionChange(key, event.target.value)}
                   aria-label={`${column_count} key note skin`}
                 >
+                  <option value="">Not selected</option>
                   {compatible_skins.map((skin) => <option key={skin.id} value={skin.id}>{skin.name}</option>)}
                 </select>
               </label>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NoteState } from "../src/gameplay/LogicEvent";
-import { getLongNoteBrightness } from "../src/gameplay/renderer/WebGlGameplayRenderer";
+import { getLongNoteBrightness } from "../src/gameplay/renderer/ManiaPlayfieldRenderer";
 
 test("dims long notes according to native hold states", () => {
   assert.equal(getLongNoteBrightness(NoteState.Clear), 1);

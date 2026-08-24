@@ -1,14 +1,9 @@
-import { NoteState, type VisualNote } from "../RhythmEngine";
+import type { VisualNote } from "../RhythmEngine";
+import { ManiaPlayfieldRenderer } from "./ManiaPlayfieldRenderer";
 import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinFrame } from "./NoteSkin";
 
 const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
 const VERTEX_FLOATS = 8;
-
-export function getLongNoteBrightness(state: NoteState): number {
-  if (state === NoteState.StartMissedPressed) return 0.75;
-  if (state === NoteState.StartMissed || state === NoteState.EndMissed || state === NoteState.EndMissedPassed) return 0.5;
-  return 1;
-}
 
 const vertex_shader_source = `#version 300 es
 in vec2 position;
@@ -62,17 +57,6 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
   return program;
 }
 
-interface Layout {
-  width: number;
-  height: number;
-  framebuffer_width: number;
-  framebuffer_height: number;
-  column_left: readonly number[];
-  column_width: readonly number[];
-  playfield_left: number;
-  receptor_y: number;
-}
-
 export class WebGlGameplayRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly skin: NoteSkin;
@@ -82,6 +66,7 @@ export class WebGlGameplayRenderer {
   private readonly vertex_buffer: WebGLBuffer;
   private readonly viewport_size: WebGLUniformLocation;
   private readonly texture: WebGLTexture;
+  private readonly playfield: ManiaPlayfieldRenderer;
   private vertices: number[] = [];
 
   constructor(canvas: HTMLCanvasElement, skin: NoteSkin) {
@@ -101,6 +86,7 @@ export class WebGlGameplayRenderer {
     this.vertex_buffer = vertex_buffer;
     this.viewport_size = viewport_size;
     this.texture = texture;
+    this.playfield = new ManiaPlayfieldRenderer(skin);
     gl.bindVertexArray(vertex_array);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     const stride = VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
@@ -120,29 +106,29 @@ export class WebGlGameplayRenderer {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
-  get comboPosition(): number { return this.skin.config.comboPosition; }
-  get judgePosition(): number { return this.skin.config.judgePosition; }
+  get comboPosition(): number { return this.playfield.comboPosition; }
+  get judgePosition(): number { return this.playfield.judgePosition; }
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
-    const layout = this.getLayout(column_count);
-    const seconds_per_pixel = 1 / (NOTE_SKIN_LOGICAL_HEIGHT * scroll_speed);
-    const margin = Math.max(...layout.column_width);
-    return { future: (layout.receptor_y + margin) * seconds_per_pixel, past: (layout.height + margin - layout.receptor_y) * seconds_per_pixel };
+    if (column_count !== this.skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
+    return this.playfield.getTimeRange(this.playfield.getLayout(this.logicalWidth()), scroll_speed);
   }
 
   draw(column_count: number, notes: readonly VisualNote[], scroll_speed: number,
     pressed_columns: ArrayLike<number> = []): void {
-    const layout = this.getLayout(column_count);
-    const pixels_per_visual_second = NOTE_SKIN_LOGICAL_HEIGHT * scroll_speed;
+    if (column_count !== this.skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
+    const framebuffer = this.resizeCanvas();
+    const layout = this.playfield.getLayout(NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height);
     const gl = this.gl;
-    gl.viewport(0, 0, layout.framebuffer_width, layout.framebuffer_height);
+    gl.viewport(0, 0, framebuffer.width, framebuffer.height);
     gl.clearColor(...BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vertex_array);
     gl.uniform2f(this.viewport_size, layout.width, layout.height);
     this.vertices = [];
-    this.drawSkinned(layout, notes, pixels_per_visual_second, pressed_columns);
+    this.playfield.draw(layout, notes, scroll_speed, pressed_columns,
+      (x, y, width, height, color, frame) => this.addQuad(x, y, width, height, color, frame));
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -154,59 +140,6 @@ export class WebGlGameplayRenderer {
     this.gl.deleteBuffer(this.vertex_buffer);
     this.gl.deleteVertexArray(this.vertex_array);
     this.gl.deleteProgram(this.program);
-  }
-
-  private drawSkinned(layout: Layout, notes: readonly VisualNote[], speed: number,
-    pressed_columns: ArrayLike<number>): void {
-    const skin = this.skin;
-    for (let column = 0; column < skin.config.columnCount; column += 1) {
-      const receptors = pressed_columns[column] ? skin.config.receptorPressed : skin.config.receptorReleased;
-      this.addSprite(receptors?.[column], column, layout, layout.receptor_y);
-    }
-    for (const note of notes) {
-      if (note.end_dt === undefined) continue;
-      const column = note.column - 1;
-      const head_y = layout.receptor_y - note.start_dt * speed;
-      const tail_y = layout.receptor_y - note.end_dt * speed;
-      const head_height = this.getSpriteHeight(skin.config.longNoteHeads?.[column], column, layout);
-      const brightness = getLongNoteBrightness(note.state);
-      this.addSprite(skin.config.longNoteBodies?.[column], column, layout, tail_y,
-        Math.max(0, head_y + head_height * 0.5 - tail_y), brightness, true);
-    }
-    for (const note of notes) {
-      if (note.end_dt === undefined) continue;
-      const column = note.column - 1;
-      const tail_y = layout.receptor_y - note.end_dt * speed;
-      this.addSprite(skin.config.longNoteTails?.[column], column, layout, tail_y, undefined,
-        getLongNoteBrightness(note.state), false, 1);
-    }
-    for (const note of notes) {
-      const column = note.column - 1;
-      const y = layout.receptor_y - note.start_dt * speed;
-      const sprites = note.end_dt === undefined ? skin.config.shortNotes : skin.config.longNoteHeads;
-      this.addSprite(sprites?.[column], column, layout, y, undefined,
-        note.end_dt === undefined ? 1 : getLongNoteBrightness(note.state));
-    }
-  }
-
-  private addSprite(name: string | undefined, column: number, layout: Layout, y: number, height?: number,
-    brightness = 1, stretch = false, origin_y = 0): void {
-    if (!name) return;
-    const frame = this.skin.frames[name];
-    if (!frame) return;
-    const scale = layout.column_width[column]! / frame.sourceSize.w;
-    const draw_height = height ?? frame.sourceSize.h * scale;
-    if (draw_height <= 0) return;
-    const x = layout.playfield_left + layout.column_left[column]! + frame.spriteSourceSize.x * scale;
-    const top = stretch ? y : y - frame.sourceSize.h * scale * origin_y + frame.spriteSourceSize.y * scale;
-    const width = frame.spriteSourceSize.w * scale;
-    const visible_height = stretch ? draw_height : frame.spriteSourceSize.h * scale;
-    this.addQuad(x, top, width, visible_height, [brightness, brightness, brightness, 1], frame);
-  }
-
-  private getSpriteHeight(name: string | undefined, column: number, layout: Layout): number {
-    const frame = name ? this.skin.frames[name] : undefined;
-    return frame ? frame.sourceSize.h * layout.column_width[column]! / frame.sourceSize.w : 0;
   }
 
   private addQuad(x: number, y: number, width: number, height: number,
@@ -223,7 +156,7 @@ export class WebGlGameplayRenderer {
     }
   }
 
-  private getLayout(column_count: number): Layout {
+  private resizeCanvas(): { width: number; height: number } {
     const ratio = window.devicePixelRatio;
     const framebuffer_width = Math.max(1, Math.round(this.canvas.clientWidth * ratio));
     const framebuffer_height = Math.max(1, Math.round(this.canvas.clientHeight * ratio));
@@ -231,24 +164,11 @@ export class WebGlGameplayRenderer {
       this.canvas.width = framebuffer_width;
       this.canvas.height = framebuffer_height;
     }
-    const height = NOTE_SKIN_LOGICAL_HEIGHT;
-    const width = height * framebuffer_width / framebuffer_height;
-    const configured_widths = Array.from({ length: column_count }, () => this.skin.config.columnSize);
-    const gap = this.skin.config.gap;
-    const natural_width = configured_widths.reduce((sum, value) => sum + value, 0) + gap * (column_count - 1);
-    const scale = Math.min(1, width / natural_width);
-    const column_width = configured_widths.map((value) => value * scale);
-    const column_left: number[] = [];
-    let offset = 0;
-    for (const column_width_value of column_width) {
-      column_left.push(offset);
-      offset += column_width_value + gap * scale;
-    }
-    const playfield_width = offset - gap * scale;
-    return {
-      width, height, framebuffer_width, framebuffer_height, column_left, column_width,
-      playfield_left: (width - playfield_width) * this.skin.config.align,
-      receptor_y: this.skin.config.hitPosition,
-    };
+    return { width: framebuffer_width, height: framebuffer_height };
+  }
+
+  private logicalWidth(): number {
+    const framebuffer = this.resizeCanvas();
+    return NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height;
   }
 }

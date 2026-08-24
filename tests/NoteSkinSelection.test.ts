@@ -10,13 +10,13 @@ test("keys skin selections by mode and column count", () => {
 });
 
 test("selects fixed and any-key skins compatible with the requested key mode", () => {
-  const selections = { "mania.4": "DefaultCircles", "mania.7": "DefaultCircles" };
-  assert.equal(selectedNoteSkin("mania", 4, selections)?.id, "DefaultCircles");
-  assert.equal(selectedNoteSkin("mania", 7, selections)?.id, "DefaultCircles");
-  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "" }).id, "DefaultCircles");
-  assert.equal(selectedNoteSkin("mania", 4, {}).id, "DefaultCircles");
+  const selections = { "mania.4": "Ralsei", "mania.7": "Ralsei" };
+  assert.equal(selectedNoteSkin("mania", 4, selections)?.id, "Ralsei");
+  assert.equal(selectedNoteSkin("mania", 7, selections)?.id, "Ralsei");
+  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "" }), undefined);
+  assert.equal(selectedNoteSkin("mania", 4, {}), undefined);
 });
 
-test("provides the renamed default skin", () => {
-  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "DefaultCircles" })?.url, "/skins/DefaultCircles.zip");
+test("provides the selected osu skin archive", () => {
+  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "Ralsei" })?.url, "/skins/skin.osk");
 });

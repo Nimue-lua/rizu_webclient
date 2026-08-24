@@ -9,7 +9,11 @@ export interface NoteSkinOption {
 export type NoteSkinSelections = Readonly<Record<string, string>>;
 
 export const note_skin_options: readonly NoteSkinOption[] = [
-  { id: "DefaultCircles", name: "Default Circles", mode: "mania", columnCount: null, url: "/skins/DefaultCircles.zip" },
+  { id: "FridayNightFunkin", name: "Friday Night Funkin", mode: "mania", columnCount: null, url: "/skins/skin3.osk" },
+  { id: "Ralsei", name: "Ralsei", mode: "mania", columnCount: null, url: "/skins/skin.osk" },
+  { id: "FleetSnowfluffAemeath", name: "Fleet Snowfluff - Aemeath", mode: "mania", columnCount: null, url: "/skins/skin2.osk" },
+  { id: "skin4", name: "skin4", mode: "mania", columnCount: null, url: "/skins/skin4.osk" },
+  { id: "skin5", name: "skin5", mode: "mania", columnCount: null, url: "/skins/skin5.osk" },
 ];
 
 const STORAGE_KEY = "rizu.note-skins";
@@ -24,7 +28,7 @@ export function loadNoteSkinSelections(): NoteSkinSelections {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
     return Object.fromEntries(Object.entries(value)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-      .map(([key, id]) => [key, id === "circles" ? "DefaultCircles" : id]));
+      .map(([key, id]) => [key, id === "circles" || id === "DefaultCircles" ? "" : id]));
   } catch {
     return {};
   }
@@ -39,9 +43,9 @@ export function saveNoteSkinSelections(selections: NoteSkinSelections): void {
 }
 
 export function selectedNoteSkin(mode: string, column_count: number,
-  selections: NoteSkinSelections): NoteSkinOption {
+  selections: NoteSkinSelections): NoteSkinOption | undefined {
   const id = selections[noteSkinSelectionKey(mode, column_count)];
   const compatible = note_skin_options.filter((skin) => skin.mode === mode &&
     (skin.columnCount === null || skin.columnCount === column_count));
-  return compatible.find((skin) => skin.id === id) ?? compatible[0] ?? note_skin_options[0]!;
+  return compatible.find((skin) => skin.id === id);
 }
