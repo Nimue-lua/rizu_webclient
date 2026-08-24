@@ -27,7 +27,10 @@ uniform sampler2D atlas;
 in vec2 uv;
 in vec4 tint;
 out vec4 color;
-void main() { color = tint * texture(atlas, uv); }`;
+void main() {
+  vec4 sampled = texture(atlas, uv);
+  color = vec4(sampled.rgb * tint.rgb * tint.a, sampled.a * tint.a);
+}`;
 
 function createShader(gl: WebGL2RenderingContext, type: GLenum, source: string): WebGLShader {
   const shader = gl.createShader(type);
@@ -107,7 +110,7 @@ export class WebGlGameplayRenderer {
       gl.enableVertexAttribArray(location);
       gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset * Float32Array.BYTES_PER_ELEMENT);
     }
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.activeTexture(gl.TEXTURE0);
     for (const [name, sprite] of Object.entries(skin.sprites)) {
       const texture = gl.createTexture();
@@ -126,7 +129,7 @@ export class WebGlGameplayRenderer {
       this.textures.set(sprite, texture);
     }
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
 
   get comboPosition(): number { return this.requireManiaPlayfield().comboPosition; }

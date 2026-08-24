@@ -236,7 +236,7 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
     const source = pngSize(file.bytes);
     const image = await createImageBitmap(new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }), {
-      premultiplyAlpha: "none",
+      premultiplyAlpha: "premultiply",
     });
     return [name, {
       image,
@@ -311,7 +311,7 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     const source = pngSize(file.bytes);
     const scale = Math.min(1, MAX_TEXTURE_SIZE / source.width, MAX_TEXTURE_SIZE / source.height);
     const image = await createImageBitmap(new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }), {
-      premultiplyAlpha: "none",
+      premultiplyAlpha: "premultiply",
       resizeWidth: Math.max(1, Math.round(source.width * scale)),
       resizeHeight: Math.max(1, Math.round(source.height * scale)),
       resizeQuality: "high",
