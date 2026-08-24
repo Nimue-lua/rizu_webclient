@@ -225,6 +225,21 @@ test("applies rate and offset to runtime input timestamps", () => {
   assert.equal(harness.scores[0]?.accuracy, 1);
 });
 
+test("prevents browser shortcuts for repeated gameplay keys", () => {
+  const harness = createRuntime([{ column: 1, absolute_time: 1, weight: 0 }]);
+  let prevented = false;
+  harness.runtime.start();
+
+  harness.events.dispatch("keydown", {
+    code: "KeyA",
+    timeStamp: 2000,
+    repeat: true,
+    preventDefault: () => { prevented = true; },
+  } as unknown as KeyboardEvent);
+
+  assert.equal(prevented, true);
+});
+
 test("Escape releases held input, misses the remaining chart, and finishes once", () => {
   const harness = createRuntime([
     { column: 1, absolute_time: 1, weight: 1 },

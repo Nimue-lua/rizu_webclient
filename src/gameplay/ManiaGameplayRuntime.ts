@@ -122,7 +122,6 @@ export class ManiaGameplayRuntime {
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
-    if (event.repeat) return;
     if (event.code === "Escape") {
       this.abortGameplay(this.clock.timeAt(event.timeStamp).corrected);
       return;
@@ -130,6 +129,7 @@ export class ManiaGameplayRuntime {
     const column = this.key_columns.get(event.code);
     if (column === undefined) return;
     event.preventDefault();
+    if (event.repeat) return;
     this.pressed_keys.add(event.code);
     this.pressed_columns[column]! += 1;
     const note_index = this.rules_engine.press(column, this.clock.timeAt(event.timeStamp).corrected);
