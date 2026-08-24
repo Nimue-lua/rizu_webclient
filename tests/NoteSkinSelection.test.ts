@@ -19,4 +19,5 @@ test("selects fixed and any-key skins compatible with the requested key mode", (
 
 test("provides the selected osu skin archive", () => {
   assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "skin1" })?.url, "/skins/skin1.osk");
+  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "osu-default" })?.url, "/skins/osu-default.osk");
 });

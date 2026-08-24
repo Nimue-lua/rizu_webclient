@@ -1,3 +1,4 @@
+import { unzipSync } from "fflate";
 import type { NoteSkin, NoteSkinConfig, NoteSkinSprite } from "./NoteSkin";
 
 export type SkinIniSection = Readonly<Record<string, string>>;
@@ -7,17 +8,7 @@ export interface SkinIni {
   readonly mania: readonly SkinIniSection[];
 }
 
-const DEFAULT_SPRITE_PATH = "/osu-defaults";
-const DEFAULT_SPRITE_NAMES = [
-  "mania-key1", "mania-key1D", "mania-key2", "mania-key2D", "mania-keyS", "mania-keySD",
-  "mania-note1", "mania-note1L", "mania-note1T", "mania-note2", "mania-note2L", "mania-note2T",
-  "mania-noteS", "mania-noteSL", "mania-noteST",
-  "mania-stage-hint", "mania-stage-left", "mania-stage-right",
-  "mania-hit0", "mania-hit50", "mania-hit100", "mania-hit200", "mania-hit300", "mania-hit300g",
-  "mania-hit300g-0",
-  "score-0", "score-1", "score-2", "score-3", "score-4", "score-5", "score-6", "score-7", "score-8", "score-9",
-  "score-dot", "score-percent",
-] as const;
+export const DEFAULT_OSU_SKIN_URL = "/skins/osu-default.osk";
 
 export function parseSkinIni(source: string): SkinIni {
   const sections: Record<string, Record<string, string>> = {};
@@ -92,8 +83,7 @@ export function osuManiaColumnType(column: number, column_count: number, special
 }
 
 export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSkinConfig {
-  const section = ini.mania.find((candidate) => Number(candidate.Keys) === column_count);
-  if (!section) throw new Error(`Skin does not contain a ${column_count}K [Mania] section`);
+  const section = maniaSection(ini, column_count);
   const special_style = numberValue(section, "SpecialStyle", 0);
   const upsideDown = numberValue(section, "UpsideDown", 0) === 1;
   const version_value = ini.sections.General?.Version;
@@ -142,6 +132,10 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
   };
 }
 
+function maniaSection(ini: SkinIni, column_count: number): SkinIniSection {
+  return ini.mania.find((candidate) => Number(candidate.Keys) === column_count) ?? { Keys: String(column_count) };
+}
+
 interface SpriteFile {
   bytes: Uint8Array;
   dpi: number;
@@ -180,28 +174,44 @@ export function resolveOsuManiaTail(tail_name: string, resolved_head: string,
   return default_sprites.has(normalizedSpriteName(default_tail)) ? default_tail : resolved_head;
 }
 
-let default_sprites: Promise<ReadonlyMap<string, SpriteFile>> | undefined;
+let default_archive: Promise<Readonly<Record<string, Uint8Array>>> | undefined;
 
-function defaultSpriteFiles(): Promise<ReadonlyMap<string, SpriteFile>> {
-  if (default_sprites) return default_sprites;
-  const sprites = new Map<string, SpriteFile>();
-  default_sprites = Promise.all(DEFAULT_SPRITE_NAMES.map(async (name) => {
-    const response = await fetch(`${DEFAULT_SPRITE_PATH}/${name}@2x.png`);
-    if (!response.ok) throw new Error(`Failed to fetch default osu sprite ${name}: ${response.status} ${response.statusText}`);
-    sprites.set(name.toLowerCase(), { bytes: new Uint8Array(await response.arrayBuffer()), dpi: 2 });
-  })).then(() => sprites);
-  return default_sprites;
+async function fetchArchive(url: string, signal?: AbortSignal): Promise<Readonly<Record<string, Uint8Array>>> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`Failed to fetch skin ${url}: ${response.status} ${response.statusText}`);
+  return unzipSync(new Uint8Array(await response.arrayBuffer()));
 }
 
-export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array>>, column_count: number): Promise<NoteSkin> {
+function defaultArchive(signal?: AbortSignal): Promise<Readonly<Record<string, Uint8Array>>> {
+  default_archive ??= fetchArchive(DEFAULT_OSU_SKIN_URL, signal).catch((error) => {
+    default_archive = undefined;
+    throw error;
+  });
+  return default_archive;
+}
+
+async function defaultSpriteFiles(signal?: AbortSignal): Promise<ReadonlyMap<string, SpriteFile>> {
+  const files = await defaultArchive(signal);
+  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  if (!ini_path) throw new Error("Default osu skin archive is missing skin.ini");
+  return spriteFiles(files, ini_path.slice(0, ini_path.lastIndexOf("/") + 1));
+}
+
+export async function loadOsuManiaSkinUrl(url: string, column_count: number, signal?: AbortSignal): Promise<NoteSkin> {
+  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
+  return loadOsuManiaSkin(files, column_count, signal);
+}
+
+export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array>>, column_count: number,
+  signal?: AbortSignal): Promise<NoteSkin> {
   const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
   if (!ini_path) throw new Error("osu skin archive is missing skin.ini");
   const directory = ini_path.slice(0, ini_path.lastIndexOf("/") + 1);
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));
   const config = parseOsuManiaConfig(ini, column_count);
   const available = spriteFiles(files, directory);
-  const defaults = await defaultSpriteFiles();
-  const section = ini.mania.find((candidate) => Number(candidate.Keys) === column_count)!;
+  const defaults = await defaultSpriteFiles(signal);
+  const section = maniaSection(ini, column_count);
   const types = Array.from({ length: column_count }, (_, column) =>
     osuManiaColumnType(column, column_count, numberValue(section, "SpecialStyle", 0)));
   const resolve = (name: string, fallback: string) => {

@@ -9,7 +9,9 @@ export interface NoteSkinOption {
 export type NoteSkinSelections = Readonly<Record<string, string>>;
 
 export const note_skin_options: readonly NoteSkinOption[] = [
+  { id: "osu-default", name: "osu! Default", mode: "mania", columnCount: null, url: "/skins/osu-default.osk" },
   { id: "skin1", name: "skin1", mode: "mania", columnCount: null, url: "/skins/skin1.osk" },
+  { id: "rskin", name: "rskin", mode: "mania", columnCount: null, url: "/skins/rskin.osk" },
 ];
 
 const STORAGE_KEY = "rizu.note-skins";

@@ -36,7 +36,7 @@ test("maps the matching osu mania section to playfield geometry and sprites", ()
 
 test("uses native osu defaults when sprite mappings are absent", () => {
   const ini = parseSkinIni(source);
-  assert.throws(() => parseOsuManiaConfig(ini, 6), /does not contain a 6K/);
+  assert.equal(parseOsuManiaConfig(ini, 6).columnCount, 6);
   const config = parseOsuManiaConfig(ini, 7);
   assert.deepEqual(config.shortNotes, [
     "mania-note1", "mania-note2", "mania-note1", "mania-noteS", "mania-note1", "mania-note2", "mania-note1",
