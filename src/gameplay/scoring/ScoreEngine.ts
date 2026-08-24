@@ -1,18 +1,17 @@
-import type { LogicEvent } from "../LogicEvent";
 import { isAccuracySource, isComboSource, isGradeSource, isJudgesSource, isScoreSource,
   type IAccuracySource, type IComboSource, type IGradeSource, type IJudgesSource,
   type IScoreSource } from "./ScoreSources";
 import type { ScoreSystem } from "./ScoreSystem";
 import type { ScoreResult } from "./ScoreResult";
 
-export class ScoreEngine {
+export class ScoreEngine<Event> {
   private score_source?: IScoreSource;
   private accuracy_source?: IAccuracySource;
   private grade_source?: IGradeSource;
   private combo_source?: IComboSource;
   private judges_source?: IJudgesSource;
 
-  constructor(private readonly systems: readonly ScoreSystem[]) {
+  constructor(private readonly systems: readonly ScoreSystem<Event>[]) {
     for (const system of systems) {
       if (isScoreSource(system)) this.score_source = system;
       if (isAccuracySource(system)) this.accuracy_source = system;
@@ -22,7 +21,7 @@ export class ScoreEngine {
     }
   }
 
-  receive(event: LogicEvent): void {
+  receive(event: Event): void {
     for (const system of this.systems) system.receive(event);
   }
 

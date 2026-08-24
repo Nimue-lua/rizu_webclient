@@ -33,6 +33,9 @@ export interface OsuChart {
   circle_size: number;
   end_time: number;
   overall_difficulty?: number;
+  hp_drain_rate: number;
+  object_count: number;
+  drain_length_seconds: number;
   primary_tempo: number;
   circles: readonly OsuCircle[];
 }

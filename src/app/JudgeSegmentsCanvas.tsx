@@ -68,11 +68,12 @@ void main() {
 }`;
 
 function calculateThresholds(judges: readonly number[]): Float32Array | null {
-  const total = judges.reduce((sum, count) => sum + count, 0);
+  const normalized_judges = Array.from({ length: 6 }, (_, index) => judges[index] ?? 0);
+  const total = normalized_judges.reduce((sum, count) => sum + count, 0);
   if (total === 0) return null;
 
-  const shares = judges.map(() => 0);
-  const remaining_indices = judges.flatMap((count, index) => count > 0 ? [index] : []);
+  const shares = normalized_judges.map(() => 0);
+  const remaining_indices = normalized_judges.flatMap((count, index) => count > 0 ? [index] : []);
   let remaining_total = total;
   let remaining_share = 1;
 
@@ -81,15 +82,15 @@ function calculateThresholds(judges: readonly number[]): Float32Array | null {
     // retains the same 1% minimum used by the native result renderer.
     const minimum_allocated_share = MINIMUM_VISIBLE_SHARE + GAP_WIDTH / Math.PI;
     const constrained_position = remaining_indices.findIndex((index) =>
-      judges[index]! / remaining_total * remaining_share < minimum_allocated_share);
+      normalized_judges[index]! / remaining_total * remaining_share < minimum_allocated_share);
     if (constrained_position === -1) {
-      for (const index of remaining_indices) shares[index] = judges[index]! / remaining_total * remaining_share;
+      for (const index of remaining_indices) shares[index] = normalized_judges[index]! / remaining_total * remaining_share;
       break;
     }
 
     const [index] = remaining_indices.splice(constrained_position, 1);
     shares[index!] = minimum_allocated_share;
-    remaining_total -= judges[index!]!;
+    remaining_total -= normalized_judges[index!]!;
     remaining_share -= minimum_allocated_share;
   }
 

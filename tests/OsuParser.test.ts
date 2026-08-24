@@ -41,6 +41,7 @@ test("parses osu circles and ignores sliders and spinners", () => {
 Mode:0
 [Difficulty]
 CircleSize:4.2
+HPDrainRate:6.5
 OverallDifficulty:6
 ApproachRate:8
 [HitObjects]
@@ -56,6 +57,9 @@ ApproachRate:8
     circle_size: 4.2,
     end_time: 2,
     overall_difficulty: 6,
+    hp_drain_rate: 6.5,
+    object_count: 4,
+    drain_length_seconds: 1,
     primary_tempo: 120,
     circles: [
       { x: 256, y: 192, absolute_time: 1 },
@@ -85,6 +89,28 @@ OverallDifficulty:7.5
 64,192,100,1,0,0:0:0:0:
 `);
   assert.equal(chart.overall_difficulty, 7.5);
+});
+
+test("retains stable standard scoring metadata and subtracts breaks from drain length", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+HPDrainRate:7
+OverallDifficulty:6
+[Events]
+2,3000,5000
+[HitObjects]
+64,192,1000,1,0,0:0:0:0:
+64,192,10000,1,0,0:0:0:0:
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode === "osu") {
+    assert.equal(chart.hp_drain_rate, 7);
+    assert.equal(chart.object_count, 2);
+    assert.equal(chart.drain_length_seconds, 7);
+  }
 });
 
 test("resets scroll velocity at BPM timing points", () => {

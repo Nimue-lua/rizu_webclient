@@ -1,13 +1,13 @@
-import { NoteState, type LogicEvent } from "../../LogicEvent";
+import { NoteState, type ManiaLogicEvent } from "../../ManiaLogicEvent";
 import type { IComboSource } from "../ScoreSources";
 import type { ScoreSystem } from "../ScoreSystem";
 
-export class BaseComboScore implements ScoreSystem, IComboSource {
-  readonly key = "base_combo";
+export class ManiaComboScore implements ScoreSystem<ManiaLogicEvent>, IComboSource {
+  readonly key = "mania_combo";
   private combo = 0;
   private max_combo = 0;
 
-  receive(event: LogicEvent): void {
+  receive(event: ManiaLogicEvent): void {
     if (event.type === "tap") {
       if (event.old_state === NoteState.Clear && event.new_state === NoteState.Passed) this.increment();
       else if (event.old_state === NoteState.Clear && event.new_state === NoteState.Missed) this.break();

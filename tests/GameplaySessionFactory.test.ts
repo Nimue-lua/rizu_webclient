@@ -21,7 +21,8 @@ function createOsuData(): OsuGameplayData {
     mode: "osu",
     audio_buffer: {} as AudioBuffer,
     audio_context: {} as AudioContext,
-    chart: { mode: "osu", approach_rate: 5, circle_size: 5, end_time: 1, primary_tempo: 120, circles: [] },
+    chart: { mode: "osu", approach_rate: 5, circle_size: 5, end_time: 1, overall_difficulty: 5,
+      hp_drain_rate: 5, object_count: 0, drain_length_seconds: 0, primary_tempo: 120, circles: [] },
     note_skin: {} as OsuGameplayData["note_skin"],
   };
 }

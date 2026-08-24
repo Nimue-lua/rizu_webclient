@@ -30,11 +30,12 @@ interface ResultScreenProps {
   music_rate: number;
   difficulty: number;
   overall_difficulty: number;
+  mode: "mania" | "osu";
   onExit: () => void;
 }
 
 export function ResultScreen({ score, background_url, title, artist, chart_name, duration_seconds,
-  long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, onExit }: ResultScreenProps) {
+  long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, mode, onExit }: ResultScreenProps) {
   const grade_color = GRADE_COLORS[score?.grade ?? ""] ?? FALLBACK_GRADE_COLOR;
 
   useEffect(() => {
@@ -63,7 +64,9 @@ export function ResultScreen({ score, background_url, title, artist, chart_name,
             <span>{music_rate.toFixed(2)}x</span>
             <strong>{difficulty.toFixed(1)}</strong><small>NPS</small>
           </div>
-          <div className="result-score-system">osu!mania V2 OD{overall_difficulty.toFixed(1).replace(/\.0$/, "")}</div>
+          <div className="result-score-system">
+            {mode === "osu" ? "osu!standard" : "osu!mania V2"} OD{overall_difficulty.toFixed(1).replace(/\.0$/, "")}
+          </div>
         </div>
         <div className="result-circle-panel">
           {score?.judge_names && score.judges && (

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NoteState } from "../src/gameplay/LogicEvent";
+import { NoteState } from "../src/gameplay/ManiaLogicEvent";
 import { ScoreEngine } from "../src/gameplay/scoring/ScoreEngine";
 import { OsuManiaV2Score } from "../src/gameplay/scoring/systems/OsuManiaV2Score";
 import { createOsuManiaV2TimingValues } from "../src/gameplay/timing/OsuManiaV2Timings";
@@ -57,4 +57,15 @@ test("grades osu mania accuracy", () => {
   score.receive({ index: 1, type: "tap", time: 0, delta_time: 0.03,
     old_state: NoteState.Clear, new_state: NoteState.Passed });
   assert.equal(score.getResult().grade, "S");
+});
+
+test("uses the same integer-rounded fractional OD preset for logic and score", () => {
+  const timings = createOsuManiaV2TimingValues(7.5);
+  assert.equal(timings.short_note.miss[0], -0.166);
+  const score = new ScoreEngine([new OsuManiaV2Score(7.5)]);
+  score.receive({ index: 0, type: "tap", time: 0, delta_time: 0.0165,
+    old_state: NoteState.Clear, new_state: NoteState.Passed });
+  assert.deepEqual(score.getResult().judges, {
+    perfect: 0, great: 1, good: 0, ok: 0, meh: 0, miss: 0,
+  });
 });

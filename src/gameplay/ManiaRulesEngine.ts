@@ -1,17 +1,17 @@
 import type { ManiaChart, ManiaNoteEvent } from "../chart/Chart";
 import { interpolateVisualPoint } from "../chart/VisualTimeline";
-import { NoteState, type LogicEvent } from "./LogicEvent";
+import { NoteState, type ManiaLogicEvent } from "./ManiaLogicEvent";
 import { ScoreEngine } from "./scoring/ScoreEngine";
 import type { ScoreResult } from "./scoring/ScoreResult";
-import { BaseComboScore } from "./scoring/systems/BaseComboScore";
+import { ManiaComboScore } from "./scoring/systems/ManiaComboScore";
 import { OsuManiaV2Score } from "./scoring/systems/OsuManiaV2Score";
-import { createOsuManiaV2TimingValues } from "./timing/OsuManiaV2Timings";
+import { createOsuManiaV2TimingPreset } from "./timing/OsuManiaV2Timings";
 import type { Subtimings } from "./timing/Subtimings";
 import type { Timings } from "./timing/Timings";
 import { resolveTimingValues } from "./timing/TimingValuesFactory";
 import { classifyTiming, type TimingResult, type TimingWindow } from "./timing/TimingValues";
 
-export { NoteState } from "./LogicEvent";
+export { NoteState } from "./ManiaLogicEvent";
 
 export type ManiaHitRegistration = "earliest" | "nearest";
 
@@ -40,12 +40,12 @@ function isActive(state: NoteState, hold: boolean): boolean {
 export class ManiaRulesEngine {
   readonly note_states: Uint8Array;
   readonly visible_notes: ManiaVisualNote[] = [];
-  readonly logic_events: LogicEvent[] = [];
+  readonly logic_events: ManiaLogicEvent[] = [];
   private readonly chart: ManiaChart;
   private readonly linked_notes: readonly LinkedNote[];
   private readonly lane_notes: number[][];
   private readonly timings;
-  private readonly score_engine: ScoreEngine;
+  private readonly score_engine: ScoreEngine<ManiaLogicEvent>;
   private readonly hit_registration: ManiaHitRegistration;
   private readonly music_rate: number;
   private readonly constant_scroll: boolean;
@@ -63,16 +63,18 @@ export class ManiaRulesEngine {
     this.linked_notes.forEach((note, index) => this.lane_notes[note.start.column - 1]?.push(index));
     const identity = timing_identity ?? undefined;
     const resolved = identity && resolveTimingValues(identity.timings, identity.subtimings);
+    const fallback_preset = createOsuManiaV2TimingPreset(chart.overall_difficulty ?? 5);
     const values = resolved?.values;
     this.timings = values ? {
       short_note: values.ShortNote,
       long_note_start: values.LongNoteStart,
       long_note_end: values.LongNoteEnd,
-    } : createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
+    } : fallback_preset;
     if (resolved && resolved.score_system !== "osu_mania_v2") {
       throw new Error("The webclient currently supports only osu!mania ScoreV2 gameplay");
     }
-    this.score_engine = new ScoreEngine([new BaseComboScore(), new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
+    const score_preset = createOsuManiaV2TimingPreset(identity?.timings.data ?? chart.overall_difficulty ?? 5);
+    this.score_engine = new ScoreEngine([new ManiaComboScore(), new OsuManiaV2Score(score_preset)]);
     this.hit_registration = hit_registration;
     this.music_rate = music_rate;
     this.constant_scroll = constant_scroll;
@@ -224,7 +226,7 @@ export class ManiaRulesEngine {
       this.head_release_times[index] = Number.NaN;
     }
     this.note_states[index] = new_state;
-    const event: LogicEvent = {
+    const event: ManiaLogicEvent = {
       index,
       type: this.linked_notes[index]!.end ? "hold" : "tap",
       time: Math.min(song_time, target_time + window.miss[1] * this.music_rate),

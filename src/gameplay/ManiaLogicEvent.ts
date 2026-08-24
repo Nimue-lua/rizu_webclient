@@ -10,7 +10,7 @@ export const enum NoteState {
   EndMissedPassed,
 }
 
-export interface LogicEvent {
+export interface ManiaLogicEvent {
   index: number;
   type: "tap" | "hold";
   time: number;

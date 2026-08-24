@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NoteState } from "../src/gameplay/LogicEvent";
+import { NoteState } from "../src/gameplay/ManiaLogicEvent";
 import { getLongNoteBrightness } from "../src/gameplay/renderer/ManiaPlayfieldRenderer";
 
 test("dims long notes according to native hold states", () => {

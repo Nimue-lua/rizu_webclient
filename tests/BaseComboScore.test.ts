@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NoteState, type LogicEvent } from "../src/gameplay/LogicEvent";
-import { BaseComboScore } from "../src/gameplay/scoring/systems/BaseComboScore";
+import { NoteState, type ManiaLogicEvent } from "../src/gameplay/ManiaLogicEvent";
+import { ManiaComboScore } from "../src/gameplay/scoring/systems/ManiaComboScore";
 
-function event(type: "tap" | "hold", old_state: NoteState, new_state: NoteState): LogicEvent {
+function event(type: "tap" | "hold", old_state: NoteState, new_state: NoteState): ManiaLogicEvent {
   return { index: 0, type, time: 0, delta_time: 0, old_state, new_state };
 }
 
 test("increments tap and completed hold combo while preserving maximum", () => {
-  const combo = new BaseComboScore();
+  const combo = new ManiaComboScore();
   combo.receive(event("tap", NoteState.Clear, NoteState.Passed));
   combo.receive(event("hold", NoteState.Clear, NoteState.StartPassedPressed));
   assert.equal(combo.getCombo(), 1);
@@ -21,7 +21,7 @@ test("increments tap and completed hold combo while preserving maximum", () => {
 });
 
 test("recovers combo at a successful hold tail after a missed head", () => {
-  const combo = new BaseComboScore();
+  const combo = new ManiaComboScore();
   combo.receive(event("hold", NoteState.Clear, NoteState.StartMissed));
   combo.receive(event("hold", NoteState.StartMissed, NoteState.StartMissedPressed));
   combo.receive(event("hold", NoteState.StartMissedPressed, NoteState.EndMissedPassed));

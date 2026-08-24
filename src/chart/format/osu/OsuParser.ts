@@ -14,6 +14,11 @@ interface ParsedHitObject {
   end_time?: number;
 }
 
+interface BreakPeriod {
+  start_time: number;
+  end_time: number;
+}
+
 function normalizeTimingPoints(points: OsuTimingPoint[]): TimingChange[] {
   points.sort((left, right) => left.offset - right.offset || right.beat_length - left.beat_length);
   const changes = new Map<number, TimingChange>();
@@ -71,9 +76,11 @@ export function parseOsuChart(source: string): Chart {
   let mode = 3;
   let circle_size: number | null = null;
   let overall_difficulty = 5;
+  let hp_drain_rate = 5;
   let approach_rate: number | null = null;
   const timing_points: OsuTimingPoint[] = [];
   const hit_objects: ParsedHitObject[] = [];
+  const breaks: BreakPeriod[] = [];
 
   for (const raw_line of source.split("\n")) {
     const line = raw_line.trim();
@@ -94,8 +101,24 @@ export function parseOsuChart(source: string): Chart {
       if (section === "Difficulty" && property_match[1] === "OverallDifficulty") {
         overall_difficulty = Number(property_match[2]);
       }
+      if (section === "Difficulty" && property_match[1] === "HPDrainRate") {
+        hp_drain_rate = Number(property_match[2]);
+      }
       if (section === "Difficulty" && property_match[1] === "ApproachRate") {
         approach_rate = Number(property_match[2]);
+      }
+      continue;
+    }
+
+    if (section === "Events") {
+      const fields = line.split(",");
+      if (fields[0] === "2" || fields[0] === "Break") {
+        const start_time = Number(fields[1]) / 1000;
+        const end_time = Number(fields[2]) / 1000;
+        if (!Number.isFinite(start_time) || !Number.isFinite(end_time) || end_time < start_time) {
+          throw new Error(`Invalid break period: ${line}`);
+        }
+        breaks.push({ start_time, end_time });
       }
       continue;
     }
@@ -138,6 +161,9 @@ export function parseOsuChart(source: string): Chart {
   if (!Number.isFinite(overall_difficulty) || overall_difficulty < 0 || overall_difficulty > 10) {
     throw new Error("Chart has an invalid OverallDifficulty");
   }
+  if (!Number.isFinite(hp_drain_rate) || hp_drain_rate < 0 || hp_drain_rate > 10) {
+    throw new Error("Chart has an invalid HPDrainRate");
+  }
   approach_rate ??= overall_difficulty;
   if (!Number.isFinite(approach_rate) || approach_rate < 0 || approach_rate > 10) {
     throw new Error("Chart has an invalid ApproachRate");
@@ -145,6 +171,10 @@ export function parseOsuChart(source: string): Chart {
 
   const timing_changes = normalizeTimingPoints(timing_points);
   const last_time = hit_objects.reduce((last, object) => Math.max(last, object.end_time ?? object.start_time), 0);
+  const first_time = hit_objects.reduce((first, object) => Math.min(first, object.start_time), Number.POSITIVE_INFINITY);
+  const break_time = breaks.reduce((total, period) => total + Math.max(0,
+    Math.min(period.end_time, last_time) - Math.max(period.start_time, Number.isFinite(first_time) ? first_time : 0)), 0);
+  const drain_length_seconds = hit_objects.length === 0 ? 0 : Math.max(0, Math.trunc(last_time - first_time - break_time));
   const primary_tempo = computePrimaryTempo(timing_changes, last_time);
   if (mode === 0) {
     const circles: OsuCircle[] = hit_objects
@@ -157,6 +187,9 @@ export function parseOsuChart(source: string): Chart {
       circle_size,
       end_time: last_time,
       overall_difficulty,
+      hp_drain_rate,
+      object_count: hit_objects.length,
+      drain_length_seconds,
       primary_tempo,
       circles,
     };

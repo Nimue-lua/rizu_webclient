@@ -1,5 +1,5 @@
-import { NoteState, type LogicEvent } from "../../LogicEvent";
-import { normalizeOsuOd } from "../../timing/OsuManiaV2Timings";
+import { NoteState, type ManiaLogicEvent } from "../../ManiaLogicEvent";
+import { createOsuManiaV2TimingPreset, type OsuManiaV2TimingPreset } from "../../timing/OsuManiaV2Timings";
 import type { IAccuracySource, IGradeSource, IJudgesSource } from "../ScoreSources";
 import type { ScoreSystem } from "../ScoreSystem";
 
@@ -9,23 +9,22 @@ export type OsuManiaV2Grade = "X" | "S" | "A" | "B" | "C" | "D";
 
 const JUDGE_WEIGHTS = [305, 300, 200, 100, 50, 0] as const;
 
-export class OsuManiaV2Score implements ScoreSystem, IAccuracySource, IGradeSource, IJudgesSource {
+export class OsuManiaV2Score implements ScoreSystem<ManiaLogicEvent>, IAccuracySource, IGradeSource, IJudgesSource {
   readonly key: string;
   readonly judge_names = OSU_MANIA_V2_JUDGE_NAMES;
   private readonly windows: readonly number[];
+  private readonly tail_windows: readonly number[];
   private readonly judge_counts = OSU_MANIA_V2_JUDGE_NAMES.map(() => 0);
   private last_judge_index: number | null = null;
 
-  constructor(od: number) {
-    const normalized_od = normalizeOsuOd(od);
-    const od3 = normalized_od * 3;
-    const perfect = normalized_od < 5 ? 22.4 - 0.6 * normalized_od : 24.9 - 1.1 * normalized_od;
-    this.key = `osu_mania_v2_od${normalized_od}`;
-    this.windows = [perfect / 1000, (64 - od3) / 1000, (97 - od3) / 1000,
-      (127 - od3) / 1000, (151 - od3) / 1000, (188 - od3) / 1000];
+  constructor(preset_or_od: OsuManiaV2TimingPreset | number) {
+    const preset = typeof preset_or_od === "number" ? createOsuManiaV2TimingPreset(preset_or_od) : preset_or_od;
+    this.key = `osu_mania_v2_od${preset.overall_difficulty}`;
+    this.windows = preset.head_judgments;
+    this.tail_windows = preset.tail_judgments;
   }
 
-  receive(event: LogicEvent): void {
+  receive(event: ManiaLogicEvent): void {
     if (event.type === "tap") {
       if (event.old_state === NoteState.Clear && event.new_state === NoteState.Passed) this.hit(event.delta_time);
       else if (event.old_state === NoteState.Clear && event.new_state === NoteState.Missed) this.miss();
@@ -74,10 +73,12 @@ export class OsuManiaV2Score implements ScoreSystem, IAccuracySource, IGradeSour
   }
 
   private hit(delta_time: number, release = false): void {
-    const normalized_delta = Math.abs(release ? delta_time / 1.5 : delta_time);
-    const judge_index = this.windows.findIndex((window) => normalized_delta <= window);
+    const windows = release ? this.tail_windows : this.windows;
+    const normalized_delta = Math.abs(delta_time);
+    const judge_index = windows.findIndex((window) => normalized_delta <= window);
     this.add(judge_index < 0 ? this.windows.length - 1 : judge_index);
   }
+
 
   private miss(): void {
     this.add(this.windows.length - 1);

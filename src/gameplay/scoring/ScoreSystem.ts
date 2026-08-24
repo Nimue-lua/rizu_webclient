@@ -1,6 +1,4 @@
-import type { LogicEvent } from "../LogicEvent";
-
-export interface ScoreSystem {
+export interface ScoreSystem<Event> {
   readonly key: string;
-  receive(event: LogicEvent): void;
+  receive(event: Event): void;
 }

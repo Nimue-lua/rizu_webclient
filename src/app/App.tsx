@@ -242,6 +242,7 @@ export function App() {
             music_rate={replay_base.rate}
             difficulty={loading_location?.difficulty ?? 0}
             overall_difficulty={assets?.chart.overall_difficulty ?? 5}
+            mode={assets?.mode ?? "mania"}
             onExit={leaveResults}
           />
         </ScreenTransition>
