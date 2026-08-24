@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { isOsuGameplayData, type GameplayData } from "../library/GameplayLoader";
-import { GameplayRuntime } from "../gameplay/GameplayRuntime";
+import { ManiaGameplayRuntime } from "../gameplay/ManiaGameplayRuntime";
 import { OsuGameplayRuntime } from "../gameplay/OsuGameplayRuntime";
-import type { HitRegistration } from "../gameplay/RhythmEngine";
+import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
 import type { ReplayBase } from "../replay/ReplayBase";
 
@@ -13,7 +13,7 @@ interface GameplayScreenProps {
   scroll_speed: number;
   replay_base: ReplayBase;
   input_bindings: readonly (string | null)[];
-  hit_registration: HitRegistration;
+  hit_registration: ManiaHitRegistration;
   onFinish: (score: ScoreResult) => void;
 }
 
@@ -28,7 +28,7 @@ export function GameplayScreen({ assets, master_volume, music_offset, scroll_spe
 
     const runtime = isOsuGameplayData(assets)
       ? new OsuGameplayRuntime(canvas, assets, master_volume, music_offset, replay_base, onFinish)
-      : new GameplayRuntime(canvas, assets, master_volume, music_offset, scroll_speed, replay_base,
+      : new ManiaGameplayRuntime(canvas, assets, master_volume, music_offset, scroll_speed, replay_base,
         input_bindings, hit_registration, onFinish);
     runtime_ref.current = runtime;
     runtime.start();

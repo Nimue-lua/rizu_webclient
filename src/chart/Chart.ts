@@ -1,4 +1,4 @@
-export interface Note {
+export interface ManiaNoteEvent {
   column: number;
   absolute_time: number;
   weight: -1 | 0 | 1;
@@ -17,7 +17,7 @@ export interface ManiaChart {
   column_count: number;
   overall_difficulty?: number;
   primary_tempo: number;
-  notes: readonly Note[];
+  notes: readonly ManiaNoteEvent[];
   visual_points: readonly VisualPoint[];
 }
 

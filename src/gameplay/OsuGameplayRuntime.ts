@@ -1,7 +1,7 @@
 import type { OsuGameplayData } from "../library/GameplayLoader";
 import type { ReplayBase } from "../replay/ReplayBase";
 import type { ScoreResult } from "./scoring/ScoreEngine";
-import { applyMusicOffset, getAudioStartDelay, getGameplayEndTime } from "./GameplayRuntime";
+import { applyMusicOffset, getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 
 export class OsuGameplayRuntime {

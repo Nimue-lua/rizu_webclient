@@ -1,4 +1,4 @@
-import type { VisualNote } from "../RhythmEngine";
+import type { ManiaVisualNote } from "../ManiaRulesEngine";
 import type { OsuChart } from "../../chart/Chart";
 import { ManiaPlayfieldRenderer, type ManiaHudState, type NoteRenderPass } from "./ManiaPlayfieldRenderer";
 import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite, type SpriteSkin } from "./NoteSkin";
@@ -139,7 +139,7 @@ export class WebGlGameplayRenderer {
     return playfield.getTimeRange(playfield.getLayout(this.logicalWidth()), scroll_speed);
   }
 
-  draw(column_count: number, notes: readonly VisualNote[], scroll_speed: number,
+  draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
     pressed_columns: ArrayLike<number> = [], hud?: ManiaHudState): void {
     const playfield = this.requireManiaPlayfield();
     const skin = this.requireManiaSkin();

@@ -1,4 +1,4 @@
-import type { ManiaChart, Note } from "../chart/Chart";
+import type { ManiaChart, ManiaNoteEvent } from "../chart/Chart";
 import { interpolateVisualPoint } from "../chart/VisualTimeline";
 import { NoteState, type LogicEvent } from "./LogicEvent";
 import { ScoreEngine, type ScoreResult } from "./scoring/ScoreEngine";
@@ -9,9 +9,9 @@ import { classifyTiming, type TimingResult, type TimingWindow } from "./timing/T
 
 export { NoteState } from "./LogicEvent";
 
-export type HitRegistration = "earliest" | "nearest";
+export type ManiaHitRegistration = "earliest" | "nearest";
 
-export interface VisualNote {
+export interface ManiaVisualNote {
   index: number;
   column: number;
   state: NoteState;
@@ -21,8 +21,8 @@ export interface VisualNote {
 }
 
 interface LinkedNote {
-  start: Note;
-  end?: Note;
+  start: ManiaNoteEvent;
+  end?: ManiaNoteEvent;
 }
 
 const TIME_EPSILON = 1e-9;
@@ -33,22 +33,22 @@ function isActive(state: NoteState, hold: boolean): boolean {
     state === NoteState.StartMissedPressed || state === NoteState.StartPassedPressed;
 }
 
-export class RhythmEngine {
+export class ManiaRulesEngine {
   readonly note_states: Uint8Array;
-  readonly visible_notes: VisualNote[] = [];
+  readonly visible_notes: ManiaVisualNote[] = [];
   readonly logic_events: LogicEvent[] = [];
   private readonly chart: ManiaChart;
   private readonly linked_notes: readonly LinkedNote[];
   private readonly lane_notes: number[][];
   private readonly timings;
   private readonly score_engine: ScoreEngine;
-  private readonly hit_registration: HitRegistration;
+  private readonly hit_registration: ManiaHitRegistration;
   private readonly music_rate: number;
   private readonly constant_scroll: boolean;
   private readonly head_press_times: Float64Array;
   private readonly head_release_times: Float64Array;
 
-  constructor(chart: ManiaChart, hit_registration: HitRegistration = "earliest", music_rate = 1,
+  constructor(chart: ManiaChart, hit_registration: ManiaHitRegistration = "earliest", music_rate = 1,
     constant_scroll = false, tap_only = false) {
     this.chart = chart;
     this.linked_notes = this.linkNotes(chart.notes, tap_only);
@@ -222,7 +222,7 @@ export class RhythmEngine {
     this.score_engine.receive(event);
   }
 
-  private linkNotes(notes: readonly Note[], tap_only: boolean): LinkedNote[] {
+  private linkNotes(notes: readonly ManiaNoteEvent[], tap_only: boolean): LinkedNote[] {
     const linked_notes: LinkedNote[] = [];
     const open_notes = Array.from({ length: this.chart.column_count }, () => [] as number[]);
     for (const note of notes) {

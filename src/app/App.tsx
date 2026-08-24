@@ -8,7 +8,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
-import type { HitRegistration } from "../gameplay/RhythmEngine";
+import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
 import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
 import { ReplayBase } from "../replay/ReplayBase";
@@ -62,7 +62,7 @@ export function App() {
   });
   const [scroll_speed_type, setScrollSpeedType] = useState<ScrollSpeedType>(() =>
     localStorage.getItem(SCROLL_SPEED_TYPE_KEY) === "osu" ? "osu" : "default");
-  const [hit_registration, setHitRegistration] = useState<HitRegistration>(() =>
+  const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
   const [replay_base, setReplayBase] = useState(() => {
     const replay_base = new ReplayBase();
@@ -95,7 +95,7 @@ export function App() {
     setScrollSpeedType(value);
   };
 
-  const changeHitRegistration = (value: HitRegistration) => {
+  const changeHitRegistration = (value: ManiaHitRegistration) => {
     localStorage.setItem(HIT_REGISTRATION_KEY, value);
     setHitRegistration(value);
   };

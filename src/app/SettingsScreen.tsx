@@ -1,6 +1,6 @@
 import { useEffect, type CSSProperties } from "react";
 import { Gamepad2, Settings, Undo2, Volume2 } from "lucide-react";
-import type { HitRegistration } from "../gameplay/RhythmEngine";
+import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
 import {
   scrollSpeedToCanonical,
   scrollSpeedToDisplay,
@@ -12,12 +12,12 @@ interface SettingsScreenProps {
   music_offset: number;
   scroll_speed: number;
   scroll_speed_type: ScrollSpeedType;
-  hit_registration: HitRegistration;
+  hit_registration: ManiaHitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
   onMusicOffsetChange: (music_offset: number) => void;
   onScrollSpeedChange: (scroll_speed: number) => void;
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
-  onHitRegistrationChange: (hit_registration: HitRegistration) => void;
+  onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
   onExit: () => void;
 }
 
@@ -153,7 +153,7 @@ export function SettingsScreen({
         <label className="settings-control" htmlFor="settings-hit-registration">
           <span>Hit registration</span>
           <select id="settings-hit-registration" value={hit_registration}
-            onChange={(event) => onHitRegistrationChange(event.target.value as HitRegistration)}>
+            onChange={(event) => onHitRegistrationChange(event.target.value as ManiaHitRegistration)}>
             <option value="earliest">Earliest note</option>
             <option value="nearest">Nearest note</option>
           </select>

@@ -1,4 +1,4 @@
-import type { Chart, Note, OsuCircle } from "../../Chart";
+import type { Chart, ManiaNoteEvent, OsuCircle } from "../../Chart";
 import { createVisualPoints, type TimingChange } from "../../VisualTimeline";
 
 interface OsuTimingPoint {
@@ -164,7 +164,7 @@ export function parseOsuChart(source: string): Chart {
   const key_count = Math.floor(circle_size);
   if (key_count <= 0) throw new Error("Chart has an invalid CircleSize");
 
-  const notes: Note[] = [];
+  const notes: ManiaNoteEvent[] = [];
   for (const hit_object of hit_objects) {
     const column = Math.min(Math.max(Math.floor(hit_object.x / 512 * key_count + 1), 1), key_count);
     if (hit_object.end_time === undefined) {

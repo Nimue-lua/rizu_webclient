@@ -1,4 +1,4 @@
-import { NoteState, type VisualNote } from "../RhythmEngine";
+import { NoteState, type ManiaVisualNote } from "../ManiaRulesEngine";
 import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite } from "./NoteSkin";
 
 export interface ManiaLayout {
@@ -64,7 +64,7 @@ export class ManiaPlayfieldRenderer {
     };
   }
 
-  draw(layout: ManiaLayout, notes: readonly VisualNote[], scroll_speed: number,
+  draw(layout: ManiaLayout, notes: readonly ManiaVisualNote[], scroll_speed: number,
     pressed_columns: ArrayLike<number>, write: QuadWriter, hud?: ManiaHudState): void {
     const speed = NOTE_SKIN_LOGICAL_HEIGHT * scroll_speed;
     const config = this.skin.config;
