@@ -83,6 +83,9 @@ test("creates a mania session with a separate narrowed pointer capability", () =
   assert.equal(harness.mania_options.length, 1);
   assert.equal(harness.osu_options.length, 0);
   assert.equal(harness.mania_options[0]?.data, options.data);
+  assert.deepEqual(harness.mania_options[0]?.replay_base.timings.toJSON(), { name: "osuod", data: 5 });
+  assert.deepEqual(harness.mania_options[0]?.replay_base.subtimings?.toJSON(), { name: "scorev", data: 2 });
+  assert.equal(harness.mania_options[0]?.replay_base.nearest, true);
   if (binding.mode === "mania") {
     assert.equal(binding.pointer_input, binding.session);
     binding.pointer_input.pressPointer(1, 0, 1000);
@@ -98,6 +101,13 @@ test("creates an osu session without exposing mania column input", () => {
   assert.equal(harness.osu_options.length, 1);
   assert.equal(harness.mania_options.length, 0);
   assert.equal(harness.osu_options[0]?.data, options.data);
+  assert.equal(harness.osu_options[0]?.replay_base.mode, "osu");
+  assert.equal(harness.osu_options[0]?.replay_base.rate, options.replay_base.rate);
+  assert.deepEqual(harness.osu_options[0]?.replay_base.timings, { name: "osu_std_od", data: 5 });
+  assert.deepEqual(harness.osu_options[0]?.replay_base.timing_values,
+    { hit_300: 0.05, hit_100: 0.1, hit_50: 0.15, early_miss: 0.4, late_miss: 0.15 });
+  assert.equal("subtimings" in harness.osu_options[0]!.replay_base, false);
+  assert.equal("const" in harness.osu_options[0]!.replay_base, false);
   assert.equal("pointer_input" in binding, false);
 });
 

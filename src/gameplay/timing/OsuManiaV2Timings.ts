@@ -1,4 +1,4 @@
-import type { TimingWindow } from "./TimingValues";
+import type { TimingValues, TimingWindow } from "./TimingValues";
 
 export interface OsuManiaV2TimingValues {
   short_note: TimingWindow;
@@ -24,5 +24,14 @@ export function createOsuManiaV2TimingValues(od: number): OsuManiaV2TimingValues
     short_note: { hit: [-meh, ok], miss: [-miss, ok] },
     long_note_start: { hit: [-meh, ok], miss: [-miss, ok] },
     long_note_end: { hit: [-tail_meh, tail_ok], miss: [-tail_miss, tail_ok] },
+  };
+}
+
+export function createOsuManiaV2ReplayTimingValues(od: number): TimingValues {
+  const values = createOsuManiaV2TimingValues(od);
+  return {
+    ShortNote: values.short_note,
+    LongNoteStart: values.long_note_start,
+    LongNoteEnd: values.long_note_end,
   };
 }

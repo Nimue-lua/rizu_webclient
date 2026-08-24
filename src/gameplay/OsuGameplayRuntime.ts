@@ -1,5 +1,5 @@
 import type { OsuGameplayData } from "../library/GameplayLoader";
-import type { ReplayBase } from "../replay/ReplayBase";
+import type { OsuReplayBaseValues } from "../replay/ReplayBase";
 import type { ScoreResult } from "./scoring/ScoreResult";
 import type { GameplaySession } from "./GameplaySession";
 import { AudioGameplayClock } from "./AudioGameplayClock";
@@ -19,7 +19,7 @@ export class OsuGameplayRuntime implements GameplaySession {
   private destroyed = false;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
-    master_volume: number, music_offset: number, replay_base: ReplayBase,
+    master_volume: number, music_offset: number, replay_base: OsuReplayBaseValues,
     private readonly finish: (score: ScoreResult) => void) {
     this.renderer = new OsuRenderer(canvas, data.note_skin);
     this.music_rate = replay_base.rate;

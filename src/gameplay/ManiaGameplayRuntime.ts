@@ -63,7 +63,11 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.music_rate = replay_base.rate;
     this.finish = finish;
     this.dependencies = dependencies;
-    this.rules_engine = new ManiaRulesEngine(data.chart, hit_registration, this.music_rate, replay_base.const, replay_base.tap_only);
+    const timing_identity = replay_base.timings.name === "sphere" && replay_base.subtimings === null
+      ? undefined
+      : { timings: replay_base.timings, subtimings: replay_base.subtimings };
+    this.rules_engine = new ManiaRulesEngine(data.chart, hit_registration, this.music_rate, replay_base.const,
+      replay_base.tap_only, timing_identity);
     this.renderer = dependencies.create_renderer(canvas, data);
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,

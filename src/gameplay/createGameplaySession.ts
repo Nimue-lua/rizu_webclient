@@ -1,5 +1,8 @@
 import type { GameplayData, ManiaGameplayData, OsuGameplayData } from "../library/GameplayLoader";
-import type { ReplayBase } from "../replay/ReplayBase";
+import { createOsuReplayBase, ReplayBase, type OsuReplayBaseValues } from "../replay/ReplayBase";
+import { Subtimings } from "./timing/Subtimings";
+import { Timings } from "./timing/Timings";
+import { normalizeOsuOd } from "./timing/OsuManiaV2Timings";
 import type { ManiaHitRegistration } from "./ManiaRulesEngine";
 import { ManiaGameplayRuntime } from "./ManiaGameplayRuntime";
 import { OsuGameplayRuntime } from "./OsuGameplayRuntime";
@@ -19,8 +22,9 @@ export interface GameplaySessionOptions {
 }
 
 export interface GameplaySessionFactoryDependencies {
-  create_mania(options: GameplaySessionOptions & { data: ManiaGameplayData }): GameplaySession & ManiaPointerInput;
-  create_osu(options: GameplaySessionOptions & { data: OsuGameplayData }): GameplaySession;
+  create_mania(options: GameplaySessionOptions & { data: ManiaGameplayData; replay_base: ReplayBase }): GameplaySession & ManiaPointerInput;
+  create_osu(options: Omit<GameplaySessionOptions, "replay_base"> &
+    { data: OsuGameplayData; replay_base: OsuReplayBaseValues }): GameplaySession;
 }
 
 const default_dependencies: GameplaySessionFactoryDependencies = {
@@ -34,8 +38,19 @@ const default_dependencies: GameplaySessionFactoryDependencies = {
 export function createGameplaySession(options: GameplaySessionOptions,
   dependencies: GameplaySessionFactoryDependencies = default_dependencies): GameplaySessionBinding {
   if (options.data.mode === "mania") {
-    const session = dependencies.create_mania({ ...options, data: options.data });
+    const replay_base = new ReplayBase();
+    replay_base.importReplayBase(options.replay_base.exportReplayBase());
+    replay_base.nearest = options.hit_registration === "nearest";
+    replay_base.setTimingIdentity(new Timings("osuod", normalizeOsuOd(options.data.chart.overall_difficulty ?? 5)),
+      new Subtimings("scorev", 2));
+    const session = dependencies.create_mania({ ...options, data: options.data, replay_base });
     return { mode: "mania", session, pointer_input: session };
   }
-  return { mode: "osu", session: dependencies.create_osu({ ...options, data: options.data }) };
+  const { replay_base, ...common_options } = options;
+  return { mode: "osu", session: dependencies.create_osu({
+    ...common_options,
+    data: options.data,
+    replay_base: createOsuReplayBase(replay_base.rate,
+      normalizeOsuOd(options.data.chart.overall_difficulty ?? 5)),
+  }) };
 }

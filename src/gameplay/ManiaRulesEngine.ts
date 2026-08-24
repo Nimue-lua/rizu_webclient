@@ -6,6 +6,9 @@ import type { ScoreResult } from "./scoring/ScoreResult";
 import { BaseComboScore } from "./scoring/systems/BaseComboScore";
 import { OsuManiaV2Score } from "./scoring/systems/OsuManiaV2Score";
 import { createOsuManiaV2TimingValues } from "./timing/OsuManiaV2Timings";
+import type { Subtimings } from "./timing/Subtimings";
+import type { Timings } from "./timing/Timings";
+import { resolveTimingValues } from "./timing/TimingValuesFactory";
 import { classifyTiming, type TimingResult, type TimingWindow } from "./timing/TimingValues";
 
 export { NoteState } from "./LogicEvent";
@@ -50,7 +53,7 @@ export class ManiaRulesEngine {
   private readonly head_release_times: Float64Array;
 
   constructor(chart: ManiaChart, hit_registration: ManiaHitRegistration = "earliest", music_rate = 1,
-    constant_scroll = false, tap_only = false) {
+    constant_scroll = false, tap_only = false, timing_identity?: { timings: Timings; subtimings: Subtimings | null }) {
     this.chart = chart;
     this.linked_notes = this.linkNotes(chart.notes, tap_only);
     this.note_states = new Uint8Array(this.linked_notes.length);
@@ -58,7 +61,17 @@ export class ManiaRulesEngine {
     this.head_release_times = new Float64Array(this.linked_notes.length).fill(Number.NaN);
     this.lane_notes = Array.from({ length: chart.column_count }, () => []);
     this.linked_notes.forEach((note, index) => this.lane_notes[note.start.column - 1]?.push(index));
-    this.timings = createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
+    const identity = timing_identity ?? undefined;
+    const resolved = identity && resolveTimingValues(identity.timings, identity.subtimings);
+    const values = resolved?.values;
+    this.timings = values ? {
+      short_note: values.ShortNote,
+      long_note_start: values.LongNoteStart,
+      long_note_end: values.LongNoteEnd,
+    } : createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
+    if (resolved && resolved.score_system !== "osu_mania_v2") {
+      throw new Error("The webclient currently supports only osu!mania ScoreV2 gameplay");
+    }
     this.score_engine = new ScoreEngine([new BaseComboScore(), new OsuManiaV2Score(chart.overall_difficulty ?? 5)]);
     this.hit_registration = hit_registration;
     this.music_rate = music_rate;

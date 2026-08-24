@@ -5,6 +5,27 @@ export interface TimingWindow {
   miss: readonly [number, number];
 }
 
+export interface TimingValues {
+  ShortNote: TimingWindow;
+  LongNoteStart: TimingWindow;
+  LongNoteEnd: TimingWindow;
+}
+
+export function createSimpleTimingValues(hit: number, miss = hit): TimingValues {
+  const createWindow = (): TimingWindow => ({ hit: [-hit, hit], miss: [-miss, miss] });
+  return { ShortNote: createWindow(), LongNoteStart: createWindow(), LongNoteEnd: createWindow() };
+}
+
+export function timingValuesEqual(left: TimingValues, right: TimingValues): boolean {
+  const names = ["ShortNote", "LongNoteStart", "LongNoteEnd"] as const;
+  return names.every((name) => {
+    const a = left[name];
+    const b = right[name];
+    return Math.abs(a.hit[0] - b.hit[0]) < 1e-9 && Math.abs(a.hit[1] - b.hit[1]) < 1e-9 &&
+      Math.abs(a.miss[0] - b.miss[0]) < 1e-9 && Math.abs(a.miss[1] - b.miss[1]) < 1e-9;
+  });
+}
+
 const TIME_EPSILON = 1e-9;
 
 export function classifyTiming(window: TimingWindow, delta_time: number): TimingResult {
