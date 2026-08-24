@@ -27,7 +27,7 @@ button, input { color: inherit; font: inherit; }
 button { border: 0; cursor: pointer; }
 button:hover { filter: brightness(1.14); }
 button:active { filter: brightness(.9); }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outline-offset: -3px; }
+:focus { outline: none; }
 button:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .55; }
 svg { width: 22px; height: 22px; }
 
@@ -177,13 +177,12 @@ svg { width: 22px; height: 22px; }
 .difficulty-strip > button { display: grid; padding: 0; place-items: center; color: var(--muted); background: #292435; border-radius: 4px; }
 .difficulty-strip > div { display: flex; gap: 5px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .difficulty-strip > div::-webkit-scrollbar { display: none; }
-.difficulty-strip > div button { display: grid; grid-template-rows: 1fr auto; flex: 1 0 84px; justify-items: start; min-width: 84px; padding: 8px 12px 7px; background: linear-gradient(to top, color-mix(in srgb, var(--difficulty-color) 22%, transparent), transparent 78%), #302a3c; border-radius: 5px; text-align: left; }
+.difficulty-strip > div button { display: grid; grid-template-rows: 1fr auto; flex: 1 0 100px; justify-items: start; min-width: 100px; padding: 8px 12px 7px; background: linear-gradient(to top, color-mix(in srgb, var(--difficulty-color) 22%, transparent), transparent 78%), #302a3c; border-radius: 5px; text-align: left; }
 .difficulty-strip strong { color: var(--difficulty-color); font-size: clamp(20px, 1.45vw, 28px); font-weight: 600; }
 .difficulty-strip span { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
 .difficulty-strip div button.selected { padding-bottom: 4px; border-bottom: 3px solid var(--difficulty-color); background: linear-gradient(to top, color-mix(in srgb, var(--difficulty-color) 30%, transparent), transparent 88%), #382d3d; }
 
 .chart-list { position: relative; min-height: 0; overflow: auto; border-top: 1px solid #4a446075; outline: 0; scrollbar-color: var(--outline) #0d0c0f70; scrollbar-width: thin; font-family: "Zen Maru Gothic", sans-serif; }
-.chart-list:focus-visible { box-shadow: inset 0 0 0 2px var(--text); }
 .chart-list-space { position: relative; }
 .chart-row { position: absolute; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; width: calc(100% - 5px); height: 79px; margin-top: 2px; padding: 4px 16px 4px 20px; transform: translateY(var(--row-offset)); color: var(--text); background: linear-gradient(to right, color-mix(in srgb, var(--difficulty-color) 20%, transparent), transparent 38%), #2a2435; border-left: 4px solid var(--difficulty-color); border-radius: 3px; text-align: left; }
 .chart-row > span { display: grid; min-width: 0; }

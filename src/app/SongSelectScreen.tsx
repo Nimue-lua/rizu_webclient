@@ -134,6 +134,8 @@ export function SongSelectScreen({
   onNoteSkinSelectionChange,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
+  const difficulty_strip_ref = useRef<HTMLDivElement>(null);
+  const selected_difficulty_ref = useRef<HTMLButtonElement>(null);
   const audio_ref = useRef<HTMLAudioElement>(null);
   const preview_unlocked_ref = useRef(false);
   const last_preview_change_ref = useRef<number | null>(null);
@@ -186,6 +188,16 @@ export function SongSelectScreen({
   const filtered_songs = chart_selector.getFilteredSongs();
   const selected_song = chart_selector.getSelectedSong();
   const selected_chart = chart_selector.getSelectedChart();
+
+  useEffect(() => {
+    const strip = difficulty_strip_ref.current;
+    const button = selected_difficulty_ref.current;
+    if (!strip || !button) return;
+    const strip_bounds = strip.getBoundingClientRect();
+    const button_bounds = button.getBoundingClientRect();
+    const center_offset = button_bounds.left + button_bounds.width / 2 - (strip_bounds.left + strip_bounds.width / 2);
+    strip.scrollTo({ left: strip.scrollLeft + center_offset, behavior: "smooth" });
+  }, [selected_chart?.id]);
 
   useEffect(() => {
     setLoadedBackgroundUrl(null);
@@ -254,6 +266,13 @@ export function SongSelectScreen({
     const row_top = next_index * ROW_HEIGHT;
     if (row_top < viewport.scrollTop) viewport.scrollTop = row_top;
     else if (row_top + ROW_HEIGHT > viewport.scrollTop + viewport.clientHeight) viewport.scrollTop = row_top + ROW_HEIGHT - viewport.clientHeight;
+  };
+
+  const selectDifficulty = (offset: -1 | 1) => {
+    if (!selected_song?.charts.length) return;
+    const selected_index = selected_song.charts.findIndex((chart) => chart.id === selected_chart?.id);
+    const next_chart = selected_song.charts[Math.min(Math.max(selected_index + offset, 0), selected_song.charts.length - 1)];
+    if (next_chart) chart_selector.selectChart(next_chart.id);
   };
 
   const date_text = new Intl.DateTimeFormat("en-GB", {
@@ -332,9 +351,9 @@ export function SongSelectScreen({
             <div className="chart-metadata"><span><Icon name="clock" /><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span><span><Icon name="music" /><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span><span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><Icon name="metronome" /><b>{Math.round(selected_chart?.bpm_avg ?? 0)} BPM</b></span><span><strong>LN</strong><b className="accent">{Math.round((selected_chart?.long_note_ratio ?? 0) * 100)}%</b></span><span><Icon name="file" /><b>{selected_chart?.format.toUpperCase() ?? "-"}</b></span></div>
           </section>
           <section className="chart-browser" aria-label="Chart browser">
-            <div className="difficulty-strip"><button aria-label="Previous difficulties"><Icon name="chevron-left" /></button><div>
-              {selected_song?.charts.map((chart) => <button className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => chart_selector.selectChart(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
-            </div><button aria-label="Next difficulties"><Icon name="chevron-right" /></button></div>
+            <div className="difficulty-strip"><button aria-label="Previous difficulty" onClick={() => selectDifficulty(-1)}><Icon name="chevron-left" /></button><div ref={difficulty_strip_ref}>
+              {selected_song?.charts.map((chart) => <button ref={chart.id === selected_chart?.id ? selected_difficulty_ref : undefined} className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => chart_selector.selectChart(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
+            </div><button aria-label="Next difficulty" onClick={() => selectDifficulty(1)}><Icon name="chevron-right" /></button></div>
             {selection.error ? <p className="song-library-error">{selection.error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
               if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
               if (event.key === "Enter" && selected_chart) playChart(selected_chart);
