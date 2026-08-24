@@ -2,7 +2,7 @@ import type { ManiaGameplayData } from "../library/GameplayLoader";
 import { ManiaRulesEngine, type ManiaHitRegistration, type ManiaVisualNote } from "./ManiaRulesEngine";
 import type { ScoreResult } from "./scoring/ScoreResult";
 import type { GameplaySession, ManiaPointerInput } from "./GameplaySession";
-import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
+import { ManiaRenderer as WebGlManiaRenderer } from "./renderer/ManiaRenderer";
 import { SpringValue } from "./SpringValue";
 import type { ReplayBase } from "../replay/ReplayBase";
 import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
@@ -30,7 +30,7 @@ function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
     request_animation_frame: (callback) => window.requestAnimationFrame(callback),
     cancel_animation_frame: (handle) => window.cancelAnimationFrame(handle),
     performance_now: () => performance.now(),
-    create_renderer: (canvas, data) => new WebGlGameplayRenderer(canvas, data.note_skin),
+    create_renderer: (canvas, data) => new WebGlManiaRenderer(canvas, data.note_skin),
   };
 }
 

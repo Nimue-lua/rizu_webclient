@@ -1,5 +1,6 @@
 import { unzipSync } from "fflate";
-import type { NoteSkin, NoteSkinConfig, NoteSkinSprite, SpriteSkin } from "./NoteSkin";
+import type { NoteSkin, NoteSkinConfig } from "./NoteSkin";
+import type { Sprite, SpriteSkin } from "./Sprite";
 
 export type SkinIniSection = Readonly<Record<string, string>>;
 
@@ -11,9 +12,9 @@ export interface SkinIni {
 export const DEFAULT_OSU_SKIN_URL = "/skins/osu-default.osk";
 
 export interface OsuStandardSkin extends SpriteSkin {
-  readonly hitCircle: NoteSkinSprite;
-  readonly hitCircleOverlay: NoteSkinSprite;
-  readonly approachCircle: NoteSkinSprite;
+  readonly hitCircle: Sprite;
+  readonly hitCircleOverlay: Sprite;
+  readonly approachCircle: Sprite;
   readonly comboColor: readonly [number, number, number, number];
 }
 
@@ -244,7 +245,7 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
       pixelSize: { w: source.width, h: source.height },
     }] as const;
   }));
-  const sprites = Object.fromEntries(decoded) as Record<(typeof names)[number], NoteSkinSprite>;
+  const sprites = Object.fromEntries(decoded) as Record<(typeof names)[number], Sprite>;
   return {
     sprites,
     hitCircle: sprites.hitcircle,
@@ -318,7 +319,7 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     });
     return { name, image, dpi: file.dpi, source };
   }));
-  const sprites: Record<string, NoteSkinSprite> = {};
+  const sprites: Record<string, Sprite> = {};
   for (const { name, image, dpi, source } of decoded) {
     sprites[name] = {
       image,

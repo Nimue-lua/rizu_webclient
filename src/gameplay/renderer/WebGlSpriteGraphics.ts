@@ -1,9 +1,5 @@
-import type { ManiaVisualNote } from "../ManiaRulesEngine";
-import type { OsuChart } from "../../chart/Chart";
-import { ManiaPlayfieldRenderer, type ManiaHudState, type NoteRenderPass } from "./ManiaPlayfieldRenderer";
-import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite, type SpriteSkin } from "./NoteSkin";
-import { OsuPlayfieldRenderer } from "./OsuPlayfieldRenderer";
-import type { OsuStandardSkin } from "./OsuSkin";
+import { resizeGameplayCanvas, type GameplayFrame } from "./GameplayFrame";
+import type { Sprite, SpriteDrawCommand, SpriteSkin } from "./Sprite";
 
 const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
 const VERTEX_FLOATS = 8;
@@ -63,20 +59,20 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
   return program;
 }
 
-export class WebGlGameplayRenderer {
+export class WebGlSpriteGraphics {
   private readonly canvas: HTMLCanvasElement;
-  private readonly skin: SpriteSkin;
+  private readonly device_pixel_ratio: () => number;
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly vertex_array: WebGLVertexArrayObject;
   private readonly vertex_buffer: WebGLBuffer;
   private readonly viewport_size: WebGLUniformLocation;
   private readonly sampler: WebGLUniformLocation;
-  private readonly textures = new Map<NoteSkinSprite, WebGLTexture>();
-  private readonly playfield: ManiaPlayfieldRenderer | null;
-  private readonly osu_playfield: OsuPlayfieldRenderer | null;
+  private readonly textures = new Map<Sprite, WebGLTexture>();
+  private destroyed = false;
 
-  constructor(canvas: HTMLCanvasElement, skin: NoteSkin | OsuStandardSkin) {
+  constructor(canvas: HTMLCanvasElement, skin: SpriteSkin,
+    device_pixel_ratio: () => number = () => window.devicePixelRatio) {
     const gl = canvas.getContext("webgl2");
     if (!gl) throw new Error("WebGL 2 is required for gameplay");
     const program = createProgram(gl);
@@ -85,34 +81,32 @@ export class WebGlGameplayRenderer {
     const viewport_size = gl.getUniformLocation(program, "viewport_size");
     const sampler = gl.getUniformLocation(program, "atlas");
     if (!vertex_array || !vertex_buffer || !viewport_size || !sampler) {
+      gl.deleteBuffer(vertex_buffer);
+      gl.deleteVertexArray(vertex_array);
+      gl.deleteProgram(program);
       throw new Error("Failed to create gameplay rendering resources");
     }
     this.canvas = canvas;
-    this.skin = skin;
+    this.device_pixel_ratio = device_pixel_ratio;
     this.gl = gl;
     this.program = program;
     this.vertex_array = vertex_array;
     this.vertex_buffer = vertex_buffer;
     this.viewport_size = viewport_size;
     this.sampler = sampler;
-    if ("config" in skin) {
-      this.playfield = new ManiaPlayfieldRenderer(skin);
-      this.osu_playfield = null;
-    } else {
-      this.playfield = null;
-      this.osu_playfield = new OsuPlayfieldRenderer(skin);
-    }
     gl.bindVertexArray(vertex_array);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     const stride = VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
     for (const [name, size, offset] of [["position", 2, 0], ["texture_position", 2, 2], ["vertex_color", 4, 4]] as const) {
       const location = gl.getAttribLocation(program, name);
+      if (location < 0) throw new Error(`Gameplay sprite shader is missing ${name}`);
       gl.enableVertexAttribArray(location);
       gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset * Float32Array.BYTES_PER_ELEMENT);
     }
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.activeTexture(gl.TEXTURE0);
     for (const [name, sprite] of Object.entries(skin.sprites)) {
+      if (this.textures.has(sprite)) continue;
       const texture = gl.createTexture();
       if (!texture) throw new Error("Failed to create gameplay sprite texture");
       gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -132,81 +126,33 @@ export class WebGlGameplayRenderer {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
 
-  get comboPosition(): number { return this.requireManiaPlayfield().comboPosition; }
-  get judgePosition(): number { return this.requireManiaPlayfield().judgePosition; }
-
-  getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
-    const playfield = this.requireManiaPlayfield();
-    const skin = this.requireManiaSkin();
-    if (column_count !== skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
-    return playfield.getTimeRange(playfield.getLayout(this.logicalWidth()), scroll_speed);
+  getFrame(): GameplayFrame {
+    return resizeGameplayCanvas(this.canvas, this.device_pixel_ratio());
   }
 
-  draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number> = [], hud?: ManiaHudState): void {
-    const playfield = this.requireManiaPlayfield();
-    const skin = this.requireManiaSkin();
-    if (column_count !== skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
-    const framebuffer = this.resizeCanvas();
-    const layout = playfield.getLayout(NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height);
+  beginFrame(frame: GameplayFrame): void {
     const gl = this.gl;
-    gl.viewport(0, 0, framebuffer.width, framebuffer.height);
+    gl.viewport(0, 0, frame.framebuffer_width, frame.framebuffer_height);
     gl.clearColor(...BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vertex_array);
-    gl.uniform2f(this.viewport_size, layout.width, layout.height);
+    gl.uniform2f(this.viewport_size, frame.logical_width, frame.logical_height);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(this.sampler, 0);
-    const commands: DrawCommand[] = [];
-    playfield.draw(layout, notes, scroll_speed, pressed_columns,
-      (x, y, width, height, color, sprite, flip_y, pass, rotate_ccw) => {
-        commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
-          rotateCounterClockwise: rotate_ccw ?? false, pass });
-      }, hud);
-    this.submitCommands(commands);
   }
 
-  drawOsu(chart: OsuChart, song_time: number): void {
-    if (!this.osu_playfield) throw new Error("Renderer does not have an osu skin");
-    const framebuffer = this.resizeCanvas();
-    const width = NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height;
-    const gl = this.gl;
-    gl.viewport(0, 0, framebuffer.width, framebuffer.height);
-    gl.clearColor(...BACKGROUND_COLOR);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(this.program);
-    gl.bindVertexArray(this.vertex_array);
-    gl.uniform2f(this.viewport_size, width, NOTE_SKIN_LOGICAL_HEIGHT);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.uniform1i(this.sampler, 0);
-    const commands: DrawCommand[] = [];
-    this.osu_playfield.draw(this.osu_playfield.getLayout(width, NOTE_SKIN_LOGICAL_HEIGHT), chart, song_time,
-      (x, y, command_width, height, color, sprite) => {
-        commands.push({ x, y, width: command_width, height, color, sprite, flipY: false,
-          rotateCounterClockwise: false });
-      });
-    this.submitCommands(commands);
-  }
-
-  destroy(): void {
-    for (const texture of this.textures.values()) this.gl.deleteTexture(texture);
-    this.gl.deleteBuffer(this.vertex_buffer);
-    this.gl.deleteVertexArray(this.vertex_array);
-    this.gl.deleteProgram(this.program);
-  }
-
-  private submitCommands(commands: readonly DrawCommand[]): void {
+  submit(commands: readonly SpriteDrawCommand[]): void {
     for (let index = 0; index < commands.length;) {
       const command = commands[index]!;
-      if (!command.pass) {
+      if (!command.batch) {
         this.submitBatch(command.sprite, [command]);
         index += 1;
         continue;
       }
-      const pass = command.pass;
-      const by_sprite = new Map<NoteSkinSprite, DrawCommand[]>();
-      while (index < commands.length && commands[index]!.pass === pass) {
+      const batch_key = command.batch;
+      const by_sprite = new Map<Sprite, SpriteDrawCommand[]>();
+      while (index < commands.length && commands[index]!.batch === batch_key) {
         const next = commands[index++]!;
         const batch = by_sprite.get(next.sprite) ?? [];
         batch.push(next);
@@ -216,7 +162,16 @@ export class WebGlGameplayRenderer {
     }
   }
 
-  private submitBatch(sprite: NoteSkinSprite, commands: readonly DrawCommand[]): void {
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    for (const texture of this.textures.values()) this.gl.deleteTexture(texture);
+    this.gl.deleteBuffer(this.vertex_buffer);
+    this.gl.deleteVertexArray(this.vertex_array);
+    this.gl.deleteProgram(this.program);
+  }
+
+  private submitBatch(sprite: Sprite, commands: readonly SpriteDrawCommand[]): void {
     const vertices: number[] = [];
     for (const command of commands) {
       if (command.width <= 0 || command.height <= 0) continue;
@@ -244,42 +199,4 @@ export class WebGlGameplayRenderer {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
   }
-
-  private resizeCanvas(): { width: number; height: number } {
-    const ratio = window.devicePixelRatio;
-    const framebuffer_width = Math.max(1, Math.round(this.canvas.clientWidth * ratio));
-    const framebuffer_height = Math.max(1, Math.round(this.canvas.clientHeight * ratio));
-    if (this.canvas.width !== framebuffer_width || this.canvas.height !== framebuffer_height) {
-      this.canvas.width = framebuffer_width;
-      this.canvas.height = framebuffer_height;
-    }
-    return { width: framebuffer_width, height: framebuffer_height };
-  }
-
-  private logicalWidth(): number {
-    const framebuffer = this.resizeCanvas();
-    return NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height;
-  }
-
-  private requireManiaSkin(): NoteSkin {
-    if (!("config" in this.skin)) throw new Error("Renderer does not have a mania skin");
-    return this.skin as NoteSkin;
-  }
-
-  private requireManiaPlayfield(): ManiaPlayfieldRenderer {
-    if (!this.playfield) throw new Error("Renderer does not have a mania playfield");
-    return this.playfield;
-  }
-}
-
-interface DrawCommand {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: readonly [number, number, number, number];
-  sprite: NoteSkinSprite;
-  flipY: boolean;
-  rotateCounterClockwise: boolean;
-  pass?: NoteRenderPass;
 }

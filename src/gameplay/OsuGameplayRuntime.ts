@@ -5,10 +5,10 @@ import type { GameplaySession } from "./GameplaySession";
 import { AudioGameplayClock } from "./AudioGameplayClock";
 import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
-import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
+import { OsuRenderer } from "./renderer/OsuRenderer";
 
 export class OsuGameplayRuntime implements GameplaySession {
-  private readonly renderer: WebGlGameplayRenderer;
+  private readonly renderer: OsuRenderer;
   private readonly playback: WebAudioPlayback;
   private readonly clock: AudioGameplayClock;
   private readonly music_rate: number;
@@ -19,7 +19,7 @@ export class OsuGameplayRuntime implements GameplaySession {
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, music_offset: number, replay_base: ReplayBase,
     private readonly finish: (score: ScoreResult) => void) {
-    this.renderer = new WebGlGameplayRenderer(canvas, data.note_skin);
+    this.renderer = new OsuRenderer(canvas, data.note_skin);
     this.music_rate = replay_base.rate;
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,
@@ -63,7 +63,7 @@ export class OsuGameplayRuntime implements GameplaySession {
 
   private readonly render = (timestamp: number) => {
     const song_time = this.clock.timeAt(timestamp).monotonic;
-    this.renderer.drawOsu(this.data.chart, song_time);
+    this.renderer.draw(this.data.chart, song_time);
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

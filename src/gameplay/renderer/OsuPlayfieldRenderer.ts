@@ -1,6 +1,6 @@
 import type { OsuChart } from "../../chart/Chart";
-import type { QuadWriter } from "./ManiaPlayfieldRenderer";
 import type { OsuStandardSkin } from "./OsuSkin";
+import type { SpriteQuadWriter } from "./Sprite";
 
 export const OSU_STAGE_WIDTH = 640;
 export const OSU_STAGE_HEIGHT = 480;
@@ -39,7 +39,7 @@ export class OsuPlayfieldRenderer {
     };
   }
 
-  draw(layout: OsuLayout, chart: OsuChart, song_time: number, write: QuadWriter): void {
+  draw(layout: OsuLayout, chart: OsuChart, song_time: number, write: SpriteQuadWriter): void {
     const preempt = approachPreempt(chart.approach_rate);
     const diameter = circleDiameter(chart.circle_size) * layout.scale;
     for (let index = chart.circles.length - 1; index >= 0; index -= 1) {

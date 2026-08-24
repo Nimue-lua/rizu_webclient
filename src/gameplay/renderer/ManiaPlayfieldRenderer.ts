@@ -1,5 +1,6 @@
 import { NoteState, type ManiaVisualNote } from "../ManiaRulesEngine";
-import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite } from "./NoteSkin";
+import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin } from "./NoteSkin";
+import type { Sprite, SpriteQuadWriter } from "./Sprite";
 
 export interface ManiaLayout {
   readonly width: number;
@@ -16,9 +17,7 @@ export interface ManiaHudState {
   judgment: string | null;
   judgmentAge: number;
 }
-export type QuadWriter = (x: number, y: number, width: number, height: number,
-  color: readonly [number, number, number, number], sprite: NoteSkinSprite, flip_y?: boolean,
-  pass?: NoteRenderPass, rotate_ccw?: boolean) => void;
+type QuadWriter = SpriteQuadWriter;
 
 export function getLongNoteBrightness(state: NoteState): number {
   if (state === NoteState.StartMissedPressed) return 0.75;
@@ -181,7 +180,7 @@ export class ManiaPlayfieldRenderer {
   private addBitmapText(text: string, glyphs: Readonly<Record<string, string>>, overlap: number,
     anchor_x: number, y: number, scale: number, align: "center" | "right", write: QuadWriter): void {
     const constant_width = this.skin.sprites[glyphs["5"] ?? ""]?.sourceSize.w ?? 40;
-    const placements: { sprite: NoteSkinSprite; x: number }[] = [];
+    const placements: { sprite: Sprite; x: number }[] = [];
     let x = 0;
     for (const character of text) {
       const sprite = this.skin.sprites[glyphs[character] ?? ""];

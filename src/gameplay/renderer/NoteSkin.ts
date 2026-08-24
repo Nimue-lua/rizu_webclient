@@ -1,6 +1,7 @@
 import { loadOsuManiaSkinUrl } from "./OsuSkin";
+import type { Sprite, SpriteSkin } from "./Sprite";
 
-export const NOTE_SKIN_LOGICAL_HEIGHT = 480;
+export { GAMEPLAY_LOGICAL_HEIGHT as NOTE_SKIN_LOGICAL_HEIGHT } from "./GameplayFrame";
 
 export interface NoteSkinConfig {
   mode: "mania";
@@ -38,19 +39,9 @@ export interface NoteSkinConfig {
   hpFill?: string;
 }
 
-export interface NoteSkinSprite {
-  image: ImageBitmap;
-  sourceSize: { w: number; h: number };
-  pixelSize: { w: number; h: number };
-}
-
-export interface SpriteSkin {
-  sprites: Readonly<Record<string, NoteSkinSprite>>;
-}
-
 export interface NoteSkin {
   config: NoteSkinConfig;
-  sprites: Readonly<Record<string, NoteSkinSprite>>;
+  sprites: Readonly<Record<string, Sprite>>;
 }
 
 export function destroyNoteSkin(skin: SpriteSkin): void {
