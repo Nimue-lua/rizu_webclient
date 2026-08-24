@@ -10,13 +10,13 @@ test("keys skin selections by mode and column count", () => {
 });
 
 test("selects fixed and any-key skins compatible with the requested key mode", () => {
-  const selections = { "mania.4": "Ralsei", "mania.7": "Ralsei" };
-  assert.equal(selectedNoteSkin("mania", 4, selections)?.id, "Ralsei");
-  assert.equal(selectedNoteSkin("mania", 7, selections)?.id, "Ralsei");
+  const selections = { "mania.4": "skin1", "mania.7": "skin1" };
+  assert.equal(selectedNoteSkin("mania", 4, selections)?.id, "skin1");
+  assert.equal(selectedNoteSkin("mania", 7, selections)?.id, "skin1");
   assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "" }), undefined);
   assert.equal(selectedNoteSkin("mania", 4, {}), undefined);
 });
 
 test("provides the selected osu skin archive", () => {
-  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "Ralsei" })?.url, "/skins/skin.osk");
+  assert.equal(selectedNoteSkin("mania", 4, { "mania.4": "skin1" })?.url, "/skins/skin1.osk");
 });

@@ -18,6 +18,7 @@ import {
   selectedNoteSkin,
   type NoteSkinSelections,
 } from "../gameplay/renderer/NoteSkinSelection";
+import { destroyNoteSkin } from "../gameplay/renderer/NoteSkin";
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -179,6 +180,7 @@ export function App() {
       void audio_context.close();
     }
 
+    if (assets) destroyNoteSkin(assets.note_skin);
     setAssets(null);
     setScore(null);
     setAudioContext(null);

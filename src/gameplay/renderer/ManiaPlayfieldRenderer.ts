@@ -1,5 +1,5 @@
 import { NoteState, type VisualNote } from "../RhythmEngine";
-import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinFrame } from "./NoteSkin";
+import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite } from "./NoteSkin";
 
 export interface ManiaLayout {
   readonly width: number;
@@ -9,8 +9,10 @@ export interface ManiaLayout {
   readonly receptorY: number;
 }
 
+export type NoteRenderPass = "long-note-bodies" | "long-note-tails" | "long-note-heads" | "short-notes";
 export type QuadWriter = (x: number, y: number, width: number, height: number,
-  color: readonly [number, number, number, number], frame: NoteSkinFrame, flip_y?: boolean) => void;
+  color: readonly [number, number, number, number], sprite: NoteSkinSprite, flip_y?: boolean,
+  pass?: NoteRenderPass) => void;
 
 export function getLongNoteBrightness(state: NoteState): number {
   if (state === NoteState.StartMissedPressed) return 0.75;
@@ -60,6 +62,8 @@ export class ManiaPlayfieldRenderer {
     pressed_columns: ArrayLike<number>, write: QuadWriter): void {
     const speed = NOTE_SKIN_LOGICAL_HEIGHT * scroll_speed;
     const config = this.skin.config;
+    this.addStageSides(layout, write);
+    this.addStageHint(layout, write);
     for (let column = 0; column < config.columnCount; column += 1) {
       const receptors = pressed_columns[column] ? config.receptorPressed : config.receptorReleased;
       this.addReceptor(receptors[column], column, layout, write);
@@ -74,47 +78,100 @@ export class ManiaPlayfieldRenderer {
       const body_head_y = head_y + direction * head_height * 0.5;
       const body_top = Math.min(body_head_y, tail_y);
       this.addSprite(config.longNoteBodies[column], column, layout, body_top, write,
-        Math.abs(body_head_y - tail_y), getLongNoteBrightness(note.state), true, 0, config.longNoteBodyFlipY[column]);
+        Math.abs(body_head_y - tail_y), getLongNoteBrightness(note.state), true, 0,
+        config.longNoteBodyFlipY[column], "long-note-bodies");
+    }
+    for (const note of notes) {
+      if (note.end_dt === undefined) continue;
+      const column = note.column - 1;
+      const direction = config.upsideDown ? 1 : -1;
+      const tail_y = layout.receptorY + note.end_dt * speed * direction;
       this.addSprite(config.longNoteTails[column], column, layout, tail_y, write,
-        undefined, getLongNoteBrightness(note.state), false, config.upsideDown ? 0 : 1, config.longNoteTailFlipY[column]);
+        undefined, getLongNoteBrightness(note.state), false, config.upsideDown ? 0 : 1,
+        config.longNoteTailFlipY[column], "long-note-tails");
+    }
+    for (const note of notes) {
+      if (note.end_dt === undefined) continue;
+      const column = note.column - 1;
+      const direction = config.upsideDown ? 1 : -1;
+      const head_y = layout.receptorY + note.start_dt * speed * direction;
       this.addSprite(config.longNoteHeads[column], column, layout, head_y, write,
-        undefined, getLongNoteBrightness(note.state), false, config.upsideDown ? 0 : 1, config.longNoteHeadFlipY[column]);
+        undefined, getLongNoteBrightness(note.state), false, config.upsideDown ? 0 : 1,
+        config.longNoteHeadFlipY[column], "long-note-heads");
     }
     for (const note of notes) {
       if (note.end_dt !== undefined) continue;
       const column = note.column - 1;
       const y = layout.receptorY + note.start_dt * speed * (config.upsideDown ? 1 : -1);
       this.addSprite(config.shortNotes[column], column, layout, y,
-        write, undefined, 1, false, config.upsideDown ? 0 : 1, config.shortNoteFlipY[column]);
+        write, undefined, 1, false, config.upsideDown ? 0 : 1,
+        config.shortNoteFlipY[column], "short-notes");
     }
+    this.addStageBottom(layout, write);
+  }
+
+  private addStageSides(layout: ManiaLayout, write: QuadWriter): void {
+    const left = layout.columnLeft[0]!;
+    const right = layout.columnLeft.at(-1)! + layout.columnWidth.at(-1)!;
+    const addSide = (name: string | undefined, x: number, left_origin: boolean) => {
+      const sprite = name ? this.skin.sprites[name] : undefined;
+      if (!sprite) return;
+      const width = sprite.sourceSize.w * NOTE_SKIN_LOGICAL_HEIGHT / 768;
+      write(left_origin ? x - width : x, 0, width, NOTE_SKIN_LOGICAL_HEIGHT, [1, 1, 1, 1], sprite);
+    };
+    addSide(this.skin.config.stageLeft, left, true);
+    addSide(this.skin.config.stageRight, right, false);
+  }
+
+  private addStageHint(layout: ManiaLayout, write: QuadWriter): void {
+    const name = this.skin.config.stageHint;
+    const sprite = name ? this.skin.sprites[name] : undefined;
+    if (!sprite) return;
+    const left = layout.columnLeft[0]!;
+    const right = layout.columnLeft.at(-1)! + layout.columnWidth.at(-1)!;
+    const height = sprite.sourceSize.h * 0.9;
+    write(left, layout.receptorY - height * 0.5, right - left, height, [1, 1, 1, 0.9], sprite,
+      this.skin.config.upsideDown);
+  }
+
+  private addStageBottom(layout: ManiaLayout, write: QuadWriter): void {
+    const name = this.skin.config.stageBottom;
+    const sprite = name ? this.skin.sprites[name] : undefined;
+    if (!sprite) return;
+    const left = layout.columnLeft[0]!;
+    const right = layout.columnLeft.at(-1)! + layout.columnWidth.at(-1)!;
+    const x = (left + right - sprite.sourceSize.w) * 0.5;
+    const y = this.skin.config.upsideDown ? 0 : NOTE_SKIN_LOGICAL_HEIGHT - sprite.sourceSize.h;
+    write(x, y, sprite.sourceSize.w, sprite.sourceSize.h, [1, 1, 1, 1], sprite);
   }
 
   private addReceptor(name: string, column: number, layout: ManiaLayout, write: QuadWriter): void {
-    const frame = this.skin.frames[name];
-    if (!frame) return;
+    const sprite = this.skin.sprites[name];
+    if (!sprite) return;
     const width = layout.columnWidth[column]!;
-    const height = frame.sourceSize.h * NOTE_SKIN_LOGICAL_HEIGHT / 768;
+    const height = sprite.sourceSize.h * NOTE_SKIN_LOGICAL_HEIGHT / 768;
     const top = this.skin.config.upsideDown ? 0 : NOTE_SKIN_LOGICAL_HEIGHT - height;
-    write(layout.columnLeft[column]!, top, width, height, [1, 1, 1, 1], frame,
+    write(layout.columnLeft[column]!, top, width, height, [1, 1, 1, 1], sprite,
       this.skin.config.receptorFlipY[column]);
   }
 
   private addSprite(name: string, column: number, layout: ManiaLayout, y: number, write: QuadWriter,
-    height?: number, brightness = 1, stretch = false, origin_y = 0, flip_y = false): void {
-    const frame = this.skin.frames[name];
-    if (!frame) return;
-    const scale = layout.columnWidth[column]! / frame.sourceSize.w;
-    const draw_height = height ?? frame.sourceSize.h * scale;
+    height?: number, brightness = 1, stretch = false, origin_y = 0, flip_y = false,
+    pass?: NoteRenderPass): void {
+    const sprite = this.skin.sprites[name];
+    if (!sprite) return;
+    const scale = layout.columnWidth[column]! / sprite.sourceSize.w;
+    const draw_height = height ?? sprite.sourceSize.h * scale;
     if (draw_height <= 0) return;
-    const x = layout.columnLeft[column]! + frame.spriteSourceSize.x * scale;
-    const top = stretch ? y : y - frame.sourceSize.h * scale * origin_y + frame.spriteSourceSize.y * scale;
-    write(x, top, frame.spriteSourceSize.w * scale, stretch ? draw_height : frame.spriteSourceSize.h * scale,
-      [brightness, brightness, brightness, 1], frame, flip_y);
+    const x = layout.columnLeft[column]!;
+    const top = stretch ? y : y - sprite.sourceSize.h * scale * origin_y;
+    write(x, top, layout.columnWidth[column]!, stretch ? draw_height : sprite.sourceSize.h * scale,
+      [brightness, brightness, brightness, 1], sprite, flip_y, pass);
   }
 
   private getSpriteHeight(name: string, column: number, layout: ManiaLayout): number {
-    const frame = this.skin.frames[name];
-    return frame ? frame.sourceSize.h * layout.columnWidth[column]! / frame.sourceSize.w : 0;
+    const sprite = this.skin.sprites[name];
+    return sprite ? sprite.sourceSize.h * layout.columnWidth[column]! / sprite.sourceSize.w : 0;
   }
 
 }

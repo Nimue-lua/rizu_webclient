@@ -1,4 +1,4 @@
-import type { NoteSkin, NoteSkinConfig, NoteSkinFrame } from "./NoteSkin";
+import type { NoteSkin, NoteSkinConfig, NoteSkinSprite } from "./NoteSkin";
 
 export type SkinIniSection = Readonly<Record<string, string>>;
 
@@ -12,6 +12,7 @@ const DEFAULT_SPRITE_NAMES = [
   "mania-key1", "mania-key1D", "mania-key2", "mania-key2D", "mania-keyS", "mania-keySD",
   "mania-note1", "mania-note1L", "mania-note1T", "mania-note2", "mania-note2L", "mania-note2T",
   "mania-noteS", "mania-noteSL", "mania-noteST",
+  "mania-stage-hint", "mania-stage-left", "mania-stage-right",
 ] as const;
 
 export function parseSkinIni(source: string): SkinIni {
@@ -125,6 +126,10 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
     receptorPressed: spriteList((column) => `KeyImage${column}D`, "D"),
     receptorFlipY: Array.from({ length: column_count }, (_, column) =>
       flipWhenUpsideDown(section, "Key", column, "", true, upsideDown)),
+    stageHint: section.StageHint?.replace(/\\/g, "/") ?? "mania-stage-hint",
+    stageLeft: section.StageLeft?.replace(/\\/g, "/") ?? "mania-stage-left",
+    stageRight: section.StageRight?.replace(/\\/g, "/") ?? "mania-stage-right",
+    stageBottom: section.StageBottom?.replace(/\\/g, "/") ?? "mania-stage-bottom",
   };
 }
 
@@ -133,7 +138,7 @@ interface SpriteFile {
   dpi: number;
 }
 
-const MAX_ATLAS_SIZE = 4096;
+const MAX_TEXTURE_SIZE = 4096;
 
 function pngSize(bytes: Uint8Array): { width: number; height: number } {
   if (bytes.length < 24 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) {
@@ -209,17 +214,23 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     longNoteTails,
     receptorReleased: config.receptorReleased.map((name, column) => resolve(name, `mania-key${types[column]}`)),
     receptorPressed: config.receptorPressed.map((name, column) => resolve(name, `mania-key${types[column]}D`)),
+    stageHint: resolveOptional(config.stageHint, "mania-stage-hint", available, defaults),
+    stageLeft: resolveOptional(config.stageLeft, "mania-stage-left", available, defaults),
+    stageRight: resolveOptional(config.stageRight, "mania-stage-right", available, defaults),
+    stageBottom: resolveOptional(config.stageBottom, "mania-stage-bottom", available, defaults),
   };
   const names = [...new Set([
     ...resolved_config.shortNotes, ...resolved_config.longNoteHeads, ...resolved_config.longNoteBodies, ...resolved_config.longNoteTails,
     ...resolved_config.receptorReleased, ...resolved_config.receptorPressed,
+    ...[resolved_config.stageHint, resolved_config.stageLeft, resolved_config.stageRight, resolved_config.stageBottom]
+      .filter((name): name is string => name !== undefined),
   ])];
   const decoded = await Promise.all(names.map(async (name) => {
     const normalized = name.replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
     const file = available.get(normalized) ?? defaults.get(normalized);
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
     const source = pngSize(file.bytes);
-    const scale = Math.min(1, MAX_ATLAS_SIZE / source.width, MAX_ATLAS_SIZE / source.height);
+    const scale = Math.min(1, MAX_TEXTURE_SIZE / source.width, MAX_TEXTURE_SIZE / source.height);
     const image = await createImageBitmap(new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }), {
       premultiplyAlpha: "none",
       resizeWidth: Math.max(1, Math.round(source.width * scale)),
@@ -228,42 +239,20 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     });
     return { name, image, dpi: file.dpi, source };
   }));
-
-  const placements = new Map<string, { x: number; y: number }>();
-  let x = 0;
-  let y = 0;
-  let row_height = 0;
-  let width = 0;
-  for (const { name, image } of [...decoded].sort((a, b) => b.image.height - a.image.height)) {
-    if (x > 0 && x + image.width > MAX_ATLAS_SIZE) {
-      x = 0;
-      y += row_height;
-      row_height = 0;
-    }
-    if (y + image.height > MAX_ATLAS_SIZE) throw new Error("Required osu skin sprites exceed the atlas size limit");
-    placements.set(name, { x, y });
-    x += image.width;
-    width = Math.max(width, x);
-    row_height = Math.max(row_height, image.height);
-  }
-  const height = y + row_height;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Could not create osu skin atlas");
-  const frames: Record<string, NoteSkinFrame> = {};
+  const sprites: Record<string, NoteSkinSprite> = {};
   for (const { name, image, dpi, source } of decoded) {
-    const placement = placements.get(name)!;
-    context.drawImage(image, placement.x, placement.y);
-    frames[name] = {
-      frame: { x: placement.x, y: placement.y, w: image.width, h: image.height },
-      spriteSourceSize: { x: 0, y: 0, w: source.width / dpi, h: source.height / dpi },
+    sprites[name] = {
+      image,
       sourceSize: { w: source.width / dpi, h: source.height / dpi },
       pixelSize: { w: source.width, h: source.height },
     };
-    image.close();
   }
-  const image = await createImageBitmap(canvas, { premultiplyAlpha: "none" });
-  return { config: resolved_config, frames, image };
+  return { config: resolved_config, sprites };
+}
+
+function resolveOptional(name: string | undefined, fallback: string, available: ReadonlyMap<string, SpriteFile>,
+  defaults: ReadonlyMap<string, SpriteFile>): string | undefined {
+  if (name && available.has(normalizedSpriteName(name))) return name;
+  if (available.has(normalizedSpriteName(fallback)) || defaults.has(normalizedSpriteName(fallback))) return fallback;
+  return undefined;
 }

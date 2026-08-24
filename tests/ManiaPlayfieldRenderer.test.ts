@@ -28,22 +28,49 @@ function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0,
       receptorPressed: ["k", "k", "k", "k"],
       receptorFlipY: [upside_down, upside_down, upside_down, upside_down],
     },
-    frames: with_frame ? {
+    sprites: with_frame ? {
       k: {
-        frame: { x: 0, y: 0, w: 313, h: 768 },
-        spriteSourceSize: { x: 0, y: 0, w: 156.5, h: 384 },
+        image: {} as ImageBitmap,
         sourceSize: { w: 156.5, h: 384 },
         pixelSize: { w: 313, h: 768 },
       },
       n: {
-        frame: { x: 0, y: 768, w: 100, h: 20 },
-        spriteSourceSize: { x: 0, y: 0, w: 100, h: 20 },
+        image: {} as ImageBitmap,
         sourceSize: { w: 100, h: 20 },
         pixelSize: { w: 100, h: 20 },
       },
     } : {},
-    image: {} as ImageBitmap,
   } satisfies NoteSkin);
+}
+
+function stageRenderer(upside_down = false) {
+  const skin = {
+    config: {
+      mode: "mania" as const,
+      columnCount: 2,
+      columnStart: 100,
+      columnWidths: [50, 50],
+      columnSpacing: [4],
+      hitPosition: 400,
+      comboPosition: 100,
+      judgePosition: 125,
+      upsideDown: upside_down,
+      shortNotes: ["n", "n"], shortNoteFlipY: [false, false],
+      longNoteHeads: ["n", "n"], longNoteHeadFlipY: [false, false],
+      longNoteBodies: ["n", "n"], longNoteBodyFlipY: [false, false],
+      longNoteTails: ["n", "n"], longNoteTailFlipY: [true, true],
+      receptorReleased: ["k", "k"], receptorPressed: ["k", "k"], receptorFlipY: [false, false],
+      stageHint: "hint", stageLeft: "left", stageRight: "right", stageBottom: "bottom",
+    },
+    sprites: Object.fromEntries([
+      ["hint", 200, 20], ["left", 16, 768], ["right", 16, 768], ["bottom", 120, 30],
+    ].map(([name, width, height]) => [name, {
+      image: {} as ImageBitmap,
+      sourceSize: { w: width, h: height },
+      pixelSize: { w: width, h: height },
+    }])),
+  } satisfies NoteSkin;
+  return new ManiaPlayfieldRenderer(skin);
 }
 
 test("uses osu's left-aligned ColumnStart when it fits", () => {
@@ -113,4 +140,25 @@ test("reflects the hit position and note direction for UpsideDown", () => {
     future: 518 / 480,
     past: 108 / 480,
   });
+});
+
+test("positions osu stage sprites using their documented origins", () => {
+  const playfield = stageRenderer();
+  const quads: Parameters<Parameters<typeof playfield.draw>[4]>[] = [];
+  playfield.draw(playfield.getLayout(854), [], 1, [], (...quad) => quads.push(quad));
+  assert.deepEqual(quads.map((quad) => quad.slice(0, 4)), [
+    [90, 0, 10, 480],
+    [204, 0, 10, 480],
+    [100, 391, 104, 18],
+    [92, 450, 120, 30],
+  ]);
+});
+
+test("anchors StageBottom and the flipped hint to the top in UpsideDown", () => {
+  const playfield = stageRenderer(true);
+  const quads: Parameters<Parameters<typeof playfield.draw>[4]>[] = [];
+  playfield.draw(playfield.getLayout(854), [], 1, [], (...quad) => quads.push(quad));
+  assert.deepEqual(quads[2]?.slice(0, 4), [100, 71, 104, 18]);
+  assert.equal(quads[2]?.[6], true);
+  assert.deepEqual(quads[3]?.slice(0, 4), [92, 0, 120, 30]);
 });

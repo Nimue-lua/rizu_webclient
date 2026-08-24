@@ -1,6 +1,6 @@
 import type { VisualNote } from "../RhythmEngine";
-import { ManiaPlayfieldRenderer } from "./ManiaPlayfieldRenderer";
-import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinFrame } from "./NoteSkin";
+import { ManiaPlayfieldRenderer, type NoteRenderPass } from "./ManiaPlayfieldRenderer";
+import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite } from "./NoteSkin";
 
 const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
 const VERTEX_FLOATS = 8;
@@ -65,9 +65,9 @@ export class WebGlGameplayRenderer {
   private readonly vertex_array: WebGLVertexArrayObject;
   private readonly vertex_buffer: WebGLBuffer;
   private readonly viewport_size: WebGLUniformLocation;
-  private readonly texture: WebGLTexture;
+  private readonly sampler: WebGLUniformLocation;
+  private readonly textures = new Map<NoteSkinSprite, WebGLTexture>();
   private readonly playfield: ManiaPlayfieldRenderer;
-  private vertices: number[] = [];
 
   constructor(canvas: HTMLCanvasElement, skin: NoteSkin) {
     const gl = canvas.getContext("webgl2");
@@ -76,8 +76,10 @@ export class WebGlGameplayRenderer {
     const vertex_array = gl.createVertexArray();
     const vertex_buffer = gl.createBuffer();
     const viewport_size = gl.getUniformLocation(program, "viewport_size");
-    const texture = gl.createTexture();
-    if (!vertex_array || !vertex_buffer || !viewport_size || !texture) throw new Error("Failed to create gameplay rendering resources");
+    const sampler = gl.getUniformLocation(program, "atlas");
+    if (!vertex_array || !vertex_buffer || !viewport_size || !sampler) {
+      throw new Error("Failed to create gameplay rendering resources");
+    }
     this.canvas = canvas;
     this.skin = skin;
     this.gl = gl;
@@ -85,7 +87,7 @@ export class WebGlGameplayRenderer {
     this.vertex_array = vertex_array;
     this.vertex_buffer = vertex_buffer;
     this.viewport_size = viewport_size;
-    this.texture = texture;
+    this.sampler = sampler;
     this.playfield = new ManiaPlayfieldRenderer(skin);
     gl.bindVertexArray(vertex_array);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
@@ -95,13 +97,24 @@ export class WebGlGameplayRenderer {
       gl.enableVertexAttribArray(location);
       gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset * Float32Array.BYTES_PER_ELEMENT);
     }
-    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skin.image);
+    gl.activeTexture(gl.TEXTURE0);
+    for (const [name, sprite] of Object.entries(skin.sprites)) {
+      const texture = gl.createTexture();
+      if (!texture) throw new Error("Failed to create gameplay sprite texture");
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, sprite.image);
+      const error = gl.getError();
+      if (error !== gl.NO_ERROR) {
+        gl.deleteTexture(texture);
+        throw new Error(`Failed to upload sprite ${name} (${sprite.image.width}x${sprite.image.height}): WebGL error 0x${error.toString(16)}`);
+      }
+      this.textures.set(sprite, texture);
+    }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
@@ -126,36 +139,65 @@ export class WebGlGameplayRenderer {
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vertex_array);
     gl.uniform2f(this.viewport_size, layout.width, layout.height);
-    this.vertices = [];
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(this.sampler, 0);
+    const commands: DrawCommand[] = [];
     this.playfield.draw(layout, notes, scroll_speed, pressed_columns,
-      (x, y, width, height, color, frame, flip_y) => this.addQuad(x, y, width, height, color, frame, flip_y));
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW);
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
-    gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / VERTEX_FLOATS);
+      (x, y, width, height, color, sprite, flip_y, pass) => {
+        commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false, pass });
+      });
+    this.submitCommands(commands);
   }
 
   destroy(): void {
-    this.gl.deleteTexture(this.texture);
+    for (const texture of this.textures.values()) this.gl.deleteTexture(texture);
     this.gl.deleteBuffer(this.vertex_buffer);
     this.gl.deleteVertexArray(this.vertex_array);
     this.gl.deleteProgram(this.program);
   }
 
-  private addQuad(x: number, y: number, width: number, height: number,
-    color: readonly [number, number, number, number], frame: NoteSkinFrame, flip_y = false): void {
-    if (width <= 0 || height <= 0) return;
-    const image = this.skin.image;
-    const u0 = frame.frame.x / image.width;
-    const v0 = frame.frame.y / image.height;
-    const u1 = (frame.frame.x + frame.frame.w) / image.width;
-    const v1 = (frame.frame.y + frame.frame.h) / image.height;
-    const top_v = flip_y ? v1 : v0;
-    const bottom_v = flip_y ? v0 : v1;
-    for (const [px, py, u, v] of [[x, y, u0, top_v], [x + width, y, u1, top_v], [x, y + height, u0, bottom_v],
-      [x, y + height, u0, bottom_v], [x + width, y, u1, top_v], [x + width, y + height, u1, bottom_v]]) {
-      this.vertices.push(px, py, u, v, ...color);
+  private submitCommands(commands: readonly DrawCommand[]): void {
+    for (let index = 0; index < commands.length;) {
+      const command = commands[index]!;
+      if (!command.pass) {
+        this.submitBatch(command.sprite, [command]);
+        index += 1;
+        continue;
+      }
+      const pass = command.pass;
+      const by_sprite = new Map<NoteSkinSprite, DrawCommand[]>();
+      while (index < commands.length && commands[index]!.pass === pass) {
+        const next = commands[index++]!;
+        const batch = by_sprite.get(next.sprite) ?? [];
+        batch.push(next);
+        by_sprite.set(next.sprite, batch);
+      }
+      for (const [sprite, batch] of by_sprite) this.submitBatch(sprite, batch);
     }
+  }
+
+  private submitBatch(sprite: NoteSkinSprite, commands: readonly DrawCommand[]): void {
+    const vertices: number[] = [];
+    for (const command of commands) {
+      if (command.width <= 0 || command.height <= 0) continue;
+      const top_v = command.flipY ? 1 : 0;
+      const bottom_v = command.flipY ? 0 : 1;
+      for (const [px, py, u, v] of [[command.x, command.y, 0, top_v],
+        [command.x + command.width, command.y, 1, top_v], [command.x, command.y + command.height, 0, bottom_v],
+        [command.x, command.y + command.height, 0, bottom_v], [command.x + command.width, command.y, 1, top_v],
+        [command.x + command.width, command.y + command.height, 1, bottom_v]]) {
+        vertices.push(px, py, u, v, ...command.color);
+      }
+    }
+    if (vertices.length === 0) return;
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+    const texture = this.textures.get(sprite);
+    if (!texture) throw new Error("Gameplay sprite texture was not uploaded");
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
   }
 
   private resizeCanvas(): { width: number; height: number } {
@@ -173,4 +215,15 @@ export class WebGlGameplayRenderer {
     const framebuffer = this.resizeCanvas();
     return NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height;
   }
+}
+
+interface DrawCommand {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: readonly [number, number, number, number];
+  sprite: NoteSkinSprite;
+  flipY: boolean;
+  pass?: NoteRenderPass;
 }

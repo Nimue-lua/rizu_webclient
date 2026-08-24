@@ -6,6 +6,7 @@ import {
   parseSkinIni,
   resolveOsuManiaTail,
 } from "../src/gameplay/renderer/OsuSkin";
+import { destroyNoteSkin, type NoteSkin } from "../src/gameplay/renderer/NoteSkin";
 
 const source = `\uFEFF[General]\nName: Test skin\n\n[Mania]\nKeys: 4\nColumnStart: 281\nColumnWidth: 73, 74, 75, 76\nColumnSpacing: 1, 2, 3 // comment\nHitPosition: 445\nScorePosition: 125\nComboPosition: 100\nKeyImage0: keys\\one\nKeyImage0D: keys/one-down\nNoteImage0: notes/one\nNoteImage0H: notes/one-head\nNoteImage0L: notes/one-body\nNoteImage0T: notes/one-tail\nKeyImage1: keys/two\nKeyImage1D: keys/two-down\nNoteImage1: notes/two\nNoteImage1H: notes/two-head\nNoteImage1L: notes/two-body\nNoteImage1T: notes/two-tail\nKeyImage2: keys/three\nKeyImage2D: keys/three-down\nNoteImage2: notes/three\nNoteImage2H: notes/three-head\nNoteImage2L: notes/three-body\nNoteImage2T: notes/three-tail\nKeyImage3: keys/four\nKeyImage3D: keys/four-down\nNoteImage3: notes/four\nNoteImage3H: notes/four-head\nNoteImage3L: notes/four-body\nNoteImage3T: notes/four-tail\n\n[Mania]\nKeys: 7\n`;
 
@@ -80,4 +81,15 @@ test("parses UpsideDown and per-part texture flip overrides", () => {
   assert.deepEqual(config.longNoteHeadFlipY, [false, true, true, true]);
   assert.deepEqual(config.longNoteTailFlipY, [true, true, true, true]);
   assert.deepEqual(config.receptorFlipY, [true, true, true, true]);
+});
+
+test("disposes shared skin images only when the loaded skin is released", () => {
+  let closes = 0;
+  const sprite = {
+    image: { close: () => { closes += 1; } } as ImageBitmap,
+    sourceSize: { w: 1, h: 1 },
+    pixelSize: { w: 1, h: 1 },
+  };
+  destroyNoteSkin({ sprites: { first: sprite, alias: sprite }, config: {} } as unknown as NoteSkin);
+  assert.equal(closes, 1);
 });

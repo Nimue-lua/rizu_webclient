@@ -24,19 +24,25 @@ export interface NoteSkinConfig {
   receptorReleased: readonly string[];
   receptorPressed: readonly string[];
   receptorFlipY: readonly boolean[];
+  stageHint?: string;
+  stageLeft?: string;
+  stageRight?: string;
+  stageBottom?: string;
 }
 
-export interface NoteSkinFrame {
-  frame: { x: number; y: number; w: number; h: number };
-  spriteSourceSize: { x: number; y: number; w: number; h: number };
+export interface NoteSkinSprite {
+  image: ImageBitmap;
   sourceSize: { w: number; h: number };
   pixelSize: { w: number; h: number };
 }
 
 export interface NoteSkin {
   config: NoteSkinConfig;
-  frames: Readonly<Record<string, NoteSkinFrame>>;
-  image: ImageBitmap;
+  sprites: Readonly<Record<string, NoteSkinSprite>>;
+}
+
+export function destroyNoteSkin(skin: NoteSkin): void {
+  for (const sprite of new Set(Object.values(skin.sprites))) sprite.image.close();
 }
 
 export async function loadNoteSkinZip(url: string, column_count: number, signal?: AbortSignal): Promise<NoteSkin> {
