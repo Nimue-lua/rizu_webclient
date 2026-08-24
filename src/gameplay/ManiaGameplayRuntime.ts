@@ -3,7 +3,7 @@ import { ManiaRulesEngine, type ManiaHitRegistration, type ManiaVisualNote } fro
 import type { ScoreResult } from "./scoring/ScoreResult";
 import type { GameplaySession, ManiaPointerInput } from "./GameplaySession";
 import { ManiaRenderer as WebGlManiaRenderer } from "./renderer/ManiaRenderer";
-import { SpringValue } from "./SpringValue";
+import { HudStateDeriver, type GameplayPresentationState } from "./HudState";
 import type { ReplayBase } from "../replay/ReplayBase";
 import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
 import { AudioGameplayClock } from "./AudioGameplayClock";
@@ -12,7 +12,7 @@ import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
   draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number>, hud: { combo: number; accuracy: number; judgment: string | null; judgmentAge: number }): void;
+    pressed_columns: ArrayLike<number>, state: GameplayPresentationState): void;
   destroy(): void;
 }
 
@@ -53,10 +53,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private animation_frame: number | null = null;
   private finished = false;
   private destroyed = false;
-  private readonly displayed_accuracy = new SpringValue(0);
-  private previous_frame_time: number | null = null;
-  private previous_judges_total = 0;
-  private judgment_time = -Infinity;
+  private readonly hud_state = new HudStateDeriver();
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
@@ -171,26 +168,13 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   };
 
   private readonly render = (timestamp: number) => {
-    const delta_time = this.previous_frame_time === null ? 0 : (timestamp - this.previous_frame_time) / 1000;
-    this.previous_frame_time = timestamp;
     const visual_scroll_speed = this.scroll_speed / this.music_rate;
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.rules_engine.update(song_time, range.past, range.future);
     const score = this.rules_engine.score;
-    const target_accuracy = (score.accuracy ?? 0) * 100;
-    const displayed_accuracy = this.displayed_accuracy.update(target_accuracy, delta_time);
-    const judges_total = Object.values(score.judges ?? {}).reduce((total, count) => total + count, 0);
-    if (judges_total !== this.previous_judges_total) {
-      this.judgment_time = timestamp / 1000;
-      this.previous_judges_total = judges_total;
-    }
-    this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed, this.pressed_columns, {
-      combo: score.combo ?? 0,
-      accuracy: displayed_accuracy,
-      judgment: score.last_judge ?? null,
-      judgmentAge: timestamp / 1000 - this.judgment_time,
-    });
+    this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed,
+      this.pressed_columns, this.hud_state.update(score, timestamp / 1000));
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

@@ -6,12 +6,14 @@ import { AudioGameplayClock } from "./AudioGameplayClock";
 import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
 import { OsuRenderer } from "./renderer/OsuRenderer";
+import { HudStateDeriver } from "./HudState";
 
 export class OsuGameplayRuntime implements GameplaySession {
   private readonly renderer: OsuRenderer;
   private readonly playback: WebAudioPlayback;
   private readonly clock: AudioGameplayClock;
   private readonly music_rate: number;
+  private readonly hud_state = new HudStateDeriver();
   private animation_frame: number | null = null;
   private finished = false;
   private destroyed = false;
@@ -63,7 +65,7 @@ export class OsuGameplayRuntime implements GameplaySession {
 
   private readonly render = (timestamp: number) => {
     const song_time = this.clock.timeAt(timestamp).monotonic;
-    this.renderer.draw(this.data.chart, song_time);
+    this.renderer.draw(this.data.chart, song_time, this.hud_state.update({}, timestamp / 1000));
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

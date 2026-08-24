@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { SpriteGameplayHudRenderer } from "../src/gameplay/renderer/GameplayHudRenderer";
+import { getGameplayHudLayout } from "../src/gameplay/GameplayHudRenderer";
+import type { Sprite } from "../src/gameplay/renderer/Sprite";
+
+function sprite(name: string, width = 20, height = 30): Sprite & { name: string } {
+  return { name, image: {} as ImageBitmap, sourceSize: { w: width, h: height }, pixelSize: { w: width, h: height } };
+}
+
+function createHud() {
+  const sprites: Record<string, Sprite & { name: string }> = {};
+  const glyphs: Record<string, string> = {};
+  for (const character of "0123456789.%") {
+    const name = `glyph-${character}`;
+    glyphs[character] = name;
+    sprites[name] = sprite(name);
+  }
+  return { sprites, glyphs };
+}
+
+test("formats the actual score without truncating values over seven digits", () => {
+  const names: string[] = [];
+  const { sprites, glyphs } = createHud();
+  new SpriteGameplayHudRenderer({ sprites, scoreGlyphs: glyphs, scoreOverlap: 0 },
+    (_x, _y, _width, _height, _color, drawn) => names.push((drawn as Sprite & { name: string }).name))
+    .draw({ score: 12345678, accuracy: 100 }, { scoreRight: 848, scoreTop: 0 });
+  assert.deepEqual(names.slice(0, 8), [..."12345678"].map((digit) => `glyph-${digit}`));
+});
+
+test("tolerates skins without global HUD assets", () => {
+  assert.doesNotThrow(() => new SpriteGameplayHudRenderer({ sprites: {} }, () => {})
+    .draw({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 }));
+});
+
+test("anchors the global HUD to the viewport instead of a letterboxed playfield", () => {
+  assert.deepEqual(getGameplayHudLayout(1280), { scoreRight: 1274, scoreTop: 0 });
+});

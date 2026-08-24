@@ -16,6 +16,11 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly hitCircleOverlay: Sprite;
   readonly approachCircle: Sprite;
   readonly comboColor: readonly [number, number, number, number];
+  readonly judgments: Readonly<Record<string, readonly string[]>>;
+  readonly scoreGlyphs: Readonly<Record<string, string>>;
+  readonly comboGlyphs: Readonly<Record<string, string>>;
+  readonly scoreOverlap: number;
+  readonly comboOverlap: number;
 }
 
 export function parseSkinIni(source: string): SkinIni {
@@ -231,7 +236,12 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));
   const available = spriteFiles(files, directory);
   const defaults = await defaultSpriteFiles(signal);
-  const names = ["hitcircle", "hitcircleoverlay", "approachcircle"] as const;
+  const fonts = ini.sections.Fonts ?? {};
+  const scoreGlyphs = resolveFontGlyphs(fonts.ScorePrefix ?? "score", available, defaults);
+  const comboGlyphs = resolveFontGlyphs(fonts.ComboPrefix ?? "score", available, defaults);
+  const judgments = resolveStandardJudgments(available, defaults);
+  const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle",
+    ...Object.values(scoreGlyphs), ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
@@ -245,13 +255,18 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
       pixelSize: { w: source.width, h: source.height },
     }] as const;
   }));
-  const sprites = Object.fromEntries(decoded) as Record<(typeof names)[number], Sprite>;
+  const sprites = Object.fromEntries(decoded) as Record<string, Sprite>;
   return {
     sprites,
-    hitCircle: sprites.hitcircle,
-    hitCircleOverlay: sprites.hitcircleoverlay,
-    approachCircle: sprites.approachcircle,
+    hitCircle: sprites.hitcircle!,
+    hitCircleOverlay: sprites.hitcircleoverlay!,
+    approachCircle: sprites.approachcircle!,
     comboColor: colorValue(ini.sections.Colours ?? {}, "Combo1", [1, 0.4, 0.4, 1]),
+    judgments,
+    scoreGlyphs,
+    comboGlyphs,
+    scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
+    comboOverlap: numberValue(fonts, "ComboOverlap", 0),
   };
 }
 
@@ -343,6 +358,25 @@ const JUDGMENT_ASSETS = {
   meh: ["Hit50", "mania-hit50"],
   miss: ["Hit0", "mania-hit0"],
 } as const;
+
+const STANDARD_JUDGMENT_ASSETS = {
+  300: "hit300",
+  100: "hit100",
+  50: "hit50",
+  miss: "hit0",
+} as const;
+
+function resolveStandardJudgments(available: ReadonlyMap<string, SpriteFile>,
+  defaults: ReadonlyMap<string, SpriteFile>): Readonly<Record<string, readonly string[]>> {
+  return Object.fromEntries(Object.entries(STANDARD_JUDGMENT_ASSETS).map(([judge, base]) => {
+    const source = available.has(normalizedSpriteName(base)) || available.has(normalizedSpriteName(`${base}-0`))
+      ? available : defaults;
+    const frames: string[] = [];
+    for (let frame = 0; source.has(normalizedSpriteName(`${base}-${frame}`)); frame += 1) frames.push(`${base}-${frame}`);
+    if (frames.length === 0 && source.has(normalizedSpriteName(base))) frames.push(base);
+    return [judge, frames];
+  }));
+}
 
 function resolveJudgments(section: SkinIniSection, available: ReadonlyMap<string, SpriteFile>,
   defaults: ReadonlyMap<string, SpriteFile>): Readonly<Record<string, readonly string[]>> {

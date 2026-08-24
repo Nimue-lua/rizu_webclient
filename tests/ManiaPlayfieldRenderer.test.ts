@@ -190,18 +190,3 @@ test("anchors StageBottom and the flipped hint to the top in UpsideDown", () => 
   assert.equal(quads[2]?.[6], true);
   assert.deepEqual(quads[3]?.slice(0, 4), [92, 0, 120, 30]);
 });
-
-test("centers judgments and combo while right-aligning score and accuracy", () => {
-  const playfield = stageRenderer();
-  const quads: Parameters<Parameters<typeof playfield.draw>[4]>[] = [];
-  playfield.draw(playfield.getLayout(854), [], 1, [], (...quad) => quads.push(quad), {
-    combo: 12,
-    accuracy: 98.5,
-    judgment: "perfect",
-    judgmentAge: 0,
-  });
-  assert.deepEqual(quads[4]?.slice(0, 4), [120.75, 112.5, 62.5, 25]);
-  assert.deepEqual(quads[5]?.slice(0, 4), [139.5, 100, 12.5, 18.75]);
-  assert.equal(quads[7]?.[0], 764);
-  assert.equal(quads.at(-1)?.[0], 840.8000000000001);
-});

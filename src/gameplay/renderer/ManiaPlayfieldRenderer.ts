@@ -1,6 +1,6 @@
 import { NoteState, type ManiaVisualNote } from "../ManiaRulesEngine";
 import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin } from "./NoteSkin";
-import type { Sprite, SpriteQuadWriter } from "./Sprite";
+import type { SpriteQuadWriter } from "./Sprite";
 
 export interface ManiaLayout {
   readonly width: number;
@@ -11,12 +11,6 @@ export interface ManiaLayout {
 }
 
 export type NoteRenderPass = "long-note-bodies" | "long-note-tails" | "long-note-heads" | "short-notes";
-export interface ManiaHudState {
-  combo: number;
-  accuracy: number;
-  judgment: string | null;
-  judgmentAge: number;
-}
 type QuadWriter = SpriteQuadWriter;
 
 export function getLongNoteBrightness(state: NoteState): number {
@@ -27,9 +21,6 @@ export function getLongNoteBrightness(state: NoteState): number {
 
 export class ManiaPlayfieldRenderer {
   constructor(private readonly skin: NoteSkin) {}
-
-  get comboPosition(): number { return this.skin.config.comboPosition; }
-  get judgePosition(): number { return this.skin.config.judgePosition; }
 
   getLayout(viewport_width: number): ManiaLayout {
     const config = this.skin.config;
@@ -64,7 +55,7 @@ export class ManiaPlayfieldRenderer {
   }
 
   draw(layout: ManiaLayout, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number>, write: QuadWriter, hud?: ManiaHudState): void {
+    pressed_columns: ArrayLike<number>, write: QuadWriter): void {
     const speed = NOTE_SKIN_LOGICAL_HEIGHT * scroll_speed;
     const config = this.skin.config;
     this.addStageSides(layout, write);
@@ -115,7 +106,6 @@ export class ManiaPlayfieldRenderer {
         config.shortNoteFlipY[column], "short-notes");
     }
     this.addStageBottom(layout, write);
-    if (hud) this.addHud(layout, hud, write);
   }
 
   private addColumnLines(layout: ManiaLayout, write: QuadWriter): void {
@@ -148,57 +138,6 @@ export class ManiaPlayfieldRenderer {
     };
     add(config.hpBackground, right + 1, NOTE_SKIN_LOGICAL_HEIGHT);
     add(config.hpFill, right + 6.6, 474.8);
-  }
-
-  private addHud(layout: ManiaLayout, hud: ManiaHudState, write: QuadWriter): void {
-    const config = this.skin.config;
-    const left = layout.columnLeft[0]!;
-    const right = layout.columnLeft.at(-1)! + layout.columnWidth.at(-1)!;
-    const center = (left + right) * 0.5;
-    if (hud.judgment && hud.judgmentAge < 0.22) {
-      const frames = config.judgments[hud.judgment] ?? [];
-      const name = frames[Math.min(frames.length - 1, Math.floor(hud.judgmentAge * 20))];
-      const sprite = name ? this.skin.sprites[name] : undefined;
-      if (sprite) {
-        const scale = 0.625;
-        const width = sprite.sourceSize.w * scale;
-        const height = sprite.sourceSize.h * scale;
-        const alpha = hud.judgmentAge <= 0.18 ? 1 : (0.22 - hud.judgmentAge) / 0.04;
-        const y = config.upsideDown ? NOTE_SKIN_LOGICAL_HEIGHT - config.judgePosition : config.judgePosition;
-        write(center - width * 0.5, y - height * 0.5, width, height, [1, 1, 1, alpha], sprite);
-      }
-    }
-    if (hud.combo > 0) this.addBitmapText(String(hud.combo), config.comboGlyphs, config.comboOverlap,
-      center, config.upsideDown ? NOTE_SKIN_LOGICAL_HEIGHT - config.comboPosition : config.comboPosition,
-      1, "center", write);
-    const score_height = this.bitmapTextHeight(config.scoreGlyphs) * 0.625 * 0.96;
-    this.addBitmapText("0000000", config.scoreGlyphs, config.scoreOverlap, layout.width - 6, 0, 0.96, "right", write);
-    this.addBitmapText(`${hud.accuracy.toFixed(2).padStart(5, "0")}%`, config.scoreGlyphs,
-      config.scoreOverlap, layout.width - 6, score_height + 3, 0.576, "right", write);
-  }
-
-  private addBitmapText(text: string, glyphs: Readonly<Record<string, string>>, overlap: number,
-    anchor_x: number, y: number, scale: number, align: "center" | "right", write: QuadWriter): void {
-    const constant_width = this.skin.sprites[glyphs["5"] ?? ""]?.sourceSize.w ?? 40;
-    const placements: { sprite: Sprite; x: number }[] = [];
-    let x = 0;
-    for (const character of text) {
-      const sprite = this.skin.sprites[glyphs[character] ?? ""];
-      if (!sprite) continue;
-      const standard = character >= "0" && character <= "9";
-      placements.push({ sprite, x: x + (standard ? Math.max(0, (constant_width - sprite.sourceSize.w) * 0.5) : 0) });
-      x += (standard ? constant_width : sprite.sourceSize.w) - overlap;
-    }
-    const logical_scale = 0.625 * scale;
-    const left = anchor_x - x * logical_scale * (align === "center" ? 0.5 : 1);
-    for (const placement of placements) {
-      write(left + placement.x * logical_scale, y, placement.sprite.sourceSize.w * logical_scale,
-        placement.sprite.sourceSize.h * logical_scale, [1, 1, 1, 1], placement.sprite);
-    }
-  }
-
-  private bitmapTextHeight(glyphs: Readonly<Record<string, string>>): number {
-    return this.skin.sprites[glyphs["0"] ?? ""]?.sourceSize.h ?? 0;
   }
 
   private addStageSides(layout: ManiaLayout, write: QuadWriter): void {
