@@ -136,6 +136,7 @@ export function SongSelectScreen({
   const viewport_ref = useRef<HTMLDivElement>(null);
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
   const selected_difficulty_ref = useRef<HTMLButtonElement>(null);
+  const restored_song_scroll_ref = useRef(false);
   const audio_ref = useRef<HTMLAudioElement>(null);
   const preview_unlocked_ref = useRef(false);
   const last_preview_change_ref = useRef<number | null>(null);
@@ -188,6 +189,17 @@ export function SongSelectScreen({
   const filtered_songs = chart_selector.getFilteredSongs();
   const selected_song = chart_selector.getSelectedSong();
   const selected_chart = chart_selector.getSelectedChart();
+
+  useEffect(() => {
+    if (restored_song_scroll_ref.current) return;
+    const viewport = viewport_ref.current;
+    const selected_index = filtered_songs.findIndex((song) => song.id === selected_song?.id);
+    if (!viewport || selected_index < 0 || viewport.clientHeight === 0) return;
+    const centered_scroll_top = Math.max(0, selected_index * ROW_HEIGHT + ROW_HEIGHT / 2 - viewport.clientHeight / 2);
+    viewport.scrollTop = centered_scroll_top;
+    setScrollTop(centered_scroll_top);
+    restored_song_scroll_ref.current = true;
+  }, [filtered_songs.length, selected_song?.id, viewport_height]);
 
   useEffect(() => {
     const strip = difficulty_strip_ref.current;
