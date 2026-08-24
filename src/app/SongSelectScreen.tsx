@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import {
   ArrowUpDown,
   Bell,
@@ -211,7 +211,7 @@ export function SongSelectScreen({
     strip.scrollTo({ left: strip.scrollLeft + center_offset, behavior: "smooth" });
   }, [selected_chart?.id]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setLoadedBackgroundUrl(null);
     const timer = window.setTimeout(() => {
       setBackgroundUrl(selected_chart?.background_url ?? null);
