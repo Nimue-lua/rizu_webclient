@@ -1,6 +1,9 @@
 import type { Chart } from "../chart/Chart";
 import { parseOsuChart } from "../chart/format/osu/OsuParser";
 import { loadNoteSkinZip, type NoteSkin } from "../gameplay/renderer/NoteSkin";
+import { note_skin_options } from "../gameplay/renderer/NoteSkinSelection";
+
+const DEFAULT_NOTE_SKIN_URL = note_skin_options[0]!.url;
 
 export interface GameplayLocation {
   audio_url: string;
@@ -20,7 +23,7 @@ export interface GameplayData {
   audio_buffer: AudioBuffer;
   audio_context: AudioContext;
   chart: Chart;
-  note_skin?: NoteSkin;
+  note_skin: NoteSkin;
 }
 
 export interface GameplayLoader {
@@ -35,22 +38,26 @@ async function fetchAsset(url: string, signal: AbortSignal): Promise<ArrayBuffer
 
 export class HttpGameplayLoader implements GameplayLoader {
   async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData> {
-    const [audio_data, chart_data, bundled_skin] = await Promise.all([
+    const skin_url = location.note_skin_url ?? DEFAULT_NOTE_SKIN_URL;
+    const [audio_data, chart_data] = await Promise.all([
       fetchAsset(location.audio_url, signal),
       fetchAsset(location.chart_url, signal),
-      location.note_skin_url ? loadNoteSkinZip(location.note_skin_url, signal).catch((error: unknown) => {
-        console.warn("Could not load bundled note skin; using fallback", error);
-        return undefined;
-      }) : Promise.resolve(undefined),
     ]);
     const [audio_buffer, chart] = await Promise.all([
       audio_context.decodeAudioData(audio_data),
       Promise.resolve(parseOsuChart(new TextDecoder().decode(chart_data))),
     ]);
-    const note_skin = bundled_skin?.config.mode === "mania" && bundled_skin.config.columnCount === chart.column_count
-      ? bundled_skin
-      : undefined;
-    if (bundled_skin && !note_skin) bundled_skin.image.close();
+    const loaded_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal).catch((error: unknown) => {
+      if (skin_url === DEFAULT_NOTE_SKIN_URL) throw error;
+      console.warn("Could not load selected note skin; using default", error);
+      return undefined;
+    });
+    let note_skin = loaded_skin;
+    if (note_skin?.config.mode !== "mania") {
+      note_skin?.image.close();
+      note_skin = undefined;
+    }
+    if (!note_skin) note_skin = await loadNoteSkinZip(DEFAULT_NOTE_SKIN_URL, chart.column_count, signal);
     return { audio_buffer, audio_context, chart, note_skin };
   }
 }

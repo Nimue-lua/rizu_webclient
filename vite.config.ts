@@ -12,7 +12,7 @@ export default defineConfig({
     {
       name: "public-logo",
       buildStart() {
-        for (const fileName of ["rizu-logo.svg", "skins/circles.zip", "skins/diamonds.zip"]) {
+        for (const fileName of ["rizu-logo.svg", "skins/DefaultCircles.zip"]) {
           this.emitFile({
             type: "asset",
             fileName,

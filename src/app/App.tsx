@@ -142,7 +142,7 @@ export function App() {
       difficulty: chart.difficulty,
       duration_seconds: chart.duration_seconds,
       long_note_ratio: chart.long_note_ratio,
-      note_skin_url: note_skin?.url ?? null,
+      note_skin_url: note_skin.url,
       title: song.title,
     });
     setInputBindings(chart_input_bindings);

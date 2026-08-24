@@ -14,7 +14,7 @@ interface NoteSkinsModalProps {
 
 export function noteSkinColumnCounts(selected_column_count: number | null): readonly number[] {
   const maximum = Math.max(88, selected_column_count ?? 0,
-    ...note_skin_options.filter((skin) => skin.mode === "mania").map((skin) => skin.columnCount));
+    ...note_skin_options.flatMap((skin) => skin.mode === "mania" && skin.columnCount !== null ? [skin.columnCount] : []));
   return Array.from({ length: maximum }, (_, index) => index + 1);
 }
 
@@ -40,17 +40,17 @@ export function NoteSkinsModal({ selections, selected_column_count, onSelectionC
         <div className="note-skin-list">
           {column_counts.map((column_count) => {
             const key = noteSkinSelectionKey("mania", column_count);
-            const compatible_skins = note_skin_options.filter((skin) => skin.mode === "mania" && skin.columnCount === column_count);
+            const compatible_skins = note_skin_options.filter((skin) => skin.mode === "mania" &&
+              (skin.columnCount === null || skin.columnCount === column_count));
             return (
               <label key={key} className={selected_column_count === column_count ? "current" : ""}>
                 <span><strong>{column_count}K</strong>{selected_column_count === column_count && <small>SELECTED CHART</small>}</span>
                 <select
                   autoFocus={selected_column_count === column_count}
-                  value={selections[key] ?? ""}
-                  onChange={(event) => onSelectionChange(key, event.target.value || undefined)}
+                  value={selections[key] ?? compatible_skins[0]?.id ?? ""}
+                  onChange={(event) => onSelectionChange(key, event.target.value)}
                   aria-label={`${column_count} key note skin`}
                 >
-                  <option value="">Fallback</option>
                   {compatible_skins.map((skin) => <option key={skin.id} value={skin.id}>{skin.name}</option>)}
                 </select>
               </label>

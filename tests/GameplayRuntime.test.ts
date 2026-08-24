@@ -13,6 +13,7 @@ function createData(note_times: readonly number[]): GameplayData {
       notes: note_times.map((absolute_time) => ({ column: 1, absolute_time, weight: 0 })),
       visual_points: [],
     },
+    note_skin: null as unknown as GameplayData["note_skin"],
   };
 }
 
