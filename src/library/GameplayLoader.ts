@@ -36,16 +36,26 @@ async function fetchAsset(url: string, signal: AbortSignal): Promise<ArrayBuffer
   return response.arrayBuffer();
 }
 
+async function fetchChart(url: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  const source = await response.text();
+  if (!source.trimStart().startsWith("osu file format v")) {
+    throw new Error(`Failed to fetch chart data from ${url}`);
+  }
+  return source;
+}
+
 export class HttpGameplayLoader implements GameplayLoader {
   async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData> {
     const skin_url = location.note_skin_url ?? DEFAULT_NOTE_SKIN_URL;
-    const [audio_data, chart_data] = await Promise.all([
+    const [audio_data, chart_source] = await Promise.all([
       fetchAsset(location.audio_url, signal),
-      fetchAsset(location.chart_url, signal),
+      fetchChart(location.chart_url, signal),
     ]);
     const [audio_buffer, chart] = await Promise.all([
       audio_context.decodeAudioData(audio_data),
-      Promise.resolve(parseOsuChart(new TextDecoder().decode(chart_data))),
+      Promise.resolve(parseOsuChart(chart_source)),
     ]);
     const loaded_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal).catch((error: unknown) => {
       if (skin_url === DEFAULT_NOTE_SKIN_URL) throw error;
