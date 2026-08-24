@@ -1,6 +1,14 @@
 import type { Library } from "../library/Library";
 import type { ChartfileSetView, Chartview, LibraryView, Location } from "../library/views";
 
+export type ChartSortMode = "title" | "artist" | "difficulty" | "duration";
+
+export interface ChartSelectionEntry {
+  chart: Chartview | null;
+  key: string;
+  song: ChartfileSetView;
+}
+
 export interface ChartSelectorSnapshot {
   locations: readonly Location[];
   songs: readonly ChartfileSetView[];
@@ -8,6 +16,7 @@ export interface ChartSelectorSnapshot {
   selected_song_id: string | null;
   selected_chart_id: string | null;
   selected_mode: number | null;
+  sort_mode: ChartSortMode;
   query: string;
   error: string | null;
 }
@@ -24,6 +33,7 @@ export class ChartSelector {
     selected_song_id: null,
     selected_chart_id: null,
     selected_mode: null,
+    sort_mode: "title",
     query: "",
     error: null,
   };
@@ -64,6 +74,11 @@ export class ChartSelector {
     this.ensureSelection();
   }
 
+  setSortMode(sort_mode: ChartSortMode): void {
+    this.update({ sort_mode });
+    this.ensureSelection();
+  }
+
   selectSong(song_id: string): void {
     const song = this.getSongs().find((candidate) => candidate.id === song_id);
     if (!song) return;
@@ -76,13 +91,21 @@ export class ChartSelector {
     this.update({ selected_chart_id: chart_id });
   }
 
+  selectEntry(entry: ChartSelectionEntry): void {
+    if (entry.chart) {
+      this.update({ selected_song_id: entry.song.id, selected_chart_id: entry.chart.id });
+      return;
+    }
+    this.selectSong(entry.song.id);
+  }
+
   scrollLevel(direction: number): void {
-    const songs = this.getFilteredSongs();
-    if (!songs.length) return;
-    const index = songs.findIndex((song) => song.id === this.snapshot.selected_song_id);
-    const next_index = Math.min(Math.max((index < 0 ? 0 : index) + direction, 0), songs.length - 1);
-    const song = songs[next_index];
-    if (song) this.selectSong(song.id);
+    const entries = this.getSelectionEntries();
+    if (!entries.length) return;
+    const index = entries.findIndex((entry) => this.isEntrySelected(entry));
+    const next_index = Math.min(Math.max((index < 0 ? 0 : index) + direction, 0), entries.length - 1);
+    const entry = entries[next_index];
+    if (entry) this.selectEntry(entry);
   }
 
   getSongs(): ChartfileSetView[] {
@@ -101,6 +124,32 @@ export class ChartSelector {
     const query = this.snapshot.query.trim().toLocaleLowerCase();
     if (!query) return songs;
     return songs.filter((song) => `${song.title}\n${song.artist}\n${song.charts.map((chart) => `${chart.name} ${chart.creator}`).join("\n")}`.toLocaleLowerCase().includes(query));
+  }
+
+  getSelectionEntries(): ChartSelectionEntry[] {
+    const songs = this.getFilteredSongs();
+    const { sort_mode } = this.snapshot;
+    if (sort_mode === "title" || sort_mode === "artist") {
+      return [...songs]
+        .sort((left, right) => this.compareSongs(left, right, sort_mode))
+        .map((song) => ({ chart: null, key: `song:${song.id}`, song }));
+    }
+
+    return songs
+      .flatMap((song) => song.charts.map((chart) => ({ chart, key: `chart:${chart.id}`, song })))
+      .sort((left, right) => {
+        const difference = sort_mode === "difficulty"
+          ? left.chart.difficulty - right.chart.difficulty
+          : left.chart.duration_seconds - right.chart.duration_seconds;
+        return difference || this.compareSongs(left.song, right.song, "title") ||
+          left.chart.name.localeCompare(right.chart.name, undefined, { sensitivity: "base" }) ||
+          left.chart.id.localeCompare(right.chart.id);
+      });
+  }
+
+  isEntrySelected(entry: ChartSelectionEntry): boolean {
+    return entry.song.id === this.snapshot.selected_song_id &&
+      (entry.chart === null || entry.chart.id === this.snapshot.selected_chart_id);
   }
 
   getSelectedSong(): ChartfileSetView | undefined {
@@ -123,11 +172,19 @@ export class ChartSelector {
   }
 
   private ensureSelection(force_first = false): void {
-    const songs = this.getFilteredSongs();
-    const current = force_first ? undefined : songs.find((song) => song.id === this.snapshot.selected_song_id);
-    const song = current ?? songs[0];
-    const chart = song?.charts.find((candidate) => candidate.id === this.snapshot.selected_chart_id) ?? song?.charts.at(-1);
-    this.update({ selected_song_id: song?.id ?? null, selected_chart_id: chart?.id ?? null });
+    const entries = this.getSelectionEntries();
+    const current = force_first ? undefined : entries.find((entry) => this.isEntrySelected(entry));
+    const entry = current ?? entries[0];
+    const chart = entry?.chart ?? entry?.song.charts.find((candidate) => candidate.id === this.snapshot.selected_chart_id) ?? entry?.song.charts.at(-1);
+    this.update({ selected_song_id: entry?.song.id ?? null, selected_chart_id: chart?.id ?? null });
+  }
+
+  private compareSongs(left: ChartfileSetView, right: ChartfileSetView, sort_mode: "title" | "artist"): number {
+    const primary = sort_mode === "title" ? "title" : "artist";
+    const secondary = sort_mode === "title" ? "artist" : "title";
+    return left[primary].localeCompare(right[primary], undefined, { sensitivity: "base" }) ||
+      left[secondary].localeCompare(right[secondary], undefined, { sensitivity: "base" }) ||
+      left.id.localeCompare(right.id);
   }
 
   private update(change: Partial<ChartSelectorSnapshot>): void {

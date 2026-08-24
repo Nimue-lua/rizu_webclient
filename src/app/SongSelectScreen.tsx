@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
 import type { Chartview } from "../library/views";
-import type { ChartSelector } from "../select/ChartSelector";
+import type { ChartSelectionEntry, ChartSelector, ChartSortMode } from "../select/ChartSelector";
 import { InputBindingsModal } from "./InputBindingsModal";
 import { GameplayModifiersModal } from "./GameplayModifiersModal";
 import { GamemodeFiltersModal } from "./GamemodeFiltersModal";
@@ -92,6 +92,12 @@ interface SongSelectScreenProps {
 }
 
 const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
+const sort_names: Record<ChartSortMode, string> = {
+  title: "Title",
+  artist: "Artist",
+  difficulty: "Difficulty",
+  duration: "Duration",
+};
 
 function chartMode(chart: Chartview): string {
   const mode = mode_names[chart.mode] ?? "UNKNOWN";
@@ -186,20 +192,35 @@ export function SongSelectScreen({
     return () => observer.disconnect();
   }, []);
 
-  const filtered_songs = chart_selector.getFilteredSongs();
+  const selection_entries = chart_selector.getSelectionEntries();
   const selected_song = chart_selector.getSelectedSong();
   const selected_chart = chart_selector.getSelectedChart();
+  const chart_level_sort = selection.sort_mode === "difficulty" || selection.sort_mode === "duration";
 
   useEffect(() => {
     if (restored_song_scroll_ref.current) return;
     const viewport = viewport_ref.current;
-    const selected_index = filtered_songs.findIndex((song) => song.id === selected_song?.id);
+    const selected_index = selection_entries.findIndex((entry) => chart_selector.isEntrySelected(entry));
     if (!viewport || selected_index < 0 || viewport.clientHeight === 0) return;
     const centered_scroll_top = Math.max(0, selected_index * ROW_HEIGHT + ROW_HEIGHT / 2 - viewport.clientHeight / 2);
     viewport.scrollTop = centered_scroll_top;
     setScrollTop(centered_scroll_top);
     restored_song_scroll_ref.current = true;
-  }, [filtered_songs.length, selected_song?.id, viewport_height]);
+  }, [selection_entries.length, selection.selected_chart_id, selection.selected_song_id, selection.sort_mode, viewport_height]);
+
+  useEffect(() => {
+    if (selection.sort_mode !== "difficulty" && selection.sort_mode !== "duration") return;
+    const viewport = viewport_ref.current;
+    const selected_index = selection_entries.findIndex((entry) => chart_selector.isEntrySelected(entry));
+    if (!viewport || selected_index < 0) return;
+    const row_top = selected_index * ROW_HEIGHT;
+    let next_scroll_top = viewport.scrollTop;
+    if (row_top < viewport.scrollTop) next_scroll_top = row_top;
+    else if (row_top + ROW_HEIGHT > viewport.scrollTop + viewport.clientHeight) next_scroll_top = row_top + ROW_HEIGHT - viewport.clientHeight;
+    if (next_scroll_top === viewport.scrollTop) return;
+    viewport.scrollTop = next_scroll_top;
+    setScrollTop(next_scroll_top);
+  }, [selection.selected_chart_id, selection.sort_mode, selection_entries.length]);
 
   useEffect(() => {
     const strip = difficulty_strip_ref.current;
@@ -248,10 +269,10 @@ export function SongSelectScreen({
 
   const first_index = Math.max(0, Math.floor(scroll_top / ROW_HEIGHT) - OVERSCAN);
   const visible_count = Math.ceil(viewport_height / ROW_HEIGHT) + OVERSCAN * 2;
-  const visible_songs = filtered_songs.slice(first_index, first_index + visible_count);
+  const visible_entries = selection_entries.slice(first_index, first_index + visible_count);
 
-  const selectSong = (song_id: string) => {
-    chart_selector.selectSong(song_id);
+  const selectEntry = (entry: ChartSelectionEntry) => {
+    chart_selector.selectEntry(entry);
   };
 
   const selectLocation = (location_id: number | null) => {
@@ -266,12 +287,17 @@ export function SongSelectScreen({
     if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
   };
 
+  const selectSortMode = (sort_mode: ChartSortMode) => {
+    chart_selector.setSortMode(sort_mode);
+    setScrollTop(0);
+    if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
+  };
+
   const moveSelection = (offset: number) => {
-    if (!filtered_songs.length) return;
-    const selected_index = filtered_songs.findIndex((song) => song.id === selection.selected_song_id);
-    const next_index = Math.min(Math.max((selected_index < 0 ? 0 : selected_index) + offset, 0), filtered_songs.length - 1);
-    const next_song = filtered_songs[next_index];
-    if (!next_song) return;
+    if (!selection_entries.length) return;
+    const selected_index = selection_entries.findIndex((entry) => chart_selector.isEntrySelected(entry));
+    const next_index = Math.min(Math.max((selected_index < 0 ? 0 : selected_index) + offset, 0), selection_entries.length - 1);
+    if (!selection_entries[next_index]) return;
     chart_selector.scrollLevel(offset);
     const viewport = viewport_ref.current;
     if (!viewport) return;
@@ -305,11 +331,11 @@ export function SongSelectScreen({
     audio.src = selected_chart.audio_preview_url;
     void audio.play().catch(() => undefined);
   };
-  const playChart = (chart: Chartview) => {
+  const playChart = (chart: Chartview, song = selected_song) => {
     audio_ref.current?.pause();
     onPlay(chart, loadInputBindings(inputLayout(chart)), {
-      title: selected_song?.title ?? "Unknown title",
-      artist: selected_song?.artist ?? "Unknown artist",
+      title: song?.title ?? "Unknown title",
+      artist: song?.artist ?? "Unknown artist",
     });
   };
   const moveRateDrag = (client_x: number) => {
@@ -336,7 +362,7 @@ export function SongSelectScreen({
 
       <section className="library-toolbar" aria-label="Chart library controls">
          <label className="collection-button"><span><small>COLLECTION</small><strong>{selection.selected_location_id === null ? "All songs" : selection.locations.find((location) => location.id === selection.selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selection.selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{selection.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
-        <button className="toolbar-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>Title</strong></span></button>
+        <label className="toolbar-button sort-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>{sort_names[selection.sort_mode]}</strong></span><select aria-label="Sort charts" value={selection.sort_mode} onChange={(event) => selectSortMode(event.target.value as ChartSortMode)}><option value="title">Title</option><option value="artist">Artist</option><option value="difficulty">Difficulty</option><option value="duration">Duration</option></select></label>
         <button className="toolbar-button" aria-haspopup="dialog" aria-expanded={filters_open} onClick={() => setFiltersOpen(true)}><Icon name="filter" /><span><small>FILTERS</small><strong>{selection.selected_mode === null ? "None" : mode_names[selection.selected_mode]}</strong></span></button>
         <label className="chart-search"><Icon name="search" /><input value={selection.query} onChange={(event) => { chart_selector.setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /></label>
       </section>
@@ -362,16 +388,16 @@ export function SongSelectScreen({
             <div className="chart-difficulty" style={{ "--difficulty-color": difficultyColor(selected_chart?.difficulty ?? 0) } as CSSProperties}><span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em>NPS</em></span><span className="chart-mode">{selected_chart ? chartSummaryMode(selected_chart) : "NO CHART"}</span></div>
             <div className="chart-metadata"><span><Icon name="clock" /><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span><span><Icon name="music" /><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span><span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><Icon name="metronome" /><b>{Math.round(selected_chart?.bpm_avg ?? 0)} BPM</b></span><span><strong>LN</strong><b className="accent">{Math.round((selected_chart?.long_note_ratio ?? 0) * 100)}%</b></span><span><Icon name="file" /><b>{selected_chart?.format.toUpperCase() ?? "-"}</b></span></div>
           </section>
-          <section className="chart-browser" aria-label="Chart browser">
-            <div className="difficulty-strip"><button aria-label="Previous difficulty" onClick={() => selectDifficulty(-1)}><Icon name="chevron-left" /></button><div ref={difficulty_strip_ref}>
+          <section className={`chart-browser${chart_level_sort ? " chart-level-browser" : ""}`} aria-label="Chart browser">
+            {!chart_level_sort && <div className="difficulty-strip"><button aria-label="Previous difficulty" onClick={() => selectDifficulty(-1)}><Icon name="chevron-left" /></button><div ref={difficulty_strip_ref}>
               {selected_song?.charts.map((chart) => <button ref={chart.id === selected_chart?.id ? selected_difficulty_ref : undefined} className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => chart_selector.selectChart(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
-            </div><button aria-label="Next difficulty" onClick={() => selectDifficulty(1)}><Icon name="chevron-right" /></button></div>
+            </div><button aria-label="Next difficulty" onClick={() => selectDifficulty(1)}><Icon name="chevron-right" /></button></div>}
             {selection.error ? <p className="song-library-error">{selection.error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
               if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
               if (event.key === "Enter" && selected_chart) playChart(selected_chart);
-            }}><div className="chart-list-space" style={{ height: filtered_songs.length * ROW_HEIGHT }}>
-               {visible_songs.map((song, offset) => { const hardest_chart = song.charts.at(-1); return <button aria-selected={song.id === selection.selected_song_id} className={`chart-row${song.id === selection.selected_song_id ? " selected" : ""}`} key={song.id} onClick={() => selectSong(song.id)} onDoubleClick={() => hardest_chart && playChart(hardest_chart)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(hardest_chart?.difficulty ?? 0) } as CSSProperties}><span><strong>{song.title}</strong><small>{song.artist}</small></span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
-            </div>{filtered_songs.length === 0 && <p className="empty-library">{selection.query ? `No songs match “${selection.query}”` : "No songs in this collection"}</p>}</div>}
+            }}><div className="chart-list-space" style={{ height: selection_entries.length * ROW_HEIGHT }}>
+               {visible_entries.map((entry, offset) => { const chart = entry.chart ?? entry.song.charts.at(-1); const selected = chart_selector.isEntrySelected(entry); return <button aria-selected={selected} className={`chart-row${entry.chart ? " chart-entry-row" : ""}${selected ? " selected" : ""}`} key={entry.key} onClick={() => selectEntry(entry)} onDoubleClick={() => chart && playChart(chart, entry.song)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(chart?.difficulty ?? 0) } as CSSProperties}><span className="chart-row-copy">{entry.chart ? <><strong>{entry.song.title} <span className="chart-row-artist"><span className="chart-row-separator">//</span> {entry.song.artist}</span></strong><em>{entry.chart.name}{selection.sort_mode === "duration" && ` // ${formatDuration(entry.chart.duration_seconds)}`}</em></> : <><strong>{entry.song.title}</strong><small>{entry.song.artist}</small></>}</span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
+            </div>{selection_entries.length === 0 && <p className="empty-library">{selection.query ? `No songs match “${selection.query}”` : "No songs in this collection"}</p>}</div>}
           </section>
         </div>
       </section>
