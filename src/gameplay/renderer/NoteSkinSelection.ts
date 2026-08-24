@@ -9,11 +9,7 @@ export interface NoteSkinOption {
 export type NoteSkinSelections = Readonly<Record<string, string>>;
 
 export const note_skin_options: readonly NoteSkinOption[] = [
-  { id: "FridayNightFunkin", name: "Friday Night Funkin", mode: "mania", columnCount: null, url: "/skins/skin3.osk" },
-  { id: "Ralsei", name: "Ralsei", mode: "mania", columnCount: null, url: "/skins/skin.osk" },
-  { id: "FleetSnowfluffAemeath", name: "Fleet Snowfluff - Aemeath", mode: "mania", columnCount: null, url: "/skins/skin2.osk" },
-  { id: "skin4", name: "skin4", mode: "mania", columnCount: null, url: "/skins/skin4.osk" },
-  { id: "skin5", name: "skin5", mode: "mania", columnCount: null, url: "/skins/skin5.osk" },
+  { id: "skin1", name: "skin1", mode: "mania", columnCount: null, url: "/skins/skin1.osk" },
 ];
 
 const STORAGE_KEY = "rizu.note-skins";

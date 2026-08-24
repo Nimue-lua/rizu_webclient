@@ -128,7 +128,7 @@ export class WebGlGameplayRenderer {
     gl.uniform2f(this.viewport_size, layout.width, layout.height);
     this.vertices = [];
     this.playfield.draw(layout, notes, scroll_speed, pressed_columns,
-      (x, y, width, height, color, frame) => this.addQuad(x, y, width, height, color, frame));
+      (x, y, width, height, color, frame, flip_y) => this.addQuad(x, y, width, height, color, frame, flip_y));
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -143,15 +143,17 @@ export class WebGlGameplayRenderer {
   }
 
   private addQuad(x: number, y: number, width: number, height: number,
-    color: readonly [number, number, number, number], frame: NoteSkinFrame): void {
+    color: readonly [number, number, number, number], frame: NoteSkinFrame, flip_y = false): void {
     if (width <= 0 || height <= 0) return;
     const image = this.skin.image;
     const u0 = frame.frame.x / image.width;
     const v0 = frame.frame.y / image.height;
     const u1 = (frame.frame.x + frame.frame.w) / image.width;
     const v1 = (frame.frame.y + frame.frame.h) / image.height;
-    for (const [px, py, u, v] of [[x, y, u0, v0], [x + width, y, u1, v0], [x, y + height, u0, v1],
-      [x, y + height, u0, v1], [x + width, y, u1, v0], [x + width, y + height, u1, v1]]) {
+    const top_v = flip_y ? v1 : v0;
+    const bottom_v = flip_y ? v0 : v1;
+    for (const [px, py, u, v] of [[x, y, u0, top_v], [x + width, y, u1, top_v], [x, y + height, u0, bottom_v],
+      [x, y + height, u0, bottom_v], [x + width, y, u1, top_v], [x + width, y + height, u1, bottom_v]]) {
       this.vertices.push(px, py, u, v, ...color);
     }
   }

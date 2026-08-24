@@ -46,6 +46,19 @@ function numberValue(section: SkinIniSection, key: string, fallback: number): nu
   return Number.isFinite(value) ? value : fallback;
 }
 
+function booleanValue(section: SkinIniSection, key: string): boolean | undefined {
+  const value = section[key];
+  if (value === undefined || value === "") return undefined;
+  return value === "1" || value.toLowerCase() === "true";
+}
+
+function flipWhenUpsideDown(section: SkinIniSection, kind: "Key" | "Note", column: number,
+  suffix: string, fallback: boolean, upside_down: boolean): boolean {
+  if (!upside_down) return false;
+  return booleanValue(section, `${kind}FlipWhenUpsideDown${column}${suffix}`) ??
+    booleanValue(section, `${kind}FlipWhenUpsideDown${suffix}`) ?? fallback;
+}
+
 function numberList(section: SkinIniSection, key: string, length: number, fallback: number): number[] {
   const values = section[key]?.split(",") ?? [];
   return Array.from({ length }, (_, index) => {
@@ -77,6 +90,12 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
   const section = ini.mania.find((candidate) => Number(candidate.Keys) === column_count);
   if (!section) throw new Error(`Skin does not contain a ${column_count}K [Mania] section`);
   const special_style = numberValue(section, "SpecialStyle", 0);
+  const upsideDown = numberValue(section, "UpsideDown", 0) === 1;
+  const version_value = ini.sections.General?.Version;
+  const skin_version = version_value?.toLowerCase() === "latest" ? Infinity : Number(version_value ?? 1);
+  const noteFlip = (column: number, suffix = "", fallback = true) =>
+    skin_version >= 2.5 && flipWhenUpsideDown(section, "Note", column, suffix, fallback, upsideDown);
+  const shortNoteFlipY = Array.from({ length: column_count }, (_, column) => noteFlip(column));
   const columnWidths = numberList(section, "ColumnWidth", column_count, 30);
   const columnSpacing = numberList(section, "ColumnSpacing", Math.max(0, column_count - 1), 0)
     .map((spacing, index) => Math.max(spacing, -columnWidths[index + 1]!));
@@ -93,12 +112,19 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
     hitPosition: numberValue(section, "HitPosition", 402),
     comboPosition: numberValue(section, "ComboPosition", 111),
     judgePosition: numberValue(section, "ScorePosition", 325),
+    upsideDown,
     shortNotes: spriteList((column) => `NoteImage${column}`, ""),
+    shortNoteFlipY,
     longNoteHeads: spriteList((column) => `NoteImage${column}H`, "H"),
+    longNoteHeadFlipY: shortNoteFlipY.map((flip, column) => noteFlip(column, "H", flip)),
     longNoteBodies: spriteList((column) => `NoteImage${column}L`, "L"),
+    longNoteBodyFlipY: Array.from({ length: column_count }, (_, column) => noteFlip(column, "L")),
     longNoteTails: spriteList((column) => `NoteImage${column}T`, "T"),
+    longNoteTailFlipY: Array.from({ length: column_count }, (_, column) => !noteFlip(column, "T")),
     receptorReleased: spriteList((column) => `KeyImage${column}`, ""),
     receptorPressed: spriteList((column) => `KeyImage${column}D`, "D"),
+    receptorFlipY: Array.from({ length: column_count }, (_, column) =>
+      flipWhenUpsideDown(section, "Key", column, "", true, upsideDown)),
   };
 }
 
@@ -133,10 +159,10 @@ function normalizedSpriteName(name: string): string {
   return name.replace(/\\/g, "/").replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
 }
 
-export function resolveOsuManiaTail(tail_name: string, configured_head: string | undefined, resolved_head: string,
+export function resolveOsuManiaTail(tail_name: string, resolved_head: string,
   default_tail: string, skin_sprites: ReadonlySet<string>, default_sprites: ReadonlySet<string>): string {
   if (skin_sprites.has(normalizedSpriteName(tail_name))) return tail_name;
-  if (configured_head && skin_sprites.has(normalizedSpriteName(configured_head))) return resolved_head;
+  if (skin_sprites.has(normalizedSpriteName(resolved_head))) return resolved_head;
   return default_sprites.has(normalizedSpriteName(default_tail)) ? default_tail : resolved_head;
 }
 
@@ -172,7 +198,7 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
   const shortNotes = config.shortNotes.map((name, column) => resolve(name, `mania-note${types[column]}`));
   const longNoteHeads = config.longNoteHeads.map((name, column) => resolve(name, shortNotes[column]!));
   const longNoteTails = config.longNoteTails.map((name, column) => resolveOsuManiaTail(
-    name, section[`NoteImage${column}H`], longNoteHeads[column]!, `mania-note${types[column]}T`,
+    name, longNoteHeads[column]!, `mania-note${types[column]}T`,
     new Set(available.keys()), new Set(defaults.keys()),
   ));
   const resolved_config: NoteSkinConfig = {

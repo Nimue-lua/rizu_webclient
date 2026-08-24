@@ -12,12 +12,18 @@ export interface NoteSkinConfig {
   hitPosition: number;
   comboPosition: number;
   judgePosition: number;
+  upsideDown: boolean;
   shortNotes: readonly string[];
+  shortNoteFlipY: readonly boolean[];
   longNoteHeads: readonly string[];
+  longNoteHeadFlipY: readonly boolean[];
   longNoteBodies: readonly string[];
+  longNoteBodyFlipY: readonly boolean[];
   longNoteTails: readonly string[];
+  longNoteTailFlipY: readonly boolean[];
   receptorReleased: readonly string[];
   receptorPressed: readonly string[];
+  receptorFlipY: readonly boolean[];
 }
 
 export interface NoteSkinFrame {

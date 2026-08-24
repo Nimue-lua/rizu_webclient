@@ -28,6 +28,7 @@ test("maps the matching osu mania section to playfield geometry and sprites", ()
   assert.equal(config.comboPosition, 100);
   assert.deepEqual(config.receptorReleased, ["keys/one", "keys/two", "keys/three", "keys/four"]);
   assert.deepEqual(config.shortNotes, ["notes/one", "notes/two", "notes/three", "notes/four"]);
+  assert.deepEqual(config.longNoteTailFlipY, [true, true, true, true]);
 });
 
 test("uses native osu defaults when sprite mappings are absent", () => {
@@ -58,7 +59,25 @@ test("reads osu column spacing partially and ignores extra values", () => {
 
 test("uses a custom LN head before the default tail when the configured tail is missing", () => {
   assert.equal(resolveOsuManiaTail(
-    "mania-note2T", "Notes\\grayln", "Notes/grayln", "mania-note2T",
+    "mania-note2T", "Notes/grayln", "mania-note2T",
     new Set(["notes/grayln"]), new Set(["mania-note2t"]),
   ), "Notes/grayln");
+});
+
+test("uses a generated LN head from the skin before the default tail", () => {
+  assert.equal(resolveOsuManiaTail(
+    "mania-note1T", "mania-note1H", "mania-note1T",
+    new Set(["mania-note1h"]), new Set(["mania-note1t"]),
+  ), "mania-note1H");
+});
+
+test("parses UpsideDown and per-part texture flip overrides", () => {
+  const config = parseOsuManiaConfig(parseSkinIni(source
+    .replace("Name: Test skin", "Name: Test skin\nVersion: 2.7")
+    .replace("HitPosition: 445", "HitPosition: 445\nUpsideDown: 1\nNoteFlipWhenUpsideDownT: 0\nNoteFlipWhenUpsideDown0H: 0")), 4);
+  assert.equal(config.upsideDown, true);
+  assert.deepEqual(config.shortNoteFlipY, [true, true, true, true]);
+  assert.deepEqual(config.longNoteHeadFlipY, [false, true, true, true]);
+  assert.deepEqual(config.longNoteTailFlipY, [true, true, true, true]);
+  assert.deepEqual(config.receptorFlipY, [true, true, true, true]);
 });
