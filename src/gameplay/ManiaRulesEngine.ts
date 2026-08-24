@@ -1,7 +1,8 @@
 import type { ManiaChart, ManiaNoteEvent } from "../chart/Chart";
 import { interpolateVisualPoint } from "../chart/VisualTimeline";
 import { NoteState, type LogicEvent } from "./LogicEvent";
-import { ScoreEngine, type ScoreResult } from "./scoring/ScoreEngine";
+import { ScoreEngine } from "./scoring/ScoreEngine";
+import type { ScoreResult } from "./scoring/ScoreResult";
 import { BaseComboScore } from "./scoring/systems/BaseComboScore";
 import { OsuManiaV2Score } from "./scoring/systems/OsuManiaV2Score";
 import { createOsuManiaV2TimingValues } from "./timing/OsuManiaV2Timings";

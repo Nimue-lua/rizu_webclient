@@ -23,20 +23,18 @@ interface GameplayDataBase {
 }
 
 export interface ManiaGameplayData extends GameplayDataBase {
+  mode: "mania";
   chart: ManiaChart;
   note_skin: NoteSkin;
 }
 
 export interface OsuGameplayData extends GameplayDataBase {
+  mode: "osu";
   chart: OsuChart;
   note_skin: OsuStandardSkin;
 }
 
 export type GameplayData = ManiaGameplayData | OsuGameplayData;
-
-export function isOsuGameplayData(data: GameplayData): data is OsuGameplayData {
-  return data.chart.mode === "osu";
-}
 
 export interface GameplayLoader {
   load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData>;
@@ -72,9 +70,9 @@ export class HttpGameplayLoader implements GameplayLoader {
     ]);
     if (chart.mode === "osu") {
       const note_skin = await loadOsuStandardSkinUrl(skin_url, signal);
-      return { audio_buffer, audio_context, chart, note_skin };
+      return { mode: "osu", audio_buffer, audio_context, chart, note_skin };
     }
     const note_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal);
-    return { audio_buffer, audio_context, chart, note_skin };
+    return { mode: "mania", audio_buffer, audio_context, chart, note_skin };
   }
 }

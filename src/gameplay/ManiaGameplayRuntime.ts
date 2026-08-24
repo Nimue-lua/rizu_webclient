@@ -1,6 +1,7 @@
 import type { ManiaGameplayData } from "../library/GameplayLoader";
 import { ManiaRulesEngine, type ManiaHitRegistration, type ManiaVisualNote } from "./ManiaRulesEngine";
-import type { ScoreResult } from "./scoring/ScoreEngine";
+import type { ScoreResult } from "./scoring/ScoreResult";
+import type { GameplaySession, ManiaPointerInput } from "./GameplaySession";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 import { SpringValue } from "./SpringValue";
 import type { ReplayBase } from "../replay/ReplayBase";
@@ -33,7 +34,7 @@ function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
   };
 }
 
-export class ManiaGameplayRuntime {
+export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput {
   private readonly data: ManiaGameplayData;
   private readonly scroll_speed: number;
   private readonly music_rate: number;

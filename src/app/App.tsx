@@ -9,7 +9,7 @@ import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
-import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
+import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
 import { ReplayBase } from "../replay/ReplayBase";
 import {

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Clock3, Metronome } from "lucide-react";
-import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
+import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { JudgeSegmentsCanvas } from "./JudgeSegmentsCanvas";
 
 const GRADE_COLORS: Readonly<Record<string, string>> = {

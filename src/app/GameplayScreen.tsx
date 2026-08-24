@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { isOsuGameplayData, type GameplayData } from "../library/GameplayLoader";
-import { ManiaGameplayRuntime } from "../gameplay/ManiaGameplayRuntime";
-import { OsuGameplayRuntime } from "../gameplay/OsuGameplayRuntime";
+import type { GameplayData } from "../library/GameplayLoader";
 import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
-import type { ScoreResult } from "../gameplay/scoring/ScoreEngine";
+import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import type { ReplayBase } from "../replay/ReplayBase";
+import type { GameplaySession, ManiaPointerInput } from "../gameplay/GameplaySession";
+import { createGameplaySession } from "../gameplay/createGameplaySession";
+import { ManiaTouchControls } from "./ManiaTouchControls";
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -19,53 +20,30 @@ interface GameplayScreenProps {
 
 export function GameplayScreen({ assets, master_volume, music_offset, scroll_speed, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
-  const runtime_ref = useRef<{ start(): void; destroy(): void; pressPointer?(pointer_id: number, column: number, performance_time: number): void;
-    releasePointer?(pointer_id: number, performance_time: number): void } | null>(null);
+  const session_ref = useRef<GameplaySession | null>(null);
+  const mania_input_ref = useRef<ManiaPointerInput | null>(null);
 
   useEffect(() => {
     const canvas = canvas_ref.current;
     if (!canvas) return;
 
-    const runtime = isOsuGameplayData(assets)
-      ? new OsuGameplayRuntime(canvas, assets, master_volume, music_offset, replay_base, onFinish)
-      : new ManiaGameplayRuntime(canvas, assets, master_volume, music_offset, scroll_speed, replay_base,
-        input_bindings, hit_registration, onFinish);
-    runtime_ref.current = runtime;
-    runtime.start();
+    const binding = createGameplaySession({ canvas, data: assets, master_volume, music_offset, scroll_speed,
+      replay_base, input_bindings, hit_registration, finish: onFinish });
+    session_ref.current = binding.session;
+    mania_input_ref.current = binding.mode === "mania" ? binding.pointer_input : null;
+    binding.session.start();
 
     return () => {
-      runtime_ref.current = null;
-      runtime.destroy();
+      session_ref.current = null;
+      mania_input_ref.current = null;
+      binding.session.destroy();
     };
   }, [assets, hit_registration, input_bindings, master_volume, music_offset, onFinish, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">
       <canvas ref={canvas_ref} />
-      {assets.chart.mode === "mania" && <div className="gameplay-touch-zones" aria-label="Gameplay touch controls">
-        {Array.from({ length: assets.chart.column_count }, (_, column) => (
-          <button
-            key={column}
-            type="button"
-            tabIndex={-1}
-            aria-label={`Column ${column + 1}`}
-            onContextMenu={(event) => event.preventDefault()}
-            onPointerDown={(event) => {
-              if (event.pointerType === "mouse") return;
-              event.preventDefault();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              runtime_ref.current?.pressPointer?.(event.pointerId, column, event.timeStamp);
-            }}
-            onPointerUp={(event) => {
-              if (event.pointerType === "mouse") return;
-              event.preventDefault();
-              runtime_ref.current?.releasePointer?.(event.pointerId, event.timeStamp);
-            }}
-            onPointerCancel={(event) => runtime_ref.current?.releasePointer?.(event.pointerId, event.timeStamp)}
-            onLostPointerCapture={(event) => runtime_ref.current?.releasePointer?.(event.pointerId, event.timeStamp)}
-          />
-        ))}
-      </div>}
+      {assets.mode === "mania" && <ManiaTouchControls column_count={assets.chart.column_count} input_ref={mania_input_ref} />}
     </main>
   );
 }

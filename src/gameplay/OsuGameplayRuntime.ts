@@ -1,12 +1,13 @@
 import type { OsuGameplayData } from "../library/GameplayLoader";
 import type { ReplayBase } from "../replay/ReplayBase";
-import type { ScoreResult } from "./scoring/ScoreEngine";
+import type { ScoreResult } from "./scoring/ScoreResult";
+import type { GameplaySession } from "./GameplaySession";
 import { AudioGameplayClock } from "./AudioGameplayClock";
 import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
 
-export class OsuGameplayRuntime {
+export class OsuGameplayRuntime implements GameplaySession {
   private readonly renderer: WebGlGameplayRenderer;
   private readonly playback: WebAudioPlayback;
   private readonly clock: AudioGameplayClock;

@@ -3,17 +3,7 @@ import { isAccuracySource, isComboSource, isGradeSource, isJudgesSource, isScore
   type IAccuracySource, type IComboSource, type IGradeSource, type IJudgesSource,
   type IScoreSource } from "./ScoreSources";
 import type { ScoreSystem } from "./ScoreSystem";
-
-export interface ScoreResult {
-  score?: number;
-  accuracy?: number;
-  grade?: string;
-  combo?: number;
-  max_combo?: number;
-  judges?: Readonly<Record<string, number>>;
-  judge_names?: readonly string[];
-  last_judge?: string | null;
-}
+import type { ScoreResult } from "./ScoreResult";
 
 export class ScoreEngine {
   private score_source?: IScoreSource;

@@ -4,11 +4,12 @@ import type { GameplayData, ManiaGameplayData } from "../src/library/GameplayLoa
 import { getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/GameplayTiming";
 import { ManiaGameplayRuntime, type ManiaGameplayRuntimeDependencies } from "../src/gameplay/ManiaGameplayRuntime";
 import { ReplayBase } from "../src/replay/ReplayBase";
-import type { ScoreResult } from "../src/gameplay/scoring/ScoreEngine";
+import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
 import type { ManiaNoteEvent } from "../src/chart/Chart";
 
 function createData(note_times: readonly number[]): GameplayData {
   return {
+    mode: "mania",
     audio_buffer: null as unknown as AudioBuffer,
     audio_context: null as unknown as AudioContext,
     chart: {
@@ -149,6 +150,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: numbe
     resume: async () => undefined,
   } as unknown as AudioContext;
   const data: ManiaGameplayData = {
+    mode: "mania",
     audio_buffer: {} as AudioBuffer,
     audio_context,
     chart: {
