@@ -45,12 +45,16 @@ export class RhythmEngine {
   private readonly hit_registration: HitRegistration;
   private readonly music_rate: number;
   private readonly constant_scroll: boolean;
+  private readonly head_press_times: Float64Array;
+  private readonly head_release_times: Float64Array;
 
   constructor(chart: Chart, hit_registration: HitRegistration = "earliest", music_rate = 1,
     constant_scroll = false, tap_only = false) {
     this.chart = chart;
     this.linked_notes = this.linkNotes(chart.notes, tap_only);
     this.note_states = new Uint8Array(this.linked_notes.length);
+    this.head_press_times = new Float64Array(this.linked_notes.length).fill(Number.NaN);
+    this.head_release_times = new Float64Array(this.linked_notes.length).fill(Number.NaN);
     this.lane_notes = Array.from({ length: chart.column_count }, () => []);
     this.linked_notes.forEach((note, index) => this.lane_notes[note.start.column - 1]?.push(index));
     this.timings = createOsuManiaV2TimingValues(chart.overall_difficulty ?? 5);
@@ -72,17 +76,26 @@ export class RhythmEngine {
       const note = this.linked_notes[index]!;
       const state = this.note_states[index] as NoteState;
       if (note.end === undefined && !isActive(state, false)) continue;
-      if (state === NoteState.EndPassed) continue;
-      const start_point = current_point && interpolateVisualPoint(this.chart.visual_points, note.start.absolute_time);
-      const end_point = current_point && note.end && interpolateVisualPoint(this.chart.visual_points, note.end.absolute_time);
-      let start_dt = start_point && current_point
-        ? (start_point.visual_time - current_point.visual_time) * current_point.global_speed * start_point.local_speed
-        : note.start.absolute_time - song_time;
-      const end_dt = note.end && (end_point && current_point
-        ? (end_point.visual_time - current_point.visual_time) * current_point.global_speed * end_point.local_speed
-        : note.end.absolute_time - song_time);
+      let start_time = note.start.absolute_time;
+      if (note.end && (state === NoteState.StartPassedPressed || state === NoteState.EndPassed)) {
+        const press_time = this.head_press_times[index];
+        const press_delay = Math.max((Number.isNaN(press_time) ? song_time : press_time) - start_time, 0);
+        const elapsed = song_time - (Number.isNaN(press_time) ? song_time : press_time);
+        start_time = Math.min(note.end.absolute_time,
+          Math.max(start_time, song_time + Math.min(elapsed - press_delay, 0)));
+      } else if (state === NoteState.StartMissed || state === NoteState.EndMissed) {
+        const release_time = this.head_release_times[index];
+        if (!Number.isNaN(release_time)) start_time = release_time;
+      }
+      const getDt = (absolute_time: number): number => {
+        if (!current_point) return absolute_time - song_time;
+        const point = interpolateVisualPoint(this.chart.visual_points, absolute_time);
+        return (point.visual_time - current_point.visual_time) * current_point.global_speed * point.local_speed;
+      };
+      const start_dt = getDt(start_time);
+      const end_dt = note.end && getDt(note.end.absolute_time);
       if ((end_dt ?? start_dt) < -past_window || start_dt > future_window) continue;
-      if (state === NoteState.StartPassedPressed) start_dt = Math.max(0, start_dt);
+      if (end_dt !== undefined && start_dt >= end_dt) continue;
       this.visible_notes.push({
         index, column: note.start.column, state, type: note.end === undefined ? "short" : "long", start_dt, end_dt,
       });
@@ -189,6 +202,13 @@ export class RhythmEngine {
 
   private switchState(index: number, new_state: NoteState, song_time: number, window: TimingWindow, target_time: number): void {
     const old_state = this.note_states[index] as NoteState;
+    if (new_state === NoteState.StartPassedPressed) this.head_press_times[index] = song_time;
+    if (old_state === NoteState.StartPassedPressed &&
+      (new_state === NoteState.StartMissed || new_state === NoteState.EndMissed)) {
+      this.head_release_times[index] = song_time;
+    } else if (new_state === NoteState.StartMissedPressed) {
+      this.head_release_times[index] = Number.NaN;
+    }
     this.note_states[index] = new_state;
     const event: LogicEvent = {
       index,

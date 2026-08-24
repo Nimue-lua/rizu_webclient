@@ -70,6 +70,52 @@ test("holds stay active after the head and score their release", () => {
   assert.equal(engine.score.accuracy, 1);
 });
 
+test("held long notes collapse at the receptor instead of passing it", () => {
+  const engine = new RhythmEngine(createChart([
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 2, weight: -1 },
+  ]));
+  engine.press(0, 1);
+  engine.update(1.9, 2, 2);
+  assertClose(engine.visible_notes[0]?.start_dt, 0);
+  assertClose(engine.visible_notes[0]?.end_dt, 0.1);
+
+  engine.update(2.1, 2, 2);
+  assert.equal(engine.note_states[0], NoteState.StartPassedPressed);
+  assert.equal(engine.visible_notes.length, 0);
+});
+
+test("released long notes move away from the receptor without teleporting", () => {
+  const engine = new RhythmEngine(createChart([
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 10, weight: -1 },
+  ]), "earliest", 1, true);
+  engine.press(0, 1);
+  engine.update(3, 10, 10);
+  assertClose(engine.visible_notes[0]?.start_dt, 0);
+
+  engine.release(0, 3);
+  engine.update(3, 10, 10);
+  assert.equal(engine.note_states[0], NoteState.StartMissed);
+  assertClose(engine.visible_notes[0]?.start_dt, 0);
+  engine.update(3.25, 10, 10);
+  assertClose(engine.visible_notes[0]?.start_dt, -0.25);
+});
+
+test("late hold presses reach the receptor smoothly like the native client", () => {
+  const engine = new RhythmEngine(createChart([
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 2, weight: -1 },
+  ]), "earliest", 1, true);
+  engine.press(0, 1.1);
+  engine.update(1.1, 2, 2);
+  assertClose(engine.visible_notes[0]?.start_dt, -0.1);
+  engine.update(1.15, 2, 2);
+  assertClose(engine.visible_notes[0]?.start_dt, -0.05);
+  engine.update(1.2, 2, 2);
+  assertClose(engine.visible_notes[0]?.start_dt, 0);
+});
+
 test("no long notes converts hold heads to taps and ignores tails", () => {
   const engine = new RhythmEngine(createChart([
     { column: 1, absolute_time: 1, weight: 1 },
