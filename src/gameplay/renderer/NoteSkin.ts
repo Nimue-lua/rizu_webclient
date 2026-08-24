@@ -28,6 +28,11 @@ export interface NoteSkinConfig {
   stageLeft?: string;
   stageRight?: string;
   stageBottom?: string;
+  judgments: Readonly<Record<string, readonly string[]>>;
+  scoreGlyphs: Readonly<Record<string, string>>;
+  comboGlyphs: Readonly<Record<string, string>>;
+  scoreOverlap: number;
+  comboOverlap: number;
 }
 
 export interface NoteSkinSprite {

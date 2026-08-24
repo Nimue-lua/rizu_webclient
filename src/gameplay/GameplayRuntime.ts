@@ -25,9 +25,6 @@ export function applyMusicOffset(song_time: number, music_rate: number, music_of
 }
 
 export class GameplayRuntime {
-  private readonly accuracy_element: HTMLElement;
-  private readonly judge_element: HTMLElement;
-  private readonly combo_element: HTMLElement;
   private readonly data: GameplayData;
   private readonly master_volume: number;
   private readonly music_offset: number;
@@ -47,18 +44,13 @@ export class GameplayRuntime {
   private audio_start_time = 0;
   private finished = false;
   private readonly displayed_accuracy = new SpringValue(0);
-  private readonly combo_offset = new SpringValue(0, 14);
   private previous_frame_time: number | null = null;
-  private previous_combo = 0;
   private previous_judges_total = 0;
+  private judgment_time = -Infinity;
 
-  constructor(canvas: HTMLCanvasElement, accuracy_element: HTMLElement, judge_element: HTMLElement,
-    combo_element: HTMLElement, data: GameplayData, master_volume: number, music_offset: number,
+  constructor(canvas: HTMLCanvasElement, data: GameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: HitRegistration,
     finish: (score: ScoreResult) => void) {
-    this.accuracy_element = accuracy_element;
-    this.judge_element = judge_element;
-    this.combo_element = combo_element;
     this.data = data;
     this.master_volume = master_volume;
     this.music_offset = music_offset;
@@ -67,12 +59,6 @@ export class GameplayRuntime {
     this.finish = finish;
     this.rhythm_engine = new RhythmEngine(data.chart, hit_registration, this.music_rate, replay_base.const, replay_base.tap_only);
     this.renderer = new WebGlGameplayRenderer(canvas, data.note_skin);
-    if (this.renderer.judgePosition !== undefined) {
-      this.judge_element.style.top = `${this.renderer.judgePosition / 480 * 100}%`;
-    }
-    if (this.renderer.comboPosition !== undefined) {
-      this.combo_element.style.top = `${this.renderer.comboPosition / 480 * 100}%`;
-    }
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
     this.pressed_columns = new Uint16Array(data.chart.column_count);
   }
@@ -187,21 +173,20 @@ export class GameplayRuntime {
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
     const song_time = this.getSongTime(timestamp);
     this.rhythm_engine.update(song_time, range.past, range.future);
-    this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, visual_scroll_speed, this.pressed_columns);
     const score = this.rhythm_engine.score;
     const target_accuracy = (score.accuracy ?? 0) * 100;
-    this.accuracy_element.textContent = `${this.displayed_accuracy.update(target_accuracy, delta_time).toFixed(2)}%`;
+    const displayed_accuracy = this.displayed_accuracy.update(target_accuracy, delta_time);
     const judges_total = Object.values(score.judges ?? {}).reduce((total, count) => total + count, 0);
     if (judges_total !== this.previous_judges_total) {
-      this.judge_element.textContent = score.last_judge ?? "";
-      this.judge_element.dataset.judge = score.last_judge ?? "";
+      this.judgment_time = timestamp / 1000;
       this.previous_judges_total = judges_total;
     }
-    const combo = score.combo ?? 0;
-    if (combo > this.previous_combo) this.combo_offset.teleport(-10);
-    this.combo_element.textContent = `${combo}x`;
-    this.combo_element.style.transform = `translate(-50%, ${this.combo_offset.update(0, delta_time).toFixed(2)}px)`;
-    this.previous_combo = combo;
+    this.renderer.draw(this.data.chart.column_count, this.rhythm_engine.visible_notes, visual_scroll_speed, this.pressed_columns, {
+      combo: score.combo ?? 0,
+      accuracy: displayed_accuracy,
+      judgment: score.last_judge ?? null,
+      judgmentAge: timestamp / 1000 - this.judgment_time,
+    });
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

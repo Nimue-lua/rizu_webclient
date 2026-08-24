@@ -13,6 +13,10 @@ const DEFAULT_SPRITE_NAMES = [
   "mania-note1", "mania-note1L", "mania-note1T", "mania-note2", "mania-note2L", "mania-note2T",
   "mania-noteS", "mania-noteSL", "mania-noteST",
   "mania-stage-hint", "mania-stage-left", "mania-stage-right",
+  "mania-hit0", "mania-hit50", "mania-hit100", "mania-hit200", "mania-hit300", "mania-hit300g",
+  "mania-hit300g-0",
+  "score-0", "score-1", "score-2", "score-3", "score-4", "score-5", "score-6", "score-7", "score-8", "score-9",
+  "score-dot", "score-percent",
 ] as const;
 
 export function parseSkinIni(source: string): SkinIni {
@@ -130,6 +134,11 @@ export function parseOsuManiaConfig(ini: SkinIni, column_count: number): NoteSki
     stageLeft: section.StageLeft?.replace(/\\/g, "/") ?? "mania-stage-left",
     stageRight: section.StageRight?.replace(/\\/g, "/") ?? "mania-stage-right",
     stageBottom: section.StageBottom?.replace(/\\/g, "/") ?? "mania-stage-bottom",
+    judgments: {},
+    scoreGlyphs: {},
+    comboGlyphs: {},
+    scoreOverlap: numberValue(ini.sections.Fonts ?? {}, "ScoreOverlap", 0),
+    comboOverlap: numberValue(ini.sections.Fonts ?? {}, "ComboOverlap", 0),
   };
 }
 
@@ -218,12 +227,17 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     stageLeft: resolveOptional(config.stageLeft, "mania-stage-left", available, defaults),
     stageRight: resolveOptional(config.stageRight, "mania-stage-right", available, defaults),
     stageBottom: resolveOptional(config.stageBottom, "mania-stage-bottom", available, defaults),
+    judgments: resolveJudgments(section, available, defaults),
+    scoreGlyphs: resolveFontGlyphs(ini.sections.Fonts?.ScorePrefix ?? "score", available, defaults),
+    comboGlyphs: resolveFontGlyphs(ini.sections.Fonts?.ComboPrefix ?? "score", available, defaults),
   };
   const names = [...new Set([
     ...resolved_config.shortNotes, ...resolved_config.longNoteHeads, ...resolved_config.longNoteBodies, ...resolved_config.longNoteTails,
     ...resolved_config.receptorReleased, ...resolved_config.receptorPressed,
     ...[resolved_config.stageHint, resolved_config.stageLeft, resolved_config.stageRight, resolved_config.stageBottom]
       .filter((name): name is string => name !== undefined),
+    ...Object.values(resolved_config.judgments).flat(),
+    ...Object.values(resolved_config.scoreGlyphs), ...Object.values(resolved_config.comboGlyphs),
   ])];
   const decoded = await Promise.all(names.map(async (name) => {
     const normalized = name.replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
@@ -248,6 +262,41 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     };
   }
   return { config: resolved_config, sprites };
+}
+
+const JUDGMENT_ASSETS = {
+  perfect: ["Hit300g", "mania-hit300g"],
+  great: ["Hit300", "mania-hit300"],
+  good: ["Hit200", "mania-hit200"],
+  ok: ["Hit100", "mania-hit100"],
+  meh: ["Hit50", "mania-hit50"],
+  miss: ["Hit0", "mania-hit0"],
+} as const;
+
+function resolveJudgments(section: SkinIniSection, available: ReadonlyMap<string, SpriteFile>,
+  defaults: ReadonlyMap<string, SpriteFile>): Readonly<Record<string, readonly string[]>> {
+  return Object.fromEntries(Object.entries(JUDGMENT_ASSETS).map(([judge, [key, fallback]]) => {
+    const configured = section[key]?.replace(/\\/g, "/");
+    const configured_exists = configured && (available.has(normalizedSpriteName(configured)) ||
+      available.has(normalizedSpriteName(`${configured}-0`)));
+    const base = configured_exists ? configured : fallback;
+    const source = available.has(normalizedSpriteName(base)) ? available : defaults;
+    const frames: string[] = [];
+    for (let frame = 0; source.has(normalizedSpriteName(`${base}-${frame}`)); frame += 1) frames.push(`${base}-${frame}`);
+    if (frames.length === 0 && source.has(normalizedSpriteName(base))) frames.push(base);
+    return [judge, frames];
+  }));
+}
+
+function resolveFontGlyphs(prefix: string, available: ReadonlyMap<string, SpriteFile>,
+  defaults: ReadonlyMap<string, SpriteFile>): Readonly<Record<string, string>> {
+  const glyphs: Record<string, string> = {};
+  for (const [character, suffix] of [..."0123456789"].map((value) => [value, value] as const)
+    .concat([[".", "dot"], ["%", "percent"]])) {
+    const name = `${prefix}-${suffix}`;
+    if (available.has(normalizedSpriteName(name)) || defaults.has(normalizedSpriteName(name))) glyphs[character] = name;
+  }
+  return glyphs;
 }
 
 function resolveOptional(name: string | undefined, fallback: string, available: ReadonlyMap<string, SpriteFile>,

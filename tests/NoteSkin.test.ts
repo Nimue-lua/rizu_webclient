@@ -30,6 +30,8 @@ test("maps the matching osu mania section to playfield geometry and sprites", ()
   assert.deepEqual(config.receptorReleased, ["keys/one", "keys/two", "keys/three", "keys/four"]);
   assert.deepEqual(config.shortNotes, ["notes/one", "notes/two", "notes/three", "notes/four"]);
   assert.deepEqual(config.longNoteTailFlipY, [true, true, true, true]);
+  assert.equal(config.scoreOverlap, 0);
+  assert.equal(config.comboOverlap, 0);
 });
 
 test("uses native osu defaults when sprite mappings are absent", () => {

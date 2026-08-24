@@ -56,7 +56,12 @@ export default defineConfig({
           "osu-defaults/mania-note2@2x.png", "osu-defaults/mania-note2L@2x.png", "osu-defaults/mania-note2T@2x.png",
           "osu-defaults/mania-noteS@2x.png", "osu-defaults/mania-noteSL@2x.png", "osu-defaults/mania-noteST@2x.png",
           "osu-defaults/mania-stage-hint@2x.png", "osu-defaults/mania-stage-left@2x.png",
-          "osu-defaults/mania-stage-right@2x.png"]) {
+          "osu-defaults/mania-stage-right@2x.png",
+          "osu-defaults/mania-hit0@2x.png", "osu-defaults/mania-hit50@2x.png", "osu-defaults/mania-hit100@2x.png",
+          "osu-defaults/mania-hit200@2x.png", "osu-defaults/mania-hit300@2x.png", "osu-defaults/mania-hit300g@2x.png",
+          "osu-defaults/mania-hit300g-0@2x.png",
+          ...Array.from({ length: 10 }, (_, digit) => `osu-defaults/score-${digit}@2x.png`),
+          "osu-defaults/score-dot@2x.png", "osu-defaults/score-percent@2x.png"]) {
           this.emitFile({
             type: "asset",
             fileName,

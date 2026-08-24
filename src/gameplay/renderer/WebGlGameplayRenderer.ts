@@ -1,5 +1,5 @@
 import type { VisualNote } from "../RhythmEngine";
-import { ManiaPlayfieldRenderer, type NoteRenderPass } from "./ManiaPlayfieldRenderer";
+import { ManiaPlayfieldRenderer, type ManiaHudState, type NoteRenderPass } from "./ManiaPlayfieldRenderer";
 import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite } from "./NoteSkin";
 
 const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
@@ -128,7 +128,7 @@ export class WebGlGameplayRenderer {
   }
 
   draw(column_count: number, notes: readonly VisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number> = []): void {
+    pressed_columns: ArrayLike<number> = [], hud?: ManiaHudState): void {
     if (column_count !== this.skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
     const framebuffer = this.resizeCanvas();
     const layout = this.playfield.getLayout(NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height);
@@ -145,7 +145,7 @@ export class WebGlGameplayRenderer {
     this.playfield.draw(layout, notes, scroll_speed, pressed_columns,
       (x, y, width, height, color, sprite, flip_y, pass) => {
         commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false, pass });
-      });
+      }, hud);
     this.submitCommands(commands);
   }
 
