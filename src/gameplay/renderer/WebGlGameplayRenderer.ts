@@ -1,6 +1,9 @@
 import type { VisualNote } from "../RhythmEngine";
+import type { OsuChart } from "../../chart/Chart";
 import { ManiaPlayfieldRenderer, type ManiaHudState, type NoteRenderPass } from "./ManiaPlayfieldRenderer";
-import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite } from "./NoteSkin";
+import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin, type NoteSkinSprite, type SpriteSkin } from "./NoteSkin";
+import { OsuPlayfieldRenderer } from "./OsuPlayfieldRenderer";
+import type { OsuStandardSkin } from "./OsuSkin";
 
 const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
 const VERTEX_FLOATS = 8;
@@ -59,7 +62,7 @@ function createProgram(gl: WebGL2RenderingContext): WebGLProgram {
 
 export class WebGlGameplayRenderer {
   private readonly canvas: HTMLCanvasElement;
-  private readonly skin: NoteSkin;
+  private readonly skin: SpriteSkin;
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly vertex_array: WebGLVertexArrayObject;
@@ -67,9 +70,10 @@ export class WebGlGameplayRenderer {
   private readonly viewport_size: WebGLUniformLocation;
   private readonly sampler: WebGLUniformLocation;
   private readonly textures = new Map<NoteSkinSprite, WebGLTexture>();
-  private readonly playfield: ManiaPlayfieldRenderer;
+  private readonly playfield: ManiaPlayfieldRenderer | null;
+  private readonly osu_playfield: OsuPlayfieldRenderer | null;
 
-  constructor(canvas: HTMLCanvasElement, skin: NoteSkin) {
+  constructor(canvas: HTMLCanvasElement, skin: NoteSkin | OsuStandardSkin) {
     const gl = canvas.getContext("webgl2");
     if (!gl) throw new Error("WebGL 2 is required for gameplay");
     const program = createProgram(gl);
@@ -88,7 +92,13 @@ export class WebGlGameplayRenderer {
     this.vertex_buffer = vertex_buffer;
     this.viewport_size = viewport_size;
     this.sampler = sampler;
-    this.playfield = new ManiaPlayfieldRenderer(skin);
+    if ("config" in skin) {
+      this.playfield = new ManiaPlayfieldRenderer(skin);
+      this.osu_playfield = null;
+    } else {
+      this.playfield = null;
+      this.osu_playfield = new OsuPlayfieldRenderer(skin);
+    }
     gl.bindVertexArray(vertex_array);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     const stride = VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
@@ -119,19 +129,23 @@ export class WebGlGameplayRenderer {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   }
 
-  get comboPosition(): number { return this.playfield.comboPosition; }
-  get judgePosition(): number { return this.playfield.judgePosition; }
+  get comboPosition(): number { return this.requireManiaPlayfield().comboPosition; }
+  get judgePosition(): number { return this.requireManiaPlayfield().judgePosition; }
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
-    if (column_count !== this.skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
-    return this.playfield.getTimeRange(this.playfield.getLayout(this.logicalWidth()), scroll_speed);
+    const playfield = this.requireManiaPlayfield();
+    const skin = this.requireManiaSkin();
+    if (column_count !== skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
+    return playfield.getTimeRange(playfield.getLayout(this.logicalWidth()), scroll_speed);
   }
 
   draw(column_count: number, notes: readonly VisualNote[], scroll_speed: number,
     pressed_columns: ArrayLike<number> = [], hud?: ManiaHudState): void {
-    if (column_count !== this.skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
+    const playfield = this.requireManiaPlayfield();
+    const skin = this.requireManiaSkin();
+    if (column_count !== skin.config.columnCount) throw new Error("Chart and skin column counts do not match");
     const framebuffer = this.resizeCanvas();
-    const layout = this.playfield.getLayout(NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height);
+    const layout = playfield.getLayout(NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height);
     const gl = this.gl;
     gl.viewport(0, 0, framebuffer.width, framebuffer.height);
     gl.clearColor(...BACKGROUND_COLOR);
@@ -142,11 +156,33 @@ export class WebGlGameplayRenderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(this.sampler, 0);
     const commands: DrawCommand[] = [];
-    this.playfield.draw(layout, notes, scroll_speed, pressed_columns,
+    playfield.draw(layout, notes, scroll_speed, pressed_columns,
       (x, y, width, height, color, sprite, flip_y, pass, rotate_ccw) => {
         commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
           rotateCounterClockwise: rotate_ccw ?? false, pass });
       }, hud);
+    this.submitCommands(commands);
+  }
+
+  drawOsu(chart: OsuChart, song_time: number): void {
+    if (!this.osu_playfield) throw new Error("Renderer does not have an osu skin");
+    const framebuffer = this.resizeCanvas();
+    const width = NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height;
+    const gl = this.gl;
+    gl.viewport(0, 0, framebuffer.width, framebuffer.height);
+    gl.clearColor(...BACKGROUND_COLOR);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(this.program);
+    gl.bindVertexArray(this.vertex_array);
+    gl.uniform2f(this.viewport_size, width, NOTE_SKIN_LOGICAL_HEIGHT);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(this.sampler, 0);
+    const commands: DrawCommand[] = [];
+    this.osu_playfield.draw(this.osu_playfield.getLayout(width, NOTE_SKIN_LOGICAL_HEIGHT), chart, song_time,
+      (x, y, command_width, height, color, sprite) => {
+        commands.push({ x, y, width: command_width, height, color, sprite, flipY: false,
+          rotateCounterClockwise: false });
+      });
     this.submitCommands(commands);
   }
 
@@ -220,6 +256,16 @@ export class WebGlGameplayRenderer {
   private logicalWidth(): number {
     const framebuffer = this.resizeCanvas();
     return NOTE_SKIN_LOGICAL_HEIGHT * framebuffer.width / framebuffer.height;
+  }
+
+  private requireManiaSkin(): NoteSkin {
+    if (!("config" in this.skin)) throw new Error("Renderer does not have a mania skin");
+    return this.skin as NoteSkin;
+  }
+
+  private requireManiaPlayfield(): ManiaPlayfieldRenderer {
+    if (!this.playfield) throw new Error("Renderer does not have a mania playfield");
+    return this.playfield;
   }
 }
 

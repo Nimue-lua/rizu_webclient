@@ -1,5 +1,5 @@
 import { unzipSync } from "fflate";
-import type { NoteSkin, NoteSkinConfig, NoteSkinSprite } from "./NoteSkin";
+import type { NoteSkin, NoteSkinConfig, NoteSkinSprite, SpriteSkin } from "./NoteSkin";
 
 export type SkinIniSection = Readonly<Record<string, string>>;
 
@@ -9,6 +9,13 @@ export interface SkinIni {
 }
 
 export const DEFAULT_OSU_SKIN_URL = "/skins/osu-default.osk";
+
+export interface OsuStandardSkin extends SpriteSkin {
+  readonly hitCircle: NoteSkinSprite;
+  readonly hitCircleOverlay: NoteSkinSprite;
+  readonly approachCircle: NoteSkinSprite;
+  readonly comboColor: readonly [number, number, number, number];
+}
 
 export function parseSkinIni(source: string): SkinIni {
   const sections: Record<string, Record<string, string>> = {};
@@ -213,6 +220,38 @@ async function defaultSpriteFiles(signal?: AbortSignal): Promise<ReadonlyMap<str
 export async function loadOsuManiaSkinUrl(url: string, column_count: number, signal?: AbortSignal): Promise<NoteSkin> {
   const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
   return loadOsuManiaSkin(files, column_count, signal);
+}
+
+export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal): Promise<OsuStandardSkin> {
+  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
+  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  if (!ini_path) throw new Error("osu skin archive is missing skin.ini");
+  const directory = ini_path.slice(0, ini_path.lastIndexOf("/") + 1);
+  const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));
+  const available = spriteFiles(files, directory);
+  const defaults = await defaultSpriteFiles(signal);
+  const names = ["hitcircle", "hitcircleoverlay", "approachcircle"] as const;
+  const decoded = await Promise.all(names.map(async (name) => {
+    const file = available.get(name) ?? defaults.get(name);
+    if (!file) throw new Error(`Skin is missing sprite ${name}`);
+    const source = pngSize(file.bytes);
+    const image = await createImageBitmap(new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }), {
+      premultiplyAlpha: "none",
+    });
+    return [name, {
+      image,
+      sourceSize: { w: source.width / file.dpi, h: source.height / file.dpi },
+      pixelSize: { w: source.width, h: source.height },
+    }] as const;
+  }));
+  const sprites = Object.fromEntries(decoded) as Record<(typeof names)[number], NoteSkinSprite>;
+  return {
+    sprites,
+    hitCircle: sprites.hitcircle,
+    hitCircleOverlay: sprites.hitcircleoverlay,
+    approachCircle: sprites.approachcircle,
+    comboColor: colorValue(ini.sections.Colours ?? {}, "Combo1", [1, 0.4, 0.4, 1]),
+  };
 }
 
 export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array>>, column_count: number,

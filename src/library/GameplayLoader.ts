@@ -1,6 +1,7 @@
-import type { Chart } from "../chart/Chart";
+import type { ManiaChart, OsuChart } from "../chart/Chart";
 import { parseOsuChart } from "../chart/format/osu/OsuParser";
 import { loadNoteSkinZip, type NoteSkin } from "../gameplay/renderer/NoteSkin";
+import { loadOsuStandardSkinUrl, type OsuStandardSkin } from "../gameplay/renderer/OsuSkin";
 
 export interface GameplayLocation {
   audio_url: string;
@@ -16,11 +17,25 @@ export interface GameplayLocation {
   title: string;
 }
 
-export interface GameplayData {
+interface GameplayDataBase {
   audio_buffer: AudioBuffer;
   audio_context: AudioContext;
-  chart: Chart;
+}
+
+export interface ManiaGameplayData extends GameplayDataBase {
+  chart: ManiaChart;
   note_skin: NoteSkin;
+}
+
+export interface OsuGameplayData extends GameplayDataBase {
+  chart: OsuChart;
+  note_skin: OsuStandardSkin;
+}
+
+export type GameplayData = ManiaGameplayData | OsuGameplayData;
+
+export function isOsuGameplayData(data: GameplayData): data is OsuGameplayData {
+  return data.chart.mode === "osu";
 }
 
 export interface GameplayLoader {
@@ -55,6 +70,10 @@ export class HttpGameplayLoader implements GameplayLoader {
       audio_context.decodeAudioData(audio_data),
       Promise.resolve(parseOsuChart(chart_source)),
     ]);
+    if (chart.mode === "osu") {
+      const note_skin = await loadOsuStandardSkinUrl(skin_url, signal);
+      return { audio_buffer, audio_context, chart, note_skin };
+    }
     const note_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal);
     return { audio_buffer, audio_context, chart, note_skin };
   }

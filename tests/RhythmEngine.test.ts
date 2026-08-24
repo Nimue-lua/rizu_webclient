@@ -4,6 +4,7 @@ import { NoteState, RhythmEngine } from "../src/gameplay/RhythmEngine";
 
 function createChart(notes: readonly { column: number; absolute_time: number; weight: -1 | 0 | 1 }[], columns = 1) {
   return {
+    mode: "mania",
     column_count: columns,
     overall_difficulty: 5,
     primary_tempo: 120,

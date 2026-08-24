@@ -12,13 +12,32 @@ export interface VisualPoint {
   global_speed: number;
 }
 
-export interface Chart {
+export interface ManiaChart {
+  mode: "mania";
   column_count: number;
   overall_difficulty?: number;
   primary_tempo: number;
   notes: readonly Note[];
   visual_points: readonly VisualPoint[];
 }
+
+export interface OsuCircle {
+  x: number;
+  y: number;
+  absolute_time: number;
+}
+
+export interface OsuChart {
+  mode: "osu";
+  approach_rate: number;
+  circle_size: number;
+  end_time: number;
+  overall_difficulty?: number;
+  primary_tempo: number;
+  circles: readonly OsuCircle[];
+}
+
+export type Chart = ManiaChart | OsuChart;
 
 export interface ChartInput {
   mode: number;

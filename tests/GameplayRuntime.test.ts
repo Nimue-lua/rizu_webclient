@@ -8,6 +8,7 @@ function createData(note_times: readonly number[]): GameplayData {
     audio_buffer: null as unknown as AudioBuffer,
     audio_context: null as unknown as AudioContext,
     chart: {
+      mode: "mania",
       column_count: 1,
       primary_tempo: 120,
       notes: note_times.map((absolute_time) => ({ column: 1, absolute_time, weight: 0 })),

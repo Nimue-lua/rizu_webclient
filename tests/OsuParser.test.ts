@@ -19,6 +19,7 @@ CircleSize:4
 `);
 
   assert.deepEqual(chart, {
+    mode: "mania",
     column_count: 4,
     overall_difficulty: 5,
     primary_tempo: 120,
@@ -32,6 +33,47 @@ CircleSize:4
       { absolute_time: 0.15, visual_time: 0.15, current_speed: 2, local_speed: 1, global_speed: 1 },
     ],
   });
+});
+
+test("parses osu circles and ignores sliders and spinners", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4.2
+OverallDifficulty:6
+ApproachRate:8
+[HitObjects]
+400,300,1500,1,0,0:0:0:0:
+100,200,500,2,0,B|200:200,1,100
+256,192,1000,5,0,0:0:0:0:
+256,192,2000,8,0,2500
+`);
+
+  assert.deepEqual(chart, {
+    mode: "osu",
+    approach_rate: 8,
+    circle_size: 4.2,
+    end_time: 2,
+    overall_difficulty: 6,
+    primary_tempo: 120,
+    circles: [
+      { x: 256, y: 192, absolute_time: 1 },
+      { x: 400, y: 300, absolute_time: 1.5 },
+    ],
+  });
+});
+
+test("uses overall difficulty as approach rate for old osu charts", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:5
+OverallDifficulty:7
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode === "osu") assert.equal(chart.approach_rate, 7);
 });
 
 test("parses overall difficulty for gameplay timings", () => {

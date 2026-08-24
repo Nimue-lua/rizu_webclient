@@ -1,4 +1,4 @@
-import type { Chart, Note } from "../chart/Chart";
+import type { ManiaChart, Note } from "../chart/Chart";
 import { interpolateVisualPoint } from "../chart/VisualTimeline";
 import { NoteState, type LogicEvent } from "./LogicEvent";
 import { ScoreEngine, type ScoreResult } from "./scoring/ScoreEngine";
@@ -37,7 +37,7 @@ export class RhythmEngine {
   readonly note_states: Uint8Array;
   readonly visible_notes: VisualNote[] = [];
   readonly logic_events: LogicEvent[] = [];
-  private readonly chart: Chart;
+  private readonly chart: ManiaChart;
   private readonly linked_notes: readonly LinkedNote[];
   private readonly lane_notes: number[][];
   private readonly timings;
@@ -48,7 +48,7 @@ export class RhythmEngine {
   private readonly head_press_times: Float64Array;
   private readonly head_release_times: Float64Array;
 
-  constructor(chart: Chart, hit_registration: HitRegistration = "earliest", music_rate = 1,
+  constructor(chart: ManiaChart, hit_registration: HitRegistration = "earliest", music_rate = 1,
     constant_scroll = false, tap_only = false) {
     this.chart = chart;
     this.linked_notes = this.linkNotes(chart.notes, tap_only);

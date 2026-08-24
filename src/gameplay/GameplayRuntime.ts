@@ -1,4 +1,4 @@
-import type { GameplayData } from "../library/GameplayLoader";
+import type { GameplayData, ManiaGameplayData } from "../library/GameplayLoader";
 import { RhythmEngine, type HitRegistration } from "./RhythmEngine";
 import type { ScoreResult } from "./scoring/ScoreEngine";
 import { WebGlGameplayRenderer } from "./renderer/WebGlGameplayRenderer";
@@ -10,13 +10,17 @@ const FIRST_NOTE_LEAD_IN = 1.2;
 const RESULT_DELAY = 1.2;
 
 export function getAudioStartDelay(data: GameplayData, music_rate: number): number {
-  const first_note_time = data.chart.notes.reduce((first, note) => note.weight >= 0 ? Math.min(first, note.absolute_time) : first, Infinity);
+  const first_note_time = data.chart.mode === "mania"
+    ? data.chart.notes.reduce((first, note) => note.weight >= 0 ? Math.min(first, note.absolute_time) : first, Infinity)
+    : data.chart.circles[0]?.absolute_time ?? Infinity;
   if (!Number.isFinite(first_note_time)) return AUDIO_SCHEDULE_MARGIN;
   return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN - first_note_time / music_rate);
 }
 
 export function getGameplayEndTime(data: GameplayData, music_rate: number): number {
-  const last_note_time = data.chart.notes.reduce((last, note) => Math.max(last, note.absolute_time), -Infinity);
+  const last_note_time = data.chart.mode === "mania"
+    ? data.chart.notes.reduce((last, note) => Math.max(last, note.absolute_time), -Infinity)
+    : data.chart.end_time;
   return last_note_time + RESULT_DELAY * music_rate;
 }
 
@@ -25,7 +29,7 @@ export function applyMusicOffset(song_time: number, music_rate: number, music_of
 }
 
 export class GameplayRuntime {
-  private readonly data: GameplayData;
+  private readonly data: ManiaGameplayData;
   private readonly master_volume: number;
   private readonly music_offset: number;
   private readonly scroll_speed: number;
@@ -48,7 +52,7 @@ export class GameplayRuntime {
   private previous_judges_total = 0;
   private judgment_time = -Infinity;
 
-  constructor(canvas: HTMLCanvasElement, data: GameplayData, master_volume: number, music_offset: number,
+  constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: HitRegistration,
     finish: (score: ScoreResult) => void) {
     this.data = data;

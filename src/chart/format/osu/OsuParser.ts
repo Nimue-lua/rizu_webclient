@@ -1,4 +1,4 @@
-import type { Chart, Note } from "../../Chart";
+import type { Chart, Note, OsuCircle } from "../../Chart";
 import { createVisualPoints, type TimingChange } from "../../VisualTimeline";
 
 interface OsuTimingPoint {
@@ -8,6 +8,8 @@ interface OsuTimingPoint {
 
 interface ParsedHitObject {
   x: number;
+  y: number;
+  type: number;
   start_time: number;
   end_time?: number;
 }
@@ -67,8 +69,9 @@ function computePrimaryTempo(changes: readonly TimingChange[], last_time: number
 export function parseOsuChart(source: string): Chart {
   let section = "";
   let mode = 3;
-  let column_count: number | null = null;
+  let circle_size: number | null = null;
   let overall_difficulty = 5;
+  let approach_rate: number | null = null;
   const timing_points: OsuTimingPoint[] = [];
   const hit_objects: ParsedHitObject[] = [];
 
@@ -86,10 +89,13 @@ export function parseOsuChart(source: string): Chart {
     if (property_match) {
       if (section === "General" && property_match[1] === "Mode") mode = Number(property_match[2]);
       if (section === "Difficulty" && property_match[1] === "CircleSize") {
-        column_count = Math.floor(Number(property_match[2]));
+        circle_size = Number(property_match[2]);
       }
       if (section === "Difficulty" && property_match[1] === "OverallDifficulty") {
         overall_difficulty = Number(property_match[2]);
+      }
+      if (section === "Difficulty" && property_match[1] === "ApproachRate") {
+        approach_rate = Number(property_match[2]);
       }
       continue;
     }
@@ -108,13 +114,14 @@ export function parseOsuChart(source: string): Chart {
     if (section === "HitObjects") {
       const fields = line.split(",");
       const x = Number(fields[0]);
+      const y = Number(fields[1]);
       const start_time = Number(fields[2]) / 1000;
       const type = Number(fields[3]);
-      if (!Number.isFinite(x) || !Number.isFinite(start_time) || !Number.isInteger(type)) {
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(start_time) || !Number.isInteger(type)) {
         throw new Error(`Invalid hit object: ${line}`);
       }
 
-      const hit_object: ParsedHitObject = { x, start_time };
+      const hit_object: ParsedHitObject = { x, y, type, start_time };
       if ((type & 128) !== 0) {
         const end_time = Number(fields[5]?.split(":", 1)[0]) / 1000;
         if (!Number.isFinite(end_time) || end_time < start_time) throw new Error(`Invalid hold note: ${line}`);
@@ -124,17 +131,40 @@ export function parseOsuChart(source: string): Chart {
     }
   }
 
-  if (mode !== 3) throw new Error(`Unsupported osu mode: ${mode}`);
-  if (column_count === null || !Number.isInteger(column_count) || column_count <= 0) {
+  if (mode !== 0 && mode !== 3) throw new Error(`Unsupported osu mode: ${mode}`);
+  if (circle_size === null || !Number.isFinite(circle_size) || circle_size <= 0 || circle_size > 10) {
     throw new Error("Chart has an invalid CircleSize");
   }
   if (!Number.isFinite(overall_difficulty) || overall_difficulty < 0 || overall_difficulty > 10) {
     throw new Error("Chart has an invalid OverallDifficulty");
   }
-  const key_count = column_count;
+  approach_rate ??= overall_difficulty;
+  if (!Number.isFinite(approach_rate) || approach_rate < 0 || approach_rate > 10) {
+    throw new Error("Chart has an invalid ApproachRate");
+  }
+
+  const timing_changes = normalizeTimingPoints(timing_points);
+  const last_time = hit_objects.reduce((last, object) => Math.max(last, object.end_time ?? object.start_time), 0);
+  const primary_tempo = computePrimaryTempo(timing_changes, last_time);
+  if (mode === 0) {
+    const circles: OsuCircle[] = hit_objects
+      .filter((object) => (object.type & 1) !== 0)
+      .map((object) => ({ x: object.x, y: object.y, absolute_time: object.start_time }))
+      .sort((left, right) => left.absolute_time - right.absolute_time);
+    return {
+      mode: "osu",
+      approach_rate,
+      circle_size,
+      end_time: last_time,
+      overall_difficulty,
+      primary_tempo,
+      circles,
+    };
+  }
+  const key_count = Math.floor(circle_size);
+  if (key_count <= 0) throw new Error("Chart has an invalid CircleSize");
 
   const notes: Note[] = [];
-  let last_time = 0;
   for (const hit_object of hit_objects) {
     const column = Math.min(Math.max(Math.floor(hit_object.x / 512 * key_count + 1), 1), key_count);
     if (hit_object.end_time === undefined) {
@@ -143,13 +173,11 @@ export function parseOsuChart(source: string): Chart {
       notes.push({ column, absolute_time: hit_object.start_time, weight: 1 });
       notes.push({ column, absolute_time: hit_object.end_time, weight: -1 });
     }
-    last_time = Math.max(last_time, hit_object.start_time, hit_object.end_time ?? hit_object.start_time);
   }
   notes.sort((left, right) => left.absolute_time - right.absolute_time);
 
-  const timing_changes = normalizeTimingPoints(timing_points);
-  const primary_tempo = computePrimaryTempo(timing_changes, last_time);
   return {
+    mode: "mania",
     column_count: key_count,
     overall_difficulty,
     primary_tempo,

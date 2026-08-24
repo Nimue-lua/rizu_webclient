@@ -44,12 +44,16 @@ export interface NoteSkinSprite {
   pixelSize: { w: number; h: number };
 }
 
+export interface SpriteSkin {
+  sprites: Readonly<Record<string, NoteSkinSprite>>;
+}
+
 export interface NoteSkin {
   config: NoteSkinConfig;
   sprites: Readonly<Record<string, NoteSkinSprite>>;
 }
 
-export function destroyNoteSkin(skin: NoteSkin): void {
+export function destroyNoteSkin(skin: SpriteSkin): void {
   for (const sprite of new Set(Object.values(skin.sprites))) sprite.image.close();
 }
 
