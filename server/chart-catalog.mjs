@@ -271,6 +271,7 @@ async function scanCharts(charts_directory, background_previews_directory, audio
   const locations = [];
   const songs = new Map();
   const charts = [];
+  const chart_ids = new Set();
   let skipped = 0;
   const location_names = [];
   for (const entry of await readdir(charts_directory, { withFileTypes: true })) {
@@ -352,6 +353,11 @@ async function scanCharts(charts_directory, background_previews_directory, audio
           await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
           background_preview_path = path.posix.join("chart-previews", preview_file);
         }
+
+        if (chart_ids.has(metadata.chart_id)) {
+          metadata.chart_id = fallbackId("chart", path.posix.join(location_name, folder, chart_file));
+        }
+        chart_ids.add(metadata.chart_id);
 
         charts.push({
           ...metadata,

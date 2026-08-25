@@ -92,7 +92,7 @@ test("caches chart collections as locations", async () => {
     await writeFile(ffmpeg_path, "#!/bin/sh\nfor output; do :; done\n: > \"$output\"\n");
     await chmod(ffmpeg_path, 0o700);
     await writeFile(path.join(chart_directory, "song.ogg"), "audio");
-    await writeFile(path.join(chart_directory, "chart.osu"), `osu file format v14
+    const chart_source = `osu file format v14
 [General]
 AudioFilename: song.ogg
 Mode: 3
@@ -109,7 +109,9 @@ CircleSize:4
 0,500,4,2,1,70,1,0
 [HitObjects]
 64,192,1000,1,0,0:0:0:0:
-`);
+`;
+    await writeFile(path.join(chart_directory, "chart.osu"), chart_source);
+    await writeFile(path.join(chart_directory, "duplicate.osu"), chart_source.replace("Version:Hard", "Version:Duplicate"));
 
     const result = await cacheCharts({
       charts_directory,
@@ -125,6 +127,9 @@ CircleSize:4
     }]);
     assert.equal(result.charts[0]?.location_id, 1);
     assert.equal(result.charts[0]?.chart_path, "charts/Collection One/Chart One/chart.osu");
+    assert.equal(result.charts[0]?.chart_id, "456");
+    assert.match(result.charts[1]?.chart_id ?? "", /^chart-[a-f0-9]{24}$/);
+    assert.equal(result.charts[1]?.beatmap_id, 456);
 
     const client = new DatabaseSync(client_database, { readOnly: true });
     try {
@@ -138,6 +143,7 @@ CircleSize:4
         chart_path: "charts/Collection One/Chart One/chart.osu",
         audio_path: "charts/Collection One/Chart One/song.ogg",
       });
+      assert.equal(client.prepare("SELECT COUNT(*) AS count FROM charts").get().count, 2);
     } finally {
       client.close();
     }
