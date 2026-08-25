@@ -1,25 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import {
+  compatibleNoteSkins,
   noteSkinSelectionKey,
-  note_skin_options,
+  type NoteSkinOption,
   type NoteSkinSelections,
 } from "../gameplay/renderer/NoteSkinSelection";
 
 interface NoteSkinsModalProps {
   selections: NoteSkinSelections;
+  options: readonly NoteSkinOption[];
+  selected_mode: string | null;
   selected_column_count: number | null;
   onSelectionChange: (key: string, skin_id: string | undefined) => void;
+  onImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
   onExit: () => void;
 }
 
-export function noteSkinColumnCounts(selected_column_count: number | null): readonly number[] {
-  const maximum = Math.max(88, selected_column_count ?? 0,
-    ...note_skin_options.flatMap((skin) => skin.mode === "mania" && skin.columnCount !== null ? [skin.columnCount] : []));
-  return Array.from({ length: maximum }, (_, index) => index + 1);
-}
-
-export function NoteSkinsModal({ selections, selected_column_count, onSelectionChange, onExit }: NoteSkinsModalProps) {
-  const column_counts = noteSkinColumnCounts(selected_column_count);
+export function NoteSkinsModal({ selections, options, selected_mode, selected_column_count, onSelectionChange, onImport, onExit }: NoteSkinsModalProps) {
+  const file_input_ref = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [import_message, setImportMessage] = useState<string | null>(null);
+  const compatible_skins = compatibleNoteSkins(selected_mode, selected_column_count, options);
+  const selection_key = selected_mode === null ? null : noteSkinSelectionKey(selected_mode, selected_column_count);
+  const stored_skin_id = selection_key === null ? "" : selections[selection_key] ?? "";
+  const selected_skin_id = compatible_skins.some((skin) => skin.id === stored_skin_id) ? stored_skin_id : "";
+  const chart_mode = selected_mode === null ? "No chart selected" :
+    selected_mode === "mania" && selected_column_count !== null ? `${selected_column_count}K MANIA` : selected_mode.toUpperCase();
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onExit();
@@ -28,37 +35,62 @@ export function NoteSkinsModal({ selections, selected_column_count, onSelectionC
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onExit]);
 
+  const importFile = async (file: File | undefined) => {
+    if (!file || importing) return;
+    setImporting(true);
+    setImportMessage(null);
+    try {
+      const imported = await onImport(file);
+      const compatible_import = compatibleNoteSkins(selected_mode, selected_column_count, imported.options)[0];
+      if (selection_key !== null && compatible_import) onSelectionChange(selection_key, compatible_import.id);
+      setImportMessage(imported.persisted ? `${file.name} imported` : `${file.name} loaded for this session only`);
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : "Could not import this skin");
+    } finally {
+      setImporting(false);
+      if (file_input_ref.current) file_input_ref.current.value = "";
+    }
+  };
+  const dropFile = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    void importFile(event.dataTransfer.files[0]);
+  };
+
   return (
-    <div className="note-skins-layer" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onExit();
-    }}>
-      <section className="note-skins-modal" role="dialog" aria-modal="true" aria-labelledby="note-skins-title">
+    <div className="note-skins-layer" role="presentation"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onExit(); }}
+      onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+      onDrop={dropFile}>
+      <section className={`note-skins-modal${dragging ? " dragging" : ""}`} role="dialog" aria-modal="true" aria-labelledby="note-skins-title"
+        onDragEnter={(event) => event.preventDefault()} onDragOver={(event) => event.preventDefault()}>
         <header>
           <div><span>GAMEPLAY</span><h1 id="note-skins-title">Note Skins</h1></div>
-          <p>Choose a skin independently for every mania key mode.</p>
+          <p>Showing skins compatible with <strong>{chart_mode}</strong>.</p>
         </header>
-        <div className="note-skin-list">
-          {column_counts.map((column_count) => {
-            const key = noteSkinSelectionKey("mania", column_count);
-            const compatible_skins = note_skin_options.filter((skin) => skin.mode === "mania" &&
-              (skin.columnCount === null || skin.columnCount === column_count));
-            return (
-              <label key={key} className={selected_column_count === column_count ? "current" : ""}>
-                <span><strong>{column_count}K</strong>{selected_column_count === column_count && <small>SELECTED CHART</small>}</span>
-                <select
-                  autoFocus={selected_column_count === column_count}
-                  value={selections[key] ?? ""}
-                  onChange={(event) => onSelectionChange(key, event.target.value)}
-                  aria-label={`${column_count} key note skin`}
-                >
-                  <option value="">Not selected</option>
-                  {compatible_skins.map((skin) => <option key={skin.id} value={skin.id}>{skin.name}</option>)}
-                </select>
-              </label>
-            );
-          })}
-        </div>
-        <footer><span>Selections are saved automatically.</span><button type="button" onClick={onExit}>CLOSE</button></footer>
+        {selection_key === null ? <p className="note-skin-empty">Select a chart to choose a compatible skin.</p> :
+          compatible_skins.length === 0 ? <p className="note-skin-empty">No skins are available for {chart_mode}.</p> :
+          <fieldset className="note-skin-list" aria-label={`Note skins for ${chart_mode}`}>
+            <label className={selected_skin_id === "" ? "current" : ""}>
+              <input autoFocus checked={selected_skin_id === ""} type="radio" name="note-skin" value="" onChange={() => onSelectionChange(selection_key, undefined)} />
+              <span><strong>Not selected</strong><small>USE NO CUSTOM SKIN</small></span>
+            </label>
+            {compatible_skins.map((skin) => <label key={skin.id} className={selected_skin_id === skin.id ? "current" : ""}>
+              <input autoFocus={selected_skin_id === skin.id} checked={selected_skin_id === skin.id} type="radio" name="note-skin" value={skin.id} onChange={() => onSelectionChange(selection_key, skin.id)} />
+              <span><strong>{skin.name}</strong>{skin.sessionOnly ? <small className="session-only">SESSION ONLY</small> : skin.local ? <small className="local">IMPORTED</small> : skin.columnCount === null && selected_mode === "mania" && <small>ALL KEY MODES</small>}</span>
+            </label>)}
+          </fieldset>}
+        <footer>
+          <div className="note-skin-import">
+            <input ref={file_input_ref} type="file" accept=".osk" onChange={(event) => void importFile(event.target.files?.[0])} />
+            <button type="button" disabled={importing} onClick={() => file_input_ref.current?.click()}>{importing ? "IMPORTING..." : "IMPORT .OSK"}</button>
+            <span>{import_message ?? "or drop an .osk anywhere in this window"}</span>
+          </div>
+          <button type="button" onClick={onExit}>CLOSE</button>
+        </footer>
+        {dragging && <div className="note-skin-drop-overlay">DROP .OSK TO IMPORT</div>}
       </section>
     </div>
   );

@@ -1,17 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { noteSkinColumnCounts } from "../src/app/NoteSkinsModal";
+import { compatibleNoteSkins } from "../src/gameplay/renderer/NoteSkinSelection";
 
-test("lists key modes through an 88-key piano", () => {
-  const counts = noteSkinColumnCounts(null);
-  assert.equal(counts[0], 1);
-  assert.equal(counts.at(-1), 88);
-  assert.equal(counts.length, 88);
+test("lists only skins compatible with the selected chart", () => {
+  const skins = compatibleNoteSkins("mania", 4);
+  assert.ok(skins.length > 0);
+  assert.ok(skins.every((skin) => skin.mode === "mania" &&
+    (skin.columnCount === null || skin.columnCount === 4)));
 });
 
-test("includes a selected chart beyond a piano key range", () => {
-  const counts = noteSkinColumnCounts(100);
-  assert.equal(counts.at(-1), 100);
-  assert.ok(counts.includes(10));
-  assert.ok(counts.includes(100));
+test("does not list mania skins without a mania column count", () => {
+  assert.deepEqual(compatibleNoteSkins("mania", null), []);
+  assert.deepEqual(compatibleNoteSkins(null, null), []);
+});
+
+test("lists skins for non-mania modes without a column count", () => {
+  const skins = compatibleNoteSkins("osu", null);
+  assert.ok(skins.some((skin) => skin.id === "osu-default"));
+  assert.ok(skins.every((skin) => skin.mode === "osu"));
+});
+
+test("filters a dynamic skin registry by mode and mania column count", () => {
+  const options = [
+    { id: "local", name: "Local", mode: "osu", columnCount: null, url: "blob:local" },
+    { id: "local", name: "Local", mode: "mania", columnCount: 7, url: "blob:local" },
+  ];
+  assert.deepEqual(compatibleNoteSkins("mania", 4, options), []);
+  assert.deepEqual(compatibleNoteSkins("mania", 7, options).map((skin) => skin.id), ["local"]);
 });

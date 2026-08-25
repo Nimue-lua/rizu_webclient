@@ -1,4 +1,4 @@
-import { useState, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
 import { SqliteLibrary } from "../library/Library";
 import type { Chartview } from "../library/views";
@@ -14,11 +14,22 @@ import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
 import { ReplayBase } from "../replay/ReplayBase";
 import {
   loadNoteSkinSelections,
+  noteSkinMode,
+  note_skin_options,
   saveNoteSkinSelections,
   selectedNoteSkin,
+  type NoteSkinOption,
   type NoteSkinSelections,
 } from "../gameplay/renderer/NoteSkinSelection";
 import { destroyNoteSkin } from "../gameplay/renderer/NoteSkin";
+import { DEFAULT_OSU_SKIN_URL } from "../gameplay/renderer/OsuSkin";
+import {
+  inspectLocalNoteSkin,
+  loadLocalNoteSkins,
+  localNoteSkinOptions,
+  saveLocalNoteSkin,
+  shouldPersistLocalNoteSkin,
+} from "../gameplay/renderer/LocalNoteSkinStore";
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -45,6 +56,8 @@ export function App() {
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
+  const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
+  const local_skin_urls = useRef(new Map<string, string>());
   const [master_volume, setMasterVolume] = useState(() => {
     const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
@@ -73,6 +86,25 @@ export function App() {
     replay_base.tap_only = localStorage.getItem(TAP_ONLY_KEY) === "true";
     return replay_base;
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadLocalNoteSkins().then((skins) => {
+      if (cancelled) return;
+      const options: NoteSkinOption[] = [...note_skin_options];
+      for (const skin of skins) {
+        const url = URL.createObjectURL(skin.archive);
+        local_skin_urls.current.set(skin.id, url);
+        options.push(...localNoteSkinOptions(skin, url));
+      }
+      setAvailableNoteSkins(options);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+      for (const url of local_skin_urls.current.values()) URL.revokeObjectURL(url);
+      local_skin_urls.current.clear();
+    };
+  }, []);
 
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
@@ -132,7 +164,9 @@ export function App() {
   };
 
   const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => {
-    const note_skin = selectedNoteSkin(chart.mode === 3 ? "mania" : String(chart.mode), chart.keys ?? 0, note_skin_selections);
+    const skin_mode = noteSkinMode(chart.mode);
+    const note_skin = skin_mode === null ? undefined : selectedNoteSkin(skin_mode, chart.mode === 3 ? chart.keys : null,
+      note_skin_selections, available_note_skins);
     setLoadingLocation({
       audio_url: chart.audio_url,
       artist: song.artist,
@@ -143,7 +177,7 @@ export function App() {
       difficulty: chart.difficulty,
       duration_seconds: chart.duration_seconds,
       long_note_ratio: chart.long_note_ratio,
-      note_skin_url: chart.mode === 0 ? "/skins/dont_commit.osk" : note_skin?.url ?? null,
+      note_skin_url: note_skin?.url ?? (chart.mode === 0 ? DEFAULT_OSU_SKIN_URL : null),
       title: song.title,
     });
     setInputBindings(chart_input_bindings);
@@ -158,6 +192,22 @@ export function App() {
       saveNoteSkinSelections(next);
       return next;
     });
+  };
+
+  const importNoteSkin = async (file: File): Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }> => {
+    const skin = await inspectLocalNoteSkin(file);
+    const persisted = shouldPersistLocalNoteSkin(file.size);
+    if (persisted) await saveLocalNoteSkin(skin);
+    const previous_url = local_skin_urls.current.get(skin.id);
+    if (previous_url) URL.revokeObjectURL(previous_url);
+    const url = URL.createObjectURL(skin.archive);
+    local_skin_urls.current.set(skin.id, url);
+    const imported_options = localNoteSkinOptions(skin, url, !persisted);
+    setAvailableNoteSkins((current) => [
+      ...current.filter((option) => option.id !== skin.id),
+      ...imported_options,
+    ]);
+    return { options: imported_options, persisted };
   };
 
   const cancelLoading = () => {
@@ -257,12 +307,14 @@ export function App() {
             constant_scroll={replay_base.const}
             tap_only={replay_base.tap_only}
             note_skin_selections={note_skin_selections}
+            available_note_skins={available_note_skins}
             onPlay={beginLoading}
             onSettings={() => setSettingsOpen(true)}
             onMusicRateChange={changeMusicRate}
             onConstantScrollChange={changeConstantScroll}
             onTapOnlyChange={changeTapOnly}
             onNoteSkinSelectionChange={changeNoteSkinSelection}
+            onNoteSkinImport={importNoteSkin}
           />
           {settings_open && (
             <SettingsScreen

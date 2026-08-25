@@ -4,22 +4,33 @@ export interface NoteSkinOption {
   mode: string;
   columnCount: number | null;
   url: string;
+  local?: boolean;
+  sessionOnly?: boolean;
 }
 
 export type NoteSkinSelections = Readonly<Record<string, string>>;
 
 export const note_skin_options: readonly NoteSkinOption[] = [
+  { id: "osu-default", name: "osu! Default", mode: "osu", columnCount: null, url: "/skins/osu-default.osk" },
   { id: "osu-default", name: "osu! Default", mode: "mania", columnCount: null, url: "/skins/osu-default.osk" },
-  { id: "skin1", name: "skin1", mode: "mania", columnCount: null, url: "/skins/skin1.osk" },
-  { id: "rskin", name: "rskin", mode: "mania", columnCount: null, url: "/skins/rskin.osk" },
-  { id: "voez", name: "voez", mode: "mania", columnCount: null, url: "/skins/voez.osk" },
-  { id: "dont_commit", name: "dont_commit", mode: "mania", columnCount: null, url: "/skins/dont_commit.osk" },
 ];
 
 const STORAGE_KEY = "rizu.note-skins";
+const mode_names = ["osu", "taiko", "fruits", "mania"] as const;
 
-export function noteSkinSelectionKey(mode: string, column_count: number): string {
-  return `${mode}.${column_count}`;
+export function noteSkinMode(chart_mode: number): string | null {
+  return mode_names[chart_mode] ?? null;
+}
+
+export function noteSkinSelectionKey(mode: string, column_count: number | null): string {
+  return column_count === null ? mode : `${mode}.${column_count}`;
+}
+
+export function compatibleNoteSkins(mode: string | null, column_count: number | null,
+  options: readonly NoteSkinOption[] = note_skin_options): readonly NoteSkinOption[] {
+  if (mode === null || (mode === "mania" && column_count === null)) return [];
+  return options.filter((skin) => skin.mode === mode &&
+    (skin.columnCount === null || skin.columnCount === column_count));
 }
 
 export function loadNoteSkinSelections(): NoteSkinSelections {
@@ -42,10 +53,8 @@ export function saveNoteSkinSelections(selections: NoteSkinSelections): void {
   }
 }
 
-export function selectedNoteSkin(mode: string, column_count: number,
-  selections: NoteSkinSelections): NoteSkinOption | undefined {
+export function selectedNoteSkin(mode: string, column_count: number | null,
+  selections: NoteSkinSelections, options: readonly NoteSkinOption[] = note_skin_options): NoteSkinOption | undefined {
   const id = selections[noteSkinSelectionKey(mode, column_count)];
-  const compatible = note_skin_options.filter((skin) => skin.mode === mode &&
-    (skin.columnCount === null || skin.columnCount === column_count));
-  return compatible.find((skin) => skin.id === id);
+  return compatibleNoteSkins(mode, column_count, options).find((skin) => skin.id === id);
 }
