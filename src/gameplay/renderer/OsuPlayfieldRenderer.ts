@@ -111,11 +111,11 @@ export class OsuPlayfieldRenderer {
       if (transient.kind === "shake") continue;
       const age = song_time - transient.start_time;
       if (age < 0 || age >= JUDGMENT_LIFETIME) continue;
-      const circle = chart.hit_objects[transient.object_index];
-      if (!circle || circle.kind !== "circle") continue;
-      const center = viewport.playfieldToScreen(circle);
-      const combo = this.comboColor(chart, circle.combo_color_index ?? 0);
-      if (transient.kind === "hit" && age < HIT_FADE_OUT) {
+      const object = chart.hit_objects[transient.object_index];
+      if (!object) continue;
+      const center = viewport.playfieldToScreen(transient.position ?? object);
+      const combo = this.comboColor(chart, object.combo_color_index ?? 0);
+      if (object.kind === "circle" && transient.kind === "hit" && age < HIT_FADE_OUT) {
         const progress = age / HIT_FADE_OUT;
         const scale = 1 + 0.4 * (2 * progress - progress * progress);
         const alpha = 1 - progress;
@@ -124,14 +124,15 @@ export class OsuPlayfieldRenderer {
           [combo[0], combo[1], combo[2], alpha], this.skin.hitCircle);
         write(center.x - size / 2, center.y - size / 2, size, size,
           [1, 1, 1, alpha], this.skin.hitCircleOverlay);
-      } else if (transient.kind === "miss" && age < MISS_FADE_OUT) {
+      } else if (object.kind === "circle" && transient.kind === "miss" && age < MISS_FADE_OUT) {
         const alpha = 1 - age / MISS_FADE_OUT;
         write(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter,
           [combo[0], combo[1], combo[2], alpha], this.skin.hitCircle);
         write(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter,
           [1, 1, 1, alpha], this.skin.hitCircleOverlay);
       }
-      this.drawJudgment(viewport, center, transient.kind === "hit" ? transient.judgment : "miss", age, write);
+      this.drawJudgment(viewport, center, transient.kind === "hit" ? transient.judgment : "miss", age,
+        diameter / OSU_HIT_OBJECT_TEXTURE_SIZE, write);
     }
   }
 
@@ -295,7 +296,7 @@ export class OsuPlayfieldRenderer {
   }
 
   private drawJudgment(viewport: OsuViewport, center: { x: number; y: number }, judgment: string,
-    age: number, write: SpriteQuadWriter): void {
+    age: number, gamefield_scale: number, write: SpriteQuadWriter): void {
     const frames = this.skin.judgments[judgment] ?? [];
     const frame_name = frames[Math.min(frames.length - 1, Math.floor(age * 60))];
     const sprite = frame_name && this.skin.sprites[frame_name];
@@ -311,8 +312,8 @@ export class OsuPlayfieldRenderer {
       y += (-5 + 45 * progress * progress) * viewport.scale;
     }
     alpha = Math.max(0, Math.min(1, alpha));
-    const width = sprite.sourceSize.w * viewport.scale * scale;
-    const height = sprite.sourceSize.h * viewport.scale * scale;
+    const width = sprite.sourceSize.w * gamefield_scale * scale;
+    const height = sprite.sourceSize.h * gamefield_scale * scale;
     write(center.x - width / 2, y - height / 2, width, height, [1, 1, 1, alpha], sprite);
   }
 }

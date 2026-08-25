@@ -146,7 +146,7 @@ export class OsuRulesEngine {
           kind: "miss", object_index: index, time: object.absolute_time + this.timings.late_miss,
         }, song_time);
       } else {
-        this.resolveSliderHead(index, object, object.absolute_time + this.timings.late_miss, 0, false);
+        this.resolveSliderHead(index, object, object.absolute_time + this.timings.late_miss, 0, false, song_time);
       }
     }
   }
@@ -182,15 +182,19 @@ export class OsuRulesEngine {
         kind: "hit", object_index: candidate, time: song_time, delta_time,
       }, song_time);
     } else if (object.kind === "slider") {
-      this.resolveSliderHead(candidate, object, song_time, delta_time, successful);
+      this.resolveSliderHead(candidate, object, song_time, delta_time, successful, song_time);
     }
     return successful ? "hit" : "miss";
   }
 
   private resolveSliderHead(index: number, slider: OsuSlider, time: number, delta_time: number,
-    successful: boolean): void {
+    successful: boolean, presentation_time: number): void {
     this.object_states[index] = successful ? OsuCircleState.Hit : OsuCircleState.Missed;
     this.emit({ kind: "slider-head", object_index: index, time, delta_time, successful });
+    if (!successful && Number.isFinite(presentation_time)) {
+      this.circle_transients.push({ kind: "miss", object_index: index, start_time: presentation_time,
+        position: { x: slider.x, y: slider.y } });
+    }
     const active: ActiveSlider = {
       index, slider, path: this.slider_paths.get(index)!, points: this.sliderScorePoints(slider),
       next_point: 0, successful_parts: successful ? 1 : 0, tracking: false,
@@ -215,8 +219,16 @@ export class OsuRulesEngine {
         index += 1;
         continue;
       }
-      this.emit({ kind: "slider-end", object_index: active.index, time: active.slider.end_time,
-        successful_parts: active.successful_parts, total_parts: active.points.length + 1 });
+      const event = { kind: "slider-end" as const, object_index: active.index, time: active.slider.end_time,
+        successful_parts: active.successful_parts, total_parts: active.points.length + 1 };
+      this.emit(event);
+      if (Number.isFinite(song_time)) {
+        const judgment = classifyOsuStandardJudgment(this.timings, event);
+        const position = active.path.endPosition(active.slider.repeat_count);
+        this.circle_transients.push(judgment === "miss"
+          ? { kind: "miss", object_index: active.index, start_time: song_time, position }
+          : { kind: "hit", object_index: active.index, start_time: song_time, judgment, position });
+      }
       this.active_sliders.splice(index, 1);
     }
   }

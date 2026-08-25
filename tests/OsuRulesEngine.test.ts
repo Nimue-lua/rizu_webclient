@@ -227,6 +227,23 @@ test("tracks slider ticks, repeats, and the lenient tail along the shared path",
   assert.equal(engine.score.combo, 5);
   assert.equal(engine.score.score, 458);
   assert.equal(engine.slider_state, null);
+  assert.deepEqual(engine.circle_transients, [{
+    kind: "hit", object_index: 0, start_time: 3, judgment: "300", position: { x: 100, y: 100 },
+  }]);
+});
+
+test("shows a slider-head miss immediately and the aggregate judgment at slider end", () => {
+  const object = slider();
+  const engine = createObjectEngine([object]);
+  engine.update(1.16);
+
+  assert.deepEqual(engine.circle_transients, [{
+    kind: "miss", object_index: 0, start_time: 1.16, position: { x: 100, y: 100 },
+  }]);
+  engine.update(2);
+  assert.deepEqual(engine.circle_transients.at(-1), {
+    kind: "miss", object_index: 0, start_time: 2, position: { x: 300, y: 100 },
+  });
 });
 
 test("uses the acquired follow radius and breaks combo on missed slider points", () => {

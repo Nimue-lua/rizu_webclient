@@ -106,6 +106,8 @@ test("matches stable hit fade-out and note-lock shake", () => {
     (...quad) => quads.push(quad));
   assert.ok(Math.abs(quads[0]![2] - 83.2) < 1e-9);
   assert.ok(Math.abs(quads[0]![4][3] - 0.5) < 1e-9);
+  assert.ok(Math.abs(quads[2]![2] - 50) < 1e-9);
+  assert.ok(Math.abs(quads[2]![3] - 25) < 1e-9);
   assert.equal(quads.length, 3);
 
   assert.equal(stableShakeOffset(0), 0);
@@ -138,8 +140,35 @@ test("renders the stable miss shell fade and local hit0 animation", () => {
     (...quad) => quads.push(quad));
   assert.equal(quads.length, 3);
   assert.ok(Math.abs(quads[0]![4][3] - 0.5) < 1e-9);
-  assert.ok(Math.abs(quads[2]![2] - 113.75) < 1e-9);
+  assert.ok(Math.abs(quads[2]![2] - 56.875) < 1e-9);
   assert.ok(Math.abs(quads[2]![4][3] - 0.25) < 1e-9);
+});
+
+test("renders a slider result at its repeat-aware final endpoint without a circle shell", () => {
+  const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const judgment = { sourceSize: { w: 100, h: 50 } } as OsuStandardSkin["hitCircle"];
+  const skin = { sprites: { hit300: judgment }, hitCircle: circle, hitCircleOverlay: circle,
+    approachCircle: circle, comboColor: [1, 1, 1, 1], judgments: { "300": ["hit300"] },
+  } as unknown as OsuStandardSkin;
+  const object = {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
+    control_points: [{ x: 200, y: 100 }], repeat_count: 2, pixel_length: 100,
+    edge_sounds: [0, 0, 0], edge_sets: Array.from({ length: 3 }, () => ({ normal_set: 0, addition_set: 0 })),
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+    span_duration: 0.5, total_duration: 1, end_time: 2, tick_distances: [],
+  } as OsuSlider;
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: [object] } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1,
+    [{ kind: "hit", object_index: 0, start_time: 2, judgment: "300", position: { x: 100, y: 100 } }], 2.25,
+    (...quad) => quads.push(quad));
+
+  assert.equal(quads.length, 1);
+  const result = quads.at(-1)!;
+  assert.equal(result[5], judgment);
+  assert.equal(result[0], 64 + 100 - 25);
 });
 
 test("requests visible slider bodies and draws repeat-aware head and end circles", () => {
