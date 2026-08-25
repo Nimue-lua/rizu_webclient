@@ -1,10 +1,11 @@
-import type { OsuChart } from "../../chart/Chart";
+import type { OsuChart, OsuSlider } from "../../chart/Chart";
 import { osuApproachPreempt, osuCircleDiameter } from "../OsuCircleGeometry";
 import type { OsuCircleTransient } from "../OsuCirclePresentation";
 import { OsuCircleState } from "../OsuCircleState";
 import { OsuViewport } from "../OsuViewport";
 import type { OsuStandardSkin } from "./OsuSkin";
 import type { SpriteQuadWriter } from "./Sprite";
+import type { OsuSliderPath } from "../OsuSliderPath";
 
 const CIRCLE_FADE_IN = 0.4;
 const APPROACH_FADE_IN = 0.8;
@@ -18,7 +19,9 @@ export class OsuPlayfieldRenderer {
   constructor(private readonly skin: OsuStandardSkin) {}
 
   draw(viewport: OsuViewport, chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
-    circle_transients: readonly OsuCircleTransient[], song_time: number, write: SpriteQuadWriter): void {
+    circle_transients: readonly OsuCircleTransient[], song_time: number, write: SpriteQuadWriter,
+    slider_path?: (slider: OsuSlider) => OsuSliderPath | undefined,
+    draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number) => void): void {
     const preempt = osuApproachPreempt(chart.approach_rate);
     const diameter = osuCircleDiameter(chart.circle_size) * viewport.scale;
     const shake_offsets = new Map<number, number>();
@@ -26,6 +29,21 @@ export class OsuPlayfieldRenderer {
       if (transient.kind !== "shake") continue;
       const age = song_time - transient.start_time;
       if (age >= 0 && age < 0.12) shake_offsets.set(transient.object_index, stableShakeOffset(age));
+    }
+    for (const object of chart.hit_objects) {
+      if (object.absolute_time > song_time + preempt) break;
+      if (object.kind !== "slider") continue;
+      const remaining = object.absolute_time - song_time;
+      if (remaining > preempt || song_time > object.end_time) continue;
+      const age = preempt - remaining;
+      const alpha = Math.min(1, Math.max(0, age / CIRCLE_FADE_IN));
+      const path = slider_path?.(object);
+      if (path) draw_slider?.(object, path, alpha);
+      const endpoint = path?.endPosition(object.repeat_count) ?? { x: object.x, y: object.y };
+      this.drawCircle(viewport, endpoint, diameter, alpha, 0, 1, write);
+      const approach_alpha = remaining > 0 ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9) : 0;
+      const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
+      this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale, write);
     }
     let low = 0;
     let high = chart.hit_objects.length;
@@ -46,16 +64,11 @@ export class OsuPlayfieldRenderer {
         ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
         : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
-      const center = viewport.playfieldToScreen({
+      const position = {
         x: circle.x + (shake_offsets.get(index) ?? 0),
         y: circle.y,
-      });
-      const addCentered = (size: number, color: readonly [number, number, number, number], sprite: OsuStandardSkin["hitCircle"]) =>
-        write(center.x - size / 2, center.y - size / 2, size, size, color, sprite);
-      const combo = this.skin.comboColor;
-      addCentered(diameter, [combo[0], combo[1], combo[2], circle_alpha], this.skin.hitCircle);
-      addCentered(diameter, [1, 1, 1, circle_alpha], this.skin.hitCircleOverlay);
-      addCentered(diameter * approach_scale, [combo[0], combo[1], combo[2], approach_alpha], this.skin.approachCircle);
+      };
+      this.drawCircle(viewport, position, diameter, circle_alpha, approach_alpha, approach_scale, write);
     }
 
     for (const transient of circle_transients) {
@@ -84,6 +97,17 @@ export class OsuPlayfieldRenderer {
       }
       this.drawJudgment(viewport, center, transient.kind === "hit" ? transient.judgment : "miss", age, write);
     }
+  }
+
+  private drawCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number, alpha: number,
+    approach_alpha: number, approach_scale: number, write: SpriteQuadWriter): void {
+    const center = viewport.playfieldToScreen(position);
+    const addCentered = (size: number, color: readonly [number, number, number, number], sprite: OsuStandardSkin["hitCircle"]) =>
+      write(center.x - size / 2, center.y - size / 2, size, size, color, sprite);
+    const combo = this.skin.comboColor;
+    addCentered(diameter, [combo[0], combo[1], combo[2], alpha], this.skin.hitCircle);
+    addCentered(diameter, [1, 1, 1, alpha], this.skin.hitCircleOverlay);
+    addCentered(diameter * approach_scale, [combo[0], combo[1], combo[2], approach_alpha], this.skin.approachCircle);
   }
 
   private drawJudgment(viewport: OsuViewport, center: { x: number; y: number }, judgment: string,

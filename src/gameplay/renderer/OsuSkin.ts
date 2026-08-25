@@ -17,6 +17,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly approachCircle: Sprite;
   readonly cursor: Sprite;
   readonly comboColor: readonly [number, number, number, number];
+  readonly sliderBorderColor: readonly [number, number, number, number];
+  readonly sliderTrackOverride: readonly [number, number, number, number] | null;
   readonly judgments: Readonly<Record<string, readonly string[]>>;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
   readonly comboGlyphs: Readonly<Record<string, string>>;
@@ -81,6 +83,13 @@ function colorValue(section: SkinIniSection, key: string,
   fallback: readonly [number, number, number, number]): [number, number, number, number] {
   const values = section[key]?.split(",").map((value) => Number(value.trim())) ?? [];
   if (values.length < 3 || values.some((value) => !Number.isFinite(value))) return [...fallback];
+  return [values[0]! / 255, values[1]! / 255, values[2]! / 255, (values[3] ?? 255) / 255];
+}
+
+export function optionalColorValue(section: SkinIniSection, key: string): [number, number, number, number] | null {
+  if (section[key] === undefined) return null;
+  const values = section[key]!.split(",").map((value) => Number(value.trim()));
+  if (values.length < 3 || values.some((value) => !Number.isFinite(value))) return null;
   return [values[0]! / 255, values[1]! / 255, values[2]! / 255, (values[3] ?? 255) / 255];
 }
 
@@ -265,6 +274,8 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     approachCircle: sprites.approachcircle!,
     cursor: sprites[cursor_name]!,
     comboColor: colorValue(ini.sections.Colours ?? {}, "Combo1", [1, 0.4, 0.4, 1]),
+    sliderBorderColor: colorValue(ini.sections.Colours ?? {}, "SliderBorder", [1, 1, 1, 1]),
+    sliderTrackOverride: optionalColorValue(ini.sections.Colours ?? {}, "SliderTrackOverride"),
     judgments,
     scoreGlyphs,
     comboGlyphs,

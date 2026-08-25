@@ -11,6 +11,7 @@ function createChart(circles: readonly { x: number; y: number; absolute_time: nu
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }));
   return {
     mode: "osu",
+    format_version: 14,
     approach_rate: 5,
     circle_size: 5,
     overall_difficulty: 5,

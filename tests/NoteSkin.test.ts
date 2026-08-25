@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   osuManiaColumnType,
+  optionalColorValue,
   parseOsuManiaConfig,
   parseSkinIni,
   resolveOsuManiaTail,
@@ -15,6 +16,13 @@ test("parses repeated Mania sections, BOM, comments, and colon values", () => {
   assert.equal(ini.sections.General?.Name, "Test: skin");
   assert.equal(ini.mania.length, 2);
   assert.equal(ini.mania[0]?.ColumnSpacing, "1, 2, 3");
+});
+
+test("parses optional osu slider colors without inventing an override", () => {
+  assert.deepEqual(optionalColorValue({ SliderTrackOverride: "10,20,30" }, "SliderTrackOverride"),
+    [10 / 255, 20 / 255, 30 / 255, 1]);
+  assert.equal(optionalColorValue({}, "SliderTrackOverride"), null);
+  assert.equal(optionalColorValue({ SliderTrackOverride: "bad" }, "SliderTrackOverride"), null);
 });
 
 test("maps the matching osu mania section to playfield geometry and sprites", () => {

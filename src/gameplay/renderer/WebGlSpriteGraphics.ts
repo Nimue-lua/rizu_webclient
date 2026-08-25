@@ -143,6 +143,13 @@ export class WebGlSpriteGraphics {
   }
 
   submit(commands: readonly SpriteDrawCommand[]): void {
+    const gl = this.gl;
+    gl.useProgram(this.program);
+    gl.bindVertexArray(this.vertex_array);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(this.sampler, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     for (let index = 0; index < commands.length;) {
       const command = commands[index]!;
       if (!command.batch) {
