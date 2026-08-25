@@ -11,6 +11,7 @@ function slider(curve_type: OsuSliderCurveType, control_points: readonly { x: nu
     edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
     span_duration: 1, total_duration: 1, end_time: 2,
+    tick_distances: [],
   };
 }
 

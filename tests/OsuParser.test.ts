@@ -69,7 +69,7 @@ test("retains typed standard objects, slider data, and normalized durations", ()
     edge_sets: [{ normal_set: 1, addition_set: 2 }, { normal_set: 2, addition_set: 3 },
       { normal_set: 3, addition_set: 1 }],
     hit_sample: { normal_set: 2, addition_set: 3, index: 4, volume: 60, filename: "slider.wav" },
-    span_duration: 0.25, total_duration: 0.5, end_time: 1.5,
+    span_duration: 0.25, total_duration: 0.5, end_time: 1.5, tick_distances: [],
   });
   assert.ok(Math.abs((sliders[2]?.span_duration ?? 0) - 0.2) < 1e-12);
   assert.equal(sliders[3]?.end_time, 2.7);
@@ -102,6 +102,46 @@ SliderMultiplier:1.4
   assert.ok(Math.abs((first?.span_duration ?? 0) - 0.28833333333333333) < 1e-12);
   assert.equal(second?.end_time, 1.778);
   assert.equal(chart.end_time, 2.115);
+});
+
+test("precomputes stable slider tick distances with versioned SV behavior", () => {
+  const modern = parseOsuChart(`osu file format v14
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+SliderMultiplier:1.4
+SliderTickRate:2
+[TimingPoints]
+0,500,4,2,0,100,1,0
+0,-50,4,2,0,100,0,0
+[HitObjects]
+64,64,1000,2,0,L|464:64,1,400
+`);
+  assert.equal(modern.mode, "osu");
+  if (modern.mode !== "osu") return;
+  assert.equal(modern.slider_tick_rate, 2);
+  const modern_slider = modern.hit_objects[0];
+  assert.equal(modern_slider?.kind, "slider");
+  if (modern_slider?.kind === "slider") assert.deepEqual(modern_slider.tick_distances, [140, 280]);
+
+  const legacy = parseOsuChart(`osu file format v7
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+SliderMultiplier:1.4
+SliderTickRate:2
+[TimingPoints]
+0,500,4,2,0,100,1,0
+0,-50,4,2,0,100,0,0
+[HitObjects]
+64,64,1000,2,0,L|464:64,1,400
+`);
+  assert.equal(legacy.mode, "osu");
+  if (legacy.mode === "osu" && legacy.hit_objects[0]?.kind === "slider") {
+    assert.deepEqual(legacy.hit_objects[0].tick_distances, [70, 140, 210, 280, 350]);
+  }
 });
 
 test("preserves source order for same-time standard objects", () => {

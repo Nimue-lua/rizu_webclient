@@ -46,7 +46,7 @@ test("renders pending circles through their late window and hides resolved circl
     drain_length_seconds: 1,
     end_time: 1,
     primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [],
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [],
     hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 1, hit_sound: 0,
       hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }],
   } as const;
@@ -76,7 +76,7 @@ test("draws only the supplied active circle range", () => {
   const chart = {
     mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
     object_count: circles.length, drain_length_seconds: circles.length, end_time: circles.length,
-    primary_tempo: 120, slider_multiplier: 1.4, timing_points: [], hit_objects: circles,
+    primary_tempo: 120, slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [], hit_objects: circles,
   } as const;
   const quads: unknown[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart,
@@ -95,7 +95,7 @@ test("matches stable hit fade-out and note-lock shake", () => {
   const chart = {
     mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
     object_count: 1, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [],
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [],
     hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 1, hit_sound: 0,
       hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }],
   } as const;
@@ -127,7 +127,7 @@ test("renders the stable miss shell fade and local hit0 animation", () => {
   const chart = {
     mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
     object_count: 1, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [],
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [],
     hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 1, hit_sound: 0,
       hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }],
   } as const;
@@ -151,11 +151,11 @@ test("requests visible slider bodies and draws repeat-aware head and end circles
     control_points: [{ x: 200, y: 100 }], repeat_count: 1, pixel_length: 100,
     edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
-    span_duration: 0.5, total_duration: 0.5, end_time: 1.5,
+    span_duration: 0.5, total_duration: 0.5, end_time: 1.5, tick_distances: [],
   };
   const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
     hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 1.5, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [], hit_objects: [slider] } as const;
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [], hit_objects: [slider] } as const;
   const path = OsuSliderPath.create(slider, 14);
   const bodies: OsuSlider[] = [];
   const quads: unknown[] = [];
@@ -176,11 +176,11 @@ test("fades slider bodies and circles for 240ms after their end", () => {
     control_points: [{ x: 200, y: 100 }], repeat_count: 1, pixel_length: 100,
     edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
-    span_duration: 0.5, total_duration: 0.5, end_time: 1.5,
+    span_duration: 0.5, total_duration: 0.5, end_time: 1.5, tick_distances: [],
   };
   const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
     hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 1.5, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [], hit_objects: [slider] } as const;
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [], hit_objects: [slider] } as const;
   const path = OsuSliderPath.create(slider, 14);
   const alphas: number[] = [];
   const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
@@ -208,11 +208,11 @@ test("animates the slider ball along repeat-aware path progress", () => {
     edge_sounds: [0, 0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 },
       { normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
-    span_duration: 0.5, total_duration: 1, end_time: 2,
+    span_duration: 0.5, total_duration: 1, end_time: 2, tick_distances: [],
   };
   const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
     hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [], hit_objects: [slider] } as const;
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [], hit_objects: [slider] } as const;
   const path = OsuSliderPath.create(slider, 14);
   const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.75,
@@ -233,11 +233,11 @@ test("scales slider balls with circle size", () => {
     control_points: [{ x: 200, y: 100 }], repeat_count: 1, pixel_length: 100,
     edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
-    span_duration: 1, total_duration: 1, end_time: 2,
+    span_duration: 1, total_duration: 1, end_time: 2, tick_distances: [],
   };
   const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 2, overall_difficulty: 5,
     hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [], hit_objects: [slider] } as const;
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [], hit_objects: [slider] } as const;
   const path = OsuSliderPath.create(slider, 14);
   const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.5,
@@ -259,11 +259,11 @@ test("draws the next repeat arrow in the outgoing endpoint direction", () => {
     edge_sounds: [0, 0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 },
       { normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
-    span_duration: 0.5, total_duration: 1, end_time: 2,
+    span_duration: 0.5, total_duration: 1, end_time: 2, tick_distances: [],
   };
   const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
     hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
-    slider_multiplier: 1.4, timing_points: [], hit_objects: [slider] } as const;
+    slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [], hit_objects: [slider] } as const;
   const path = OsuSliderPath.create(slider, 14);
   const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.25,
@@ -271,4 +271,28 @@ test("draws the next repeat arrow in the outgoing endpoint direction", () => {
   const reverse = quads.at(-1)!;
   assert.equal(reverse[5], arrow);
   assert.ok(Math.abs(Math.abs(reverse[9]!) - Math.PI) < 1e-9);
+});
+
+test("draws only upcoming ticks for the current slider span", () => {
+  const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const tick = { sourceSize: { w: 16, h: 17 } } as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: circle, hitCircleOverlay: circle, approachCircle: circle,
+    comboColor: [1, 1, 1, 1], sliderBallFrames: [], sliderTick: tick } as unknown as OsuStandardSkin;
+  const slider: OsuSlider = {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
+    control_points: [{ x: 300, y: 100 }], repeat_count: 1, pixel_length: 200,
+    edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+    span_duration: 1, total_duration: 1, end_time: 2, tick_distances: [70, 140],
+  };
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 2, timing_points: [], hit_objects: [slider] } as const;
+  const path = OsuSliderPath.create(slider, 14);
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.5,
+    (...quad) => quads.push(quad), () => path, () => undefined);
+  const ticks = quads.filter((quad) => quad[5] === tick);
+  assert.equal(ticks.length, 1);
+  assert.equal(ticks[0]![0], 64 + 240 - 4);
 });

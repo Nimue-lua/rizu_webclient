@@ -11,6 +11,7 @@ function straightSlider(): OsuSlider {
     edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
     span_duration: 1, total_duration: 1, end_time: 1,
+    tick_distances: [],
   };
 }
 

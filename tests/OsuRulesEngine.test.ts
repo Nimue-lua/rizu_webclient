@@ -21,6 +21,7 @@ function createChart(circles: readonly { x: number; y: number; absolute_time: nu
     end_time: circles.at(-1)?.absolute_time ?? 0,
     primary_tempo: 120,
     slider_multiplier: 1.4,
+    slider_tick_rate: 1,
     timing_points: [],
     hit_objects,
   };

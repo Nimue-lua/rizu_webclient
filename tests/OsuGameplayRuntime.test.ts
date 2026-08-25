@@ -62,7 +62,7 @@ function createHarness() {
     mode: "osu", audio_buffer: {} as AudioBuffer, audio_context,
     chart: { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
       object_count: 1, drain_length_seconds: 1, end_time: 10, primary_tempo: 120,
-      slider_multiplier: 1.4, timing_points: [],
+      slider_multiplier: 1.4, slider_tick_rate: 1, timing_points: [],
       hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 2, hit_sound: 0,
         hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }] },
     note_skin: {} as OsuGameplayData["note_skin"],
