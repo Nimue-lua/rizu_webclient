@@ -33,6 +33,20 @@ test("tolerates skins without global HUD assets", () => {
     .draw({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 }));
 });
 
+test("draws the osu HP background and full HP fill at native HUD positions", () => {
+  const background = sprite("scorebar-bg", 200, 20);
+  const fill = sprite("scorebar-colour", 180, 8);
+  const draws: Array<{ x: number; y: number; width: number; height: number; name: string }> = [];
+  new SpriteGameplayHudRenderer({ sprites: {}, hpBackground: background, hpFill: fill },
+    (x, y, width, height, _color, drawn) => draws.push({
+      x, y, width, height, name: (drawn as Sprite & { name: string }).name,
+    })).draw({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 });
+  assert.deepEqual(draws, [
+    { x: 0, y: 0, width: 120, height: 12, name: "scorebar-bg" },
+    { x: 7.5, y: 7.8, width: 108.5625, height: 4.825, name: "scorebar-colour" },
+  ]);
+});
+
 test("anchors the global HUD to the viewport instead of a letterboxed playfield", () => {
   assert.deepEqual(getGameplayHudLayout(1280), { scoreRight: 1274, scoreTop: 0 });
 });

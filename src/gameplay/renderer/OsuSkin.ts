@@ -29,6 +29,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly reverseArrow: Sprite;
   readonly sliderTick: Sprite;
   readonly judgments: Readonly<Record<string, readonly string[]>>;
+  readonly hpBackground: Sprite;
+  readonly hpFill: Sprite;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
   readonly comboGlyphs: Readonly<Record<string, string>>;
   readonly scoreOverlap: number;
@@ -286,7 +288,8 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
   const slider_end_names = resolveSliderEndSpriteNames(new Set(available.keys()), new Set(defaults.keys()));
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", "sliderfollowcircle",
-    "sliderscorepoint", cursor_name, slider_end_names.circle, ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
+    "sliderscorepoint", "scorebar-bg", "scorebar-colour", cursor_name, slider_end_names.circle,
+    ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
     ...slider_ball_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
     ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
@@ -338,6 +341,8 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     reverseArrow: sprites.reversearrow!,
     sliderTick: sprites.sliderscorepoint!,
     judgments,
+    hpBackground: sprites["scorebar-bg"]!,
+    hpFill: sprites["scorebar-colour"]!,
     scoreGlyphs,
     comboGlyphs,
     scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
