@@ -24,6 +24,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly sliderTrackOverride: readonly [number, number, number, number] | null;
   readonly sliderBallFrames: readonly Sprite[];
   readonly sliderFollowCircle: Sprite;
+  readonly sliderEndCircle: Sprite;
+  readonly sliderEndCircleOverlay: Sprite | null;
   readonly reverseArrow: Sprite;
   readonly sliderTick: Sprite;
   readonly judgments: Readonly<Record<string, readonly string[]>>;
@@ -260,8 +262,9 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
   const judgments = resolveStandardJudgments(available, defaults);
   const slider_ball_names = resolveSliderBallFrames(available, defaults);
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
+  const slider_end_names = resolveSliderEndSpriteNames(new Set(available.keys()), new Set(defaults.keys()));
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", "sliderfollowcircle",
-    "sliderscorepoint", cursor_name,
+    "sliderscorepoint", cursor_name, slider_end_names.circle, ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
     ...slider_ball_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
     ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
@@ -298,6 +301,8 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     sliderTrackOverride: optionalColorValue(ini.sections.Colours ?? {}, "SliderTrackOverride"),
     sliderBallFrames: slider_ball_names.map((name) => sprites[name]!),
     sliderFollowCircle: sprites.sliderfollowcircle!,
+    sliderEndCircle: sprites[slider_end_names.circle]!,
+    sliderEndCircleOverlay: slider_end_names.overlay ? sprites[slider_end_names.overlay]! : null,
     reverseArrow: sprites.reversearrow!,
     sliderTick: sprites.sliderscorepoint!,
     judgments,
@@ -305,6 +310,21 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     comboGlyphs,
     scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
     comboOverlap: numberValue(fonts, "ComboOverlap", 0),
+  };
+}
+
+export function resolveSliderEndSpriteNames(available: ReadonlySet<string>, defaults: ReadonlySet<string>): {
+  circle: string;
+  overlay: string | null;
+} {
+  if (!available.has("sliderendcircle") && !defaults.has("sliderendcircle")) {
+    return { circle: "hitcircle", overlay: "hitcircleoverlay" };
+  }
+  return {
+    circle: "sliderendcircle",
+    overlay: available.has("sliderendcircleoverlay") || defaults.has("sliderendcircleoverlay")
+      ? "sliderendcircleoverlay"
+      : null,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   parseOsuManiaConfig,
   parseSkinIni,
   resolveSliderBallFrameNames,
+  resolveSliderEndSpriteNames,
   resolveOsuManiaTail,
 } from "../src/gameplay/renderer/OsuSkin";
 import { destroyNoteSkin, type NoteSkin } from "../src/gameplay/renderer/NoteSkin";
@@ -31,6 +32,16 @@ test("discovers contiguous slider ball animation frames with static fallback", (
     ["sliderb0", "sliderb1"]);
   assert.deepEqual(resolveSliderBallFrameNames(new Set(["sliderb"]), new Set(["sliderb0"])), ["sliderb"]);
   assert.deepEqual(resolveSliderBallFrameNames(new Set(), new Set(["sliderb0", "sliderb1"])), ["sliderb0", "sliderb1"]);
+});
+
+test("resolves osu slider end sprites without falling back to the hit circle overlay", () => {
+  assert.deepEqual(resolveSliderEndSpriteNames(new Set(), new Set(["hitcircle", "hitcircleoverlay"])),
+    { circle: "hitcircle", overlay: "hitcircleoverlay" });
+  assert.deepEqual(resolveSliderEndSpriteNames(new Set(["sliderendcircle"]), new Set(["hitcircleoverlay"])),
+    { circle: "sliderendcircle", overlay: null });
+  assert.deepEqual(resolveSliderEndSpriteNames(
+    new Set(["sliderendcircle", "sliderendcircleoverlay"]), new Set(["hitcircleoverlay"])),
+    { circle: "sliderendcircle", overlay: "sliderendcircleoverlay" });
 });
 
 test("maps the matching osu mania section to playfield geometry and sprites", () => {

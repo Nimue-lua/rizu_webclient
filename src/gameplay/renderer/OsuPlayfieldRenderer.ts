@@ -53,7 +53,7 @@ export class OsuPlayfieldRenderer {
       const path = slider_path?.(object);
       if (path) draw_slider?.(object, path, alpha, combo);
       const endpoint = path?.endPosition(object.repeat_count) ?? { x: object.x, y: object.y };
-      this.drawCircle(viewport, endpoint, diameter, alpha, 0, 1, combo, null, write);
+      this.drawSliderEndCircle(viewport, endpoint, diameter, alpha, combo, write);
       const slider_state = slider_states?.find((state) => state.object_index === object_index && state.active);
       const head_fade_duration = slider_state?.head_successful ? HIT_FADE_OUT : MISS_FADE_OUT;
       const head_alpha = slider_state
@@ -253,6 +253,19 @@ export class OsuPlayfieldRenderer {
     if (combo_number !== null) this.drawComboNumber(center, combo_number, diameter, alpha, write);
     addCentered(diameter, [1, 1, 1, alpha], this.skin.hitCircleOverlay);
     addCentered(diameter * approach_scale, [combo[0], combo[1], combo[2], approach_alpha], this.skin.approachCircle);
+  }
+
+  private drawSliderEndCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number,
+    alpha: number, combo: readonly [number, number, number, number], write: SpriteQuadWriter): void {
+    const center = viewport.playfieldToScreen(position);
+    const circle = this.skin.sliderEndCircle ?? this.skin.hitCircle;
+    const overlay = this.skin.sliderEndCircle === undefined
+      ? this.skin.hitCircleOverlay
+      : this.skin.sliderEndCircleOverlay;
+    write(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter,
+      [combo[0], combo[1], combo[2], alpha], circle);
+    if (overlay) write(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter,
+      [1, 1, 1, alpha], overlay);
   }
 
   private drawComboNumber(center: { x: number; y: number }, combo_number: number, diameter: number, alpha: number,

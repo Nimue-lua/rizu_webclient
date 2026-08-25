@@ -144,7 +144,9 @@ test("renders the stable miss shell fade and local hit0 animation", () => {
 
 test("requests visible slider bodies and draws repeat-aware head and end circles", () => {
   const sprite = {} as OsuStandardSkin["hitCircle"];
+  const slider_end = {} as OsuStandardSkin["hitCircle"];
   const skin = { hitCircle: sprite, hitCircleOverlay: sprite, approachCircle: sprite,
+    sliderEndCircle: slider_end, sliderEndCircleOverlay: null,
     comboColor: [1, 1, 1, 1] } as unknown as OsuStandardSkin;
   const slider: OsuSlider = {
     kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
@@ -162,9 +164,10 @@ test("requests visible slider bodies and draws repeat-aware head and end circles
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 0.5,
     (...quad) => quads.push(quad), () => path, (object) => bodies.push(object));
   assert.deepEqual(bodies, [slider]);
-  assert.equal(quads.length, 6);
+  assert.equal(quads.length, 4);
   const endpoint_quad = quads[0] as [number, number];
   assert.equal(endpoint_quad[0], 64 + 200 - 32);
+  assert.equal((quads[0] as unknown[])[5], slider_end);
 });
 
 test("fades slider bodies and circles for 240ms after their end", () => {

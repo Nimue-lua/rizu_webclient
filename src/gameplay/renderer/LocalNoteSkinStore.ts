@@ -83,7 +83,7 @@ export async function inspectLocalNoteSkin(file: SkinArchiveFile): Promise<Store
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));
   const mania_column_counts = [...new Set(ini.mania.map((section) => Number(section.Keys))
     .filter((count) => Number.isInteger(count) && count > 0 && count <= 100))].sort((a, b) => a - b);
-  const standard_sprite = /^(hitcircle|hitcircleoverlay|approachcircle|sliderb\d*|sliderfollowcircle|reversearrow|sliderscorepoint|cursor)(@2x)?\.png$/i;
+  const standard_sprite = /^(hitcircle|hitcircleoverlay|approachcircle|sliderb\d*|sliderfollowcircle|sliderendcircle(?:overlay)?|reversearrow|sliderscorepoint|cursor)(@2x)?\.png$/i;
   const supports_osu = Object.keys(files).some((path) => {
     const normalized = path.replace(/\\/g, "/");
     return normalized.toLowerCase().startsWith(directory.toLowerCase()) && standard_sprite.test(normalized.slice(directory.length));
