@@ -1,10 +1,15 @@
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { createReadStream, readFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const public_directory = path.resolve(import.meta.dirname, "public");
+const git_hash = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+  cwd: import.meta.dirname,
+  encoding: "utf8",
+}).trim();
 
 function chartAssetPath(url: string): string | null {
   const pathname = url.split("?", 1)[0] ?? "";
@@ -22,6 +27,9 @@ function chartAssetPath(url: string): string | null {
 }
 
 export default defineConfig({
+  define: {
+    __GIT_HASH__: JSON.stringify(git_hash),
+  },
   build: {
     copyPublicDir: false,
   },

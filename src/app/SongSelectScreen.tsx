@@ -353,7 +353,7 @@ export function SongSelectScreen({
     <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
       <audio ref={audio_ref} preload="auto" />
       <header className="song-select-header">
-        <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT</span></div>
+        <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT | {__GIT_HASH__}</span></div>
         <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status">OFFLINE</span></div>
         <nav className="header-actions" aria-label="Account and settings">
           <div className="player-info"><span><strong>Guest</strong></span><i /></div>
