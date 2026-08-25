@@ -91,6 +91,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
       }
       return path;
     };
+    this.hud.drawHpBar();
     this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write,
       sliderPath, (slider, _path, alpha, color) => {
         this.graphics.submit(commands);
@@ -100,13 +101,13 @@ export class OsuRenderer implements OsuGameplayRenderer {
       }, slider_states, spinner_state);
     this.combo.draw(state.combo, state.comboAnimationAge, state.comboAnimationFrom,
       8, frame.logical_height - 8, write);
+    this.hud.drawScore(state.hud, getGameplayHudLayout(frame.logical_width));
     const cursor_center = viewport.playfieldToScreen(cursor.position);
     const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
     const cursor_width = this.skin.cursor.sourceSize.w * viewport.scale * cursor_scale;
     const cursor_height = this.skin.cursor.sourceSize.h * viewport.scale * cursor_scale;
     write(cursor_center.x - cursor_width / 2, cursor_center.y - cursor_height / 2,
       cursor_width, cursor_height, [1, 1, 1, 1], this.skin.cursor);
-    this.hud.draw(state.hud, getGameplayHudLayout(frame.logical_width));
     this.active_commands = null;
     this.graphics.submit(commands);
   }

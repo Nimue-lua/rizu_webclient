@@ -52,7 +52,7 @@ export class ManiaRenderer {
       comboTop: this.skin.config.upsideDown ? layout.height - this.skin.config.comboPosition : this.skin.config.comboPosition,
       judgmentCenterY: this.skin.config.upsideDown ? layout.height - this.skin.config.judgePosition : this.skin.config.judgePosition,
     }, state, write);
-    this.hud.draw(state.hud, getGameplayHudLayout(layout.width));
+    this.hud.drawScore(state.hud, getGameplayHudLayout(layout.width));
     this.active_commands = null;
     this.graphics.submit(commands);
   }

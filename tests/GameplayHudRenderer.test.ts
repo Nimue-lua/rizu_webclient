@@ -24,13 +24,13 @@ test("formats the actual score without truncating values over seven digits", () 
   const { sprites, glyphs } = createHud();
   new SpriteGameplayHudRenderer({ sprites, scoreGlyphs: glyphs, scoreOverlap: 0 },
     (_x, _y, _width, _height, _color, drawn) => names.push((drawn as Sprite & { name: string }).name))
-    .draw({ score: 12345678, accuracy: 100 }, { scoreRight: 848, scoreTop: 0 });
+    .drawScore({ score: 12345678, accuracy: 100 }, { scoreRight: 848, scoreTop: 0 });
   assert.deepEqual(names.slice(0, 8), [..."12345678"].map((digit) => `glyph-${digit}`));
 });
 
 test("tolerates skins without global HUD assets", () => {
   assert.doesNotThrow(() => new SpriteGameplayHudRenderer({ sprites: {} }, () => {})
-    .draw({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 }));
+    .drawScore({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 }));
 });
 
 test("draws the osu HP background and full HP fill at native HUD positions", () => {
@@ -40,10 +40,10 @@ test("draws the osu HP background and full HP fill at native HUD positions", () 
   new SpriteGameplayHudRenderer({ sprites: {}, hpBackground: background, hpFill: fill },
     (x, y, width, height, _color, drawn) => draws.push({
       x, y, width, height, name: (drawn as Sprite & { name: string }).name,
-    })).draw({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 });
+    })).drawHpBar();
   assert.deepEqual(draws, [
-    { x: 0, y: 0, width: 120, height: 12, name: "scorebar-bg" },
-    { x: 7.5, y: 7.8, width: 108.5625, height: 4.825, name: "scorebar-colour" },
+    { x: 0, y: 0, width: 125, height: 12.5, name: "scorebar-bg" },
+    { x: 7.5, y: 7.8, width: 112.5, height: 5, name: "scorebar-colour" },
   ]);
 });
 

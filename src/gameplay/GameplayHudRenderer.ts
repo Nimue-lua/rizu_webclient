@@ -6,7 +6,8 @@ export interface HudLayout {
 }
 
 export interface GameplayHudRenderer {
-  draw(state: HudState, layout: HudLayout): void;
+  drawHpBar(): void;
+  drawScore(state: HudState, layout: HudLayout): void;
 }
 
 export function getGameplayHudLayout(logical_width: number): HudLayout {
