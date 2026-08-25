@@ -166,3 +166,32 @@ test("requests visible slider bodies and draws repeat-aware head and end circles
   const endpoint_quad = quads[0] as [number, number];
   assert.equal(endpoint_quad[0], 64 + 200 - 32);
 });
+
+test("fades slider bodies and circles for 240ms after their end", () => {
+  const sprite = {} as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: sprite, hitCircleOverlay: sprite, approachCircle: sprite,
+    comboColor: [1, 1, 1, 1] } as unknown as OsuStandardSkin;
+  const slider: OsuSlider = {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
+    control_points: [{ x: 200, y: 100 }], repeat_count: 1, pixel_length: 100,
+    edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+    span_duration: 0.5, total_duration: 0.5, end_time: 1.5,
+  };
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 1.5, primary_tempo: 120,
+    slider_multiplier: 1.4, timing_points: [], hit_objects: [slider] } as const;
+  const path = OsuSliderPath.create(slider, 14);
+  const alphas: number[] = [];
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  const renderer = new OsuPlayfieldRenderer(skin);
+  renderer.draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.62,
+    (...quad) => quads.push(quad), () => path, (_slider, _path, alpha) => alphas.push(alpha));
+  assert.ok(Math.abs(alphas[0]! - 0.5) < 1e-9);
+  assert.ok(quads.slice(0, 2).every((quad) => Math.abs(quad[4][3] - 0.5) < 1e-9));
+
+  const gone: unknown[] = [];
+  renderer.draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.74,
+    (...quad) => gone.push(quad), () => path, () => gone.push("body"));
+  assert.deepEqual(gone, []);
+});

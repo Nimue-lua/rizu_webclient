@@ -17,13 +17,16 @@ function createSlider(): OsuSlider {
 
 function createGl() {
   let id = 0;
-  const calls = { buffers: 0, deleted_buffers: 0, arrays: 0, deleted_arrays: 0, draws: 0, deleted_programs: 0 };
+  const calls = { buffers: 0, deleted_buffers: 0, arrays: 0, deleted_arrays: 0, draws: 0,
+    shader_sources: [] as string[],
+    depth_masks: [] as boolean[], color_masks: [] as boolean[][], deleted_programs: 0 };
   const handle = () => ({ id: ++id });
   const gl = {
     VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4, ARRAY_BUFFER: 5,
     ELEMENT_ARRAY_BUFFER: 6, FLOAT: 7, STATIC_DRAW: 8, BLEND: 9, ONE: 10, ONE_MINUS_SRC_ALPHA: 11,
-    TRIANGLES: 12, UNSIGNED_INT: 13,
-    createShader: handle, shaderSource() {}, compileShader() {}, getShaderParameter: () => true,
+    TRIANGLES: 12, UNSIGNED_INT: 13, DEPTH_TEST: 14, DEPTH_BUFFER_BIT: 15, LEQUAL: 16, LESS: 17,
+    createShader: handle, shaderSource(_shader: object, source: string) { calls.shader_sources.push(source); },
+    compileShader() {}, getShaderParameter: () => true,
     getShaderInfoLog: () => null, deleteShader() {}, createProgram: handle, attachShader() {}, linkProgram() {},
     getProgramParameter: () => true, getProgramInfoLog: () => null,
     deleteProgram() { calls.deleted_programs += 1; }, getUniformLocation: handle,
@@ -33,7 +36,10 @@ function createGl() {
     deleteBuffer(value: object | null) { if (value) calls.deleted_buffers += 1; }, bindBuffer() {}, bufferData() {},
     getAttribLocation: (_program: object, name: string) => name === "position" ? 0 : 1,
     enableVertexAttribArray() {}, vertexAttribPointer() {}, useProgram() {}, uniform2f() {}, uniform4f() {},
-    uniform1f() {}, enable() {}, blendFunc() {}, drawElements() { calls.draws += 1; },
+    uniform1f() {}, enable() {}, disable() {}, blendFunc() {}, depthFunc() {}, clearDepth() {}, clear() {},
+    depthMask(value: boolean) { calls.depth_masks.push(value); },
+    colorMask(...values: boolean[]) { calls.color_masks.push(values); },
+    drawElements() { calls.draws += 1; },
   } as unknown as WebGL2RenderingContext;
   return { gl, calls };
 }
@@ -41,6 +47,9 @@ function createGl() {
 test("uploads each slider once, draws indexed geometry, and destroys owned buffers", () => {
   const fake = createGl();
   const graphics = new WebGlSliderGraphics({ getContext: () => fake.gl } as unknown as HTMLCanvasElement);
+  assert.match(fake.calls.shader_sources[0]!, /out float radial;/);
+  assert.match(fake.calls.shader_sources[0]!, /radial = edge_distance;/);
+  assert.match(fake.calls.shader_sources[1]!, /in float radial;/);
   const slider = createSlider();
   const path = OsuSliderPath.create(slider, 14);
   assert.equal(graphics.upload(slider, path, 20), true);
@@ -50,7 +59,9 @@ test("uploads each slider once, draws indexed geometry, and destroys owned buffe
   graphics.draw(slider, new OsuViewport(640, 480), {
     framebuffer_width: 640, framebuffer_height: 480, logical_width: 640, logical_height: 480,
   }, [1, 0, 0, 1], [1, 1, 1, 1], 1);
-  assert.equal(fake.calls.draws, 1);
+  assert.equal(fake.calls.draws, 2);
+  assert.deepEqual(fake.calls.depth_masks, [true, false]);
+  assert.deepEqual(fake.calls.color_masks, [[false, false, false, false], [true, true, true, true]]);
   graphics.destroy();
   graphics.destroy();
   assert.equal(fake.calls.deleted_buffers, 2);

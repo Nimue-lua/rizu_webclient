@@ -11,6 +11,7 @@ const CIRCLE_FADE_IN = 0.4;
 const APPROACH_FADE_IN = 0.8;
 const HIT_FADE_OUT = 0.24;
 const MISS_FADE_OUT = 0.06;
+const SLIDER_FADE_OUT = 0.24;
 const JUDGMENT_FADE_IN = 0.12;
 const JUDGMENT_HOLD = 0.5;
 const JUDGMENT_LIFETIME = 1.1;
@@ -34,14 +35,19 @@ export class OsuPlayfieldRenderer {
       if (object.absolute_time > song_time + preempt) break;
       if (object.kind !== "slider") continue;
       const remaining = object.absolute_time - song_time;
-      if (remaining > preempt || song_time > object.end_time) continue;
+      const end_age = song_time - object.end_time;
+      if (remaining > preempt || end_age >= SLIDER_FADE_OUT) continue;
       const age = preempt - remaining;
-      const alpha = Math.min(1, Math.max(0, age / CIRCLE_FADE_IN));
+      const fade_in_alpha = Math.min(1, Math.max(0, age / CIRCLE_FADE_IN));
+      const fade_out_alpha = end_age > 0 ? Math.max(0, 1 - end_age / SLIDER_FADE_OUT) : 1;
+      const alpha = fade_in_alpha * fade_out_alpha;
       const path = slider_path?.(object);
       if (path) draw_slider?.(object, path, alpha);
       const endpoint = path?.endPosition(object.repeat_count) ?? { x: object.x, y: object.y };
       this.drawCircle(viewport, endpoint, diameter, alpha, 0, 1, write);
-      const approach_alpha = remaining > 0 ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9) : 0;
+      const approach_alpha = remaining > 0
+        ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
+        : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
       this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale, write);
     }

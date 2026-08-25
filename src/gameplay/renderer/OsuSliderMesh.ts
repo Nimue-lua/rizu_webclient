@@ -1,7 +1,7 @@
 import type { Point } from "../OsuViewport";
 import type { OsuSliderPath } from "../OsuSliderPath";
 
-const CIRCLE_SEGMENTS = 16;
+const CIRCLE_SEGMENTS = 24;
 const MAX_RENDER_POINTS = 2_048;
 const RENDER_POINT_DISTANCE = 6;
 const VERTEX_FLOATS = 3;
@@ -9,6 +9,7 @@ const VERTEX_FLOATS = 3;
 export interface OsuSliderMeshData {
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
+  readonly wireframe_indices: Uint32Array;
   readonly bounds: Readonly<{ left: number; top: number; right: number; bottom: number }>;
 }
 
@@ -30,35 +31,25 @@ export function createOsuSliderMesh(path: OsuSliderPath, radius: number): OsuSli
     return index;
   };
 
-  const strip_points = points.map((point, index) => {
-    const previous = points[Math.max(0, index - 1)]!;
-    const next = points[Math.min(points.length - 1, index + 1)]!;
-    const before = unitNormal(previous, point, point, next);
-    const after = unitNormal(point, next, previous, point);
-    let normal_x = before.x + after.x;
-    let normal_y = before.y + after.y;
-    const normal_length = Math.hypot(normal_x, normal_y);
-    if (normal_length === 0) {
-      normal_x = after.x || before.x;
-      normal_y = after.y || before.y;
-    } else {
-      normal_x /= normal_length;
-      normal_y /= normal_length;
-    }
-    const projection = Math.max(0.5, Math.abs(normal_x * after.x + normal_y * after.y));
-    const scale = Math.min(radius / projection, radius * 2);
-    return { point, normal_x: normal_x * scale, normal_y: normal_y * scale };
-  });
-  for (const { point, normal_x, normal_y } of strip_points) {
-    vertex(point.x + normal_x, point.y + normal_y, 1);
-    vertex(point.x, point.y, 0);
-    vertex(point.x - normal_x, point.y - normal_y, 1);
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1]!;
+    const end = points[index]!;
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length === 0) continue;
+    const normal_x = -(end.y - start.y) / length * radius;
+    const normal_y = (end.x - start.x) / length * radius;
+    const base = vertices.length / VERTEX_FLOATS;
+    vertex(start.x + normal_x, start.y + normal_y, 1);
+    vertex(start.x, start.y, 0);
+    vertex(start.x - normal_x, start.y - normal_y, 1);
+    vertex(end.x + normal_x, end.y + normal_y, 1);
+    vertex(end.x, end.y, 0);
+    vertex(end.x - normal_x, end.y - normal_y, 1);
+    indices.push(base, base + 1, base + 3, base + 3, base + 1, base + 4,
+      base + 1, base + 2, base + 4, base + 4, base + 2, base + 5);
   }
-  for (let index = 1; index < strip_points.length; index += 1) {
-    const base = (index - 1) * 3;
-    const next = index * 3;
-    indices.push(base, base + 1, next, next, base + 1, next + 1,
-      base + 1, base + 2, next + 1, next + 1, base + 2, next + 2);
+  for (let index = 1; index < points.length - 1; index += 1) {
+    addRoundJoin(points[index - 1]!, points[index]!, points[index + 1]!, radius, vertex, indices);
   }
   for (const point of points.length > 1 ? [points[0]!, points.at(-1)!] : points) {
     const base = vertices.length / VERTEX_FLOATS;
@@ -78,19 +69,59 @@ export function createOsuSliderMesh(path: OsuSliderPath, radius: number): OsuSli
     right += radius;
     bottom += radius;
   }
-  return { vertices: new Float32Array(vertices), indices: new Uint32Array(indices), bounds: { left, top, right, bottom } };
+  return {
+    vertices: new Float32Array(vertices),
+    indices: new Uint32Array(indices),
+    wireframe_indices: createWireframeIndices(indices),
+    bounds: { left, top, right, bottom },
+  };
 }
 
-function unitNormal(start: Point, end: Point, fallback_start: Point, fallback_end: Point): Point {
-  let dx = end.x - start.x;
-  let dy = end.y - start.y;
-  let length = Math.hypot(dx, dy);
-  if (length === 0) {
-    dx = fallback_end.x - fallback_start.x;
-    dy = fallback_end.y - fallback_start.y;
-    length = Math.hypot(dx, dy);
+function addRoundJoin(previous: Point, point: Point, next: Point, radius: number,
+  vertex: (x: number, y: number, edge_distance: number) => number, indices: number[]): void {
+  const before_length = Math.hypot(point.x - previous.x, point.y - previous.y);
+  const after_length = Math.hypot(next.x - point.x, next.y - point.y);
+  if (before_length === 0 || after_length === 0) return;
+  const before_x = (point.x - previous.x) / before_length;
+  const before_y = (point.y - previous.y) / before_length;
+  const after_x = (next.x - point.x) / after_length;
+  const after_y = (next.y - point.y) / after_length;
+  const cross = before_x * after_y - before_y * after_x;
+  if (Math.abs(cross) < 1e-6) return;
+
+  const side = cross > 0 ? -1 : 1;
+  let start_angle = Math.atan2(before_x * side, -before_y * side);
+  let end_angle = Math.atan2(after_x * side, -after_y * side);
+  if (cross > 0) {
+    while (end_angle < start_angle) end_angle += Math.PI * 2;
+  } else {
+    while (end_angle > start_angle) end_angle -= Math.PI * 2;
   }
-  return length > 0 ? { x: -dy / length, y: dx / length } : { x: 0, y: 0 };
+  const sweep = end_angle - start_angle;
+  const segments = Math.max(1, Math.ceil(Math.abs(sweep) * CIRCLE_SEGMENTS / (Math.PI * 2)));
+  const center = vertex(point.x, point.y, 0);
+  let previous_edge = vertex(point.x + Math.cos(start_angle) * radius,
+    point.y + Math.sin(start_angle) * radius, 1);
+  for (let segment = 1; segment <= segments; segment += 1) {
+    const angle = start_angle + sweep * segment / segments;
+    const edge = vertex(point.x + Math.cos(angle) * radius, point.y + Math.sin(angle) * radius, 1);
+    if (cross > 0) indices.push(center, previous_edge, edge);
+    else indices.push(center, edge, previous_edge);
+    previous_edge = edge;
+  }
+}
+
+function createWireframeIndices(indices: readonly number[]): Uint32Array {
+  const edges = new Map<string, readonly [number, number]>();
+  for (let index = 0; index < indices.length; index += 3) {
+    const triangle = [indices[index]!, indices[index + 1]!, indices[index + 2]!] as const;
+    for (const [first, second] of [[triangle[0], triangle[1]], [triangle[1], triangle[2]],
+      [triangle[2], triangle[0]]] as const) {
+      const edge = first < second ? [first, second] as const : [second, first] as const;
+      edges.set(`${edge[0]}:${edge[1]}`, edge);
+    }
+  }
+  return new Uint32Array([...edges.values()].flatMap((edge) => edge));
 }
 
 function simplify(points: readonly Point[]): Point[] {
@@ -99,10 +130,21 @@ function simplify(points: readonly Point[]): Point[] {
   for (let index = 1; index < points.length - 1; index += 1) {
     const previous = simplified.at(-1)!;
     const point = points[index]!;
-    if (Math.hypot(point.x - previous.x, point.y - previous.y) >= RENDER_POINT_DISTANCE) simplified.push(point);
+    const next = points[index + 1]!;
+    if (Math.hypot(point.x - previous.x, point.y - previous.y) >= RENDER_POINT_DISTANCE ||
+      isSharpTurn(points[index - 1]!, point, next)) simplified.push(point);
   }
   simplified.push(points.at(-1)!);
   if (simplified.length <= MAX_RENDER_POINTS) return simplified;
   return Array.from({ length: MAX_RENDER_POINTS }, (_, index) =>
     simplified[Math.floor(index * (simplified.length - 1) / (MAX_RENDER_POINTS - 1))]!);
+}
+
+function isSharpTurn(previous: Point, point: Point, next: Point): boolean {
+  const before_x = point.x - previous.x;
+  const before_y = point.y - previous.y;
+  const after_x = next.x - point.x;
+  const after_y = next.y - point.y;
+  const denominator = Math.hypot(before_x, before_y) * Math.hypot(after_x, after_y);
+  return denominator > 0 && (before_x * after_x + before_y * after_y) / denominator < 0.95;
 }

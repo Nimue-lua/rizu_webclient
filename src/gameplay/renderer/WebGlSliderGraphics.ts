@@ -13,10 +13,12 @@ in float edge_distance;
 uniform vec2 viewport_size;
 uniform vec2 playfield_scale;
 uniform vec2 playfield_offset;
+uniform float depth_bias;
 out float radial;
 void main() {
   vec2 screen = playfield_offset + position * playfield_scale;
-  gl_Position = vec4(screen.x / viewport_size.x * 2.0 - 1.0, 1.0 - screen.y / viewport_size.y * 2.0, 0.0, 1.0);
+  gl_Position = vec4(screen.x / viewport_size.x * 2.0 - 1.0, 1.0 - screen.y / viewport_size.y * 2.0,
+    edge_distance * 1.8 - 0.8 - depth_bias, 1.0);
   radial = edge_distance;
 }`;
 
@@ -28,7 +30,6 @@ uniform vec4 border_color;
 uniform float opacity;
 out vec4 color;
 void main() {
-  // Stable samples a 1D texture from the outside of the slider (0) to its centre (1).
   float track_position = 1.0 - radial;
   float aa = max(fwidth(track_position), 3.0 / 256.0);
   vec4 shadow = vec4(0.0, 0.0, 0.0, 64.0 / 255.0);
@@ -65,7 +66,7 @@ interface UploadedMesh {
 export class WebGlSliderGraphics {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
-  private readonly uniforms: Readonly<Record<"viewport" | "scale" | "offset" | "body" | "border" | "opacity", WebGLUniformLocation>>;
+  private readonly uniforms: Readonly<Record<"viewport" | "scale" | "offset" | "depth_bias" | "body" | "border" | "opacity", WebGLUniformLocation>>;
   private readonly meshes = new Map<OsuSlider, UploadedMesh>();
   private uploaded_bytes = 0;
   private destroyed = false;
@@ -76,8 +77,9 @@ export class WebGlSliderGraphics {
     const program = createProgram(gl);
     const uniforms = {
       viewport: gl.getUniformLocation(program, "viewport_size"), scale: gl.getUniformLocation(program, "playfield_scale"),
-      offset: gl.getUniformLocation(program, "playfield_offset"), body: gl.getUniformLocation(program, "body_color"),
-      border: gl.getUniformLocation(program, "border_color"), opacity: gl.getUniformLocation(program, "opacity"),
+      offset: gl.getUniformLocation(program, "playfield_offset"), depth_bias: gl.getUniformLocation(program, "depth_bias"),
+      body: gl.getUniformLocation(program, "body_color"), border: gl.getUniformLocation(program, "border_color"),
+      opacity: gl.getUniformLocation(program, "opacity"),
     };
     if (Object.values(uniforms).some((uniform) => !uniform)) {
       gl.deleteProgram(program);
@@ -137,9 +139,24 @@ export class WebGlSliderGraphics {
     gl.uniform4f(this.uniforms.body, ...body);
     gl.uniform4f(this.uniforms.border, ...border);
     gl.uniform1f(this.uniforms.opacity, Math.min(Math.max(opacity, 0), 1));
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
+    gl.clearDepth(1);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.colorMask(false, false, false, false);
+    gl.depthFunc(gl.LEQUAL);
+    gl.uniform1f(this.uniforms.depth_bias, 0);
+    gl.drawElements(gl.TRIANGLES, mesh.index_count, gl.UNSIGNED_INT, 0);
+
+    gl.colorMask(true, true, true, true);
+    gl.depthFunc(gl.LESS);
+    gl.uniform1f(this.uniforms.depth_bias, 1 / 65_536);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawElements(gl.TRIANGLES, mesh.index_count, gl.UNSIGNED_INT, 0);
+    gl.depthMask(false);
+    gl.disable(gl.DEPTH_TEST);
   }
 
   destroy(): void {
