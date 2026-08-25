@@ -60,12 +60,16 @@ export class OsuPlayfieldRenderer {
         ? Math.min(alpha, Math.max(0, 1 - (song_time - slider_state.head_resolved_at) / head_fade_duration))
         : slider_states !== undefined && circle_states[object_index] !== OsuCircleState.Pending ? 0
         : alpha;
+      const head_hit_progress = slider_state?.head_successful
+        ? Math.min(1, Math.max(0, (song_time - slider_state.head_resolved_at) / HIT_FADE_OUT))
+        : 0;
+      const head_scale = 1 + 0.4 * (2 * head_hit_progress - head_hit_progress * head_hit_progress);
       const approach_alpha = remaining > 0
         ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
         : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
       this.drawCircle(viewport, object, diameter, head_alpha, slider_state ? 0 : approach_alpha, approach_scale,
-        combo, object.combo_number, write);
+        combo, object.combo_number, write, head_scale, slider_state?.head_successful ? 0 : head_alpha);
       if (path && object.tick_distances.length > 0 && song_time < object.end_time) {
         this.drawSliderTicks(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
@@ -245,13 +249,15 @@ export class OsuPlayfieldRenderer {
 
   private drawCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number, alpha: number,
     approach_alpha: number, approach_scale: number, combo: readonly [number, number, number, number],
-    combo_number: number | null, write: SpriteQuadWriter): void {
+    combo_number: number | null, write: SpriteQuadWriter, circle_scale = 1, number_alpha = alpha): void {
     const center = viewport.playfieldToScreen(position);
     const addCentered = (size: number, color: readonly [number, number, number, number], sprite: OsuStandardSkin["hitCircle"]) =>
       write(center.x - size / 2, center.y - size / 2, size, size, color, sprite);
-    addCentered(diameter, [combo[0], combo[1], combo[2], alpha], this.skin.hitCircle);
-    if (combo_number !== null) this.drawComboNumber(center, combo_number, diameter, alpha, write);
-    addCentered(diameter, [1, 1, 1, alpha], this.skin.hitCircleOverlay);
+    addCentered(diameter * circle_scale, [combo[0], combo[1], combo[2], alpha], this.skin.hitCircle);
+    if (combo_number !== null && number_alpha > 0) {
+      this.drawComboNumber(center, combo_number, diameter, number_alpha, write);
+    }
+    addCentered(diameter * circle_scale, [1, 1, 1, alpha], this.skin.hitCircleOverlay);
     addCentered(diameter * approach_scale, [combo[0], combo[1], combo[2], approach_alpha], this.skin.approachCircle);
   }
 

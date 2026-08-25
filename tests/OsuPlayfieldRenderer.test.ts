@@ -286,14 +286,16 @@ test("matches stable slider head, ball, and follow-circle activation animations"
   const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
   const ball = { sourceSize: { w: 20, h: 20 } } as OsuStandardSkin["hitCircle"];
   const follow = { sourceSize: { w: 128, h: 128 } } as OsuStandardSkin["hitCircle"];
+  const digit = { sourceSize: { w: 20, h: 40 } } as OsuStandardSkin["hitCircle"];
   const skin = { hitCircle: circle, hitCircleOverlay: circle, approachCircle: circle,
-    comboColor: [1, 1, 1, 1], sliderBallFrames: [ball], sliderFollowCircle: follow } as unknown as OsuStandardSkin;
+    comboColor: [1, 1, 1, 1], sliderBallFrames: [ball], sliderFollowCircle: follow,
+    hitCircleGlyphs: { "1": digit } } as unknown as OsuStandardSkin;
   const object = {
     kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
     control_points: [{ x: 200, y: 100 }], repeat_count: 1, pixel_length: 100,
     edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
     hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
-    span_duration: 1, total_duration: 1, end_time: 2, tick_distances: [],
+    span_duration: 1, total_duration: 1, end_time: 2, tick_distances: [], combo_number: 1,
   } as OsuSlider;
   const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
     hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
@@ -310,12 +312,16 @@ test("matches stable slider head, ball, and follow-circle activation animations"
 
   const early = drawAt(0.9, false, null);
   assert.equal(early.some((quad) => quad[5] === ball || quad[5] === follow), false);
+  assert.equal(early.some((quad) => quad[5] === digit), false);
 
   const untracked = drawAt(1, false, null);
   assert.equal(untracked.filter((quad) => quad[5] === ball).length, 1);
   assert.equal(untracked.some((quad) => quad[5] === follow), false);
-  assert.ok(untracked.filter((quad) => quad[5] === circle).some((quad) =>
-    quad[0] === 64 + 100 - 32 && quad[4][3] < 0.59));
+  const head = untracked.filter((quad) => quad[5] === circle).find((quad) => quad[4][3] < 0.59)!;
+  const hit_progress = 0.1 / 0.24;
+  const expected_head_size = 64 * (1 + 0.4 * (2 * hit_progress - hit_progress * hit_progress));
+  assert.ok(Math.abs(head[2] - expected_head_size) < 1e-9);
+  assert.ok(Math.abs(head[0] - (64 + 100 - expected_head_size / 2)) < 1e-9);
 
   const starting = drawAt(1.03, true, 1);
   const follower = starting.find((quad) => quad[5] === follow)!;
