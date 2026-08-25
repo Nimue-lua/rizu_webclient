@@ -43,6 +43,7 @@ test("retains typed standard objects, slider data, and normalized durations", ()
   if (chart.mode !== "osu") return;
 
   assert.equal(chart.slider_multiplier, 2);
+  assert.equal(chart.format_version, 14);
   assert.equal(chart.end_time, 3.6);
   assert.equal(chart.object_count, 6);
   assert.equal(chart.drain_length_seconds, 3);

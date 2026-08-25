@@ -78,6 +78,7 @@ export interface OsuTimingPoint {
 
 export interface OsuChart {
   mode: "osu";
+  format_version: number;
   approach_rate: number;
   circle_size: number;
   end_time: number;

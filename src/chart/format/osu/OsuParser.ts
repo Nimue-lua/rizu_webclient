@@ -191,6 +191,8 @@ function computePrimaryTempo(changes: readonly TimingChange[], last_time: number
 }
 
 export function parseOsuChart(source: string): Chart {
+  const format_match = /^osu file format v(\d+)/.exec(source.replace(/^\uFEFF/, ""));
+  const format_version = format_match ? Number(format_match[1]) : 14;
   let section = "";
   let mode = 3;
   let circle_size: number | null = null;
@@ -320,6 +322,7 @@ export function parseOsuChart(source: string): Chart {
   if (mode === 0) {
     return {
       mode: "osu",
+      format_version,
       approach_rate,
       circle_size,
       end_time: last_time,
