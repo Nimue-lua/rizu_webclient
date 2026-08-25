@@ -14,6 +14,7 @@ import type { OsuSlider } from "../../chart/Chart";
 import { OsuSliderPath } from "../OsuSliderPath";
 import { osuCircleDiameter } from "../OsuCircleGeometry";
 import { WebGlSliderGraphics } from "./WebGlSliderGraphics";
+import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
 
 const MAX_SLIDER_UPLOADS_PER_FRAME = 2;
 
@@ -21,7 +22,8 @@ export interface OsuGameplayRenderer {
   clientToPlayfield(point: Point, bounds: ClientBounds): Point;
   draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
     circle_transients: readonly OsuCircleTransient[], song_time: number,
-    state: GameplayPresentationState, cursor: OsuCursorState): void;
+    state: GameplayPresentationState, cursor: OsuCursorState,
+    slider_states?: readonly OsuSliderPresentationState[], spinner_state?: OsuSpinnerPresentationState | null): void;
   destroy(): void;
 }
 
@@ -58,7 +60,9 @@ export class OsuRenderer implements OsuGameplayRenderer {
 
   draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
     circle_transients: readonly OsuCircleTransient[], song_time: number,
-    state: GameplayPresentationState, cursor: OsuCursorState): void {
+    state: GameplayPresentationState, cursor: OsuCursorState,
+    slider_states: readonly OsuSliderPresentationState[] | undefined = undefined,
+    spinner_state: OsuSpinnerPresentationState | null = null): void {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
     const commands: SpriteDrawCommand[] = [];
@@ -87,7 +91,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     };
     this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write,
       sliderPath, (slider, _path, alpha, color) => this.slider_graphics.draw(slider, viewport, frame,
-        this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha));
+        this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha), slider_states, spinner_state);
     this.combo.draw(state.combo, 8, frame.logical_height - 8, write);
     const cursor_center = viewport.playfieldToScreen(cursor.position);
     const cursor_scale = cursor.primary || cursor.secondary ? 0.9 : 1;

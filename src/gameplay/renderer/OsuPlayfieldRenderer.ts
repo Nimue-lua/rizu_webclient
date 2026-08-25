@@ -6,6 +6,7 @@ import { OsuViewport } from "../OsuViewport";
 import type { OsuStandardSkin } from "./OsuSkin";
 import type { SpriteQuadWriter } from "./Sprite";
 import type { OsuSliderPath } from "../OsuSliderPath";
+import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
 
 const CIRCLE_FADE_IN = 0.4;
 const APPROACH_FADE_IN = 0.8;
@@ -17,6 +18,8 @@ const JUDGMENT_HOLD = 0.5;
 const JUDGMENT_LIFETIME = 1.1;
 const OSU_HIT_OBJECT_TEXTURE_SIZE = 128;
 const REVERSE_ARROW_FADE_IN = 0.15;
+const FOLLOW_FADE_IN = 0.06;
+const FOLLOW_SCALE_IN = 0.18;
 
 export class OsuPlayfieldRenderer {
   constructor(private readonly skin: OsuStandardSkin) {}
@@ -25,7 +28,9 @@ export class OsuPlayfieldRenderer {
     circle_transients: readonly OsuCircleTransient[], song_time: number, write: SpriteQuadWriter,
     slider_path?: (slider: OsuSlider) => OsuSliderPath | undefined,
     draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number,
-      color: readonly [number, number, number, number]) => void): void {
+      color: readonly [number, number, number, number]) => void,
+    slider_states: readonly OsuSliderPresentationState[] | undefined = undefined,
+    spinner_state: OsuSpinnerPresentationState | null = null): void {
     const preempt = osuApproachPreempt(chart.approach_rate);
     const diameter = osuCircleDiameter(chart.circle_size) * viewport.scale;
     const shake_offsets = new Map<number, number>();
@@ -34,7 +39,7 @@ export class OsuPlayfieldRenderer {
       const age = song_time - transient.start_time;
       if (age >= 0 && age < 0.12) shake_offsets.set(transient.object_index, stableShakeOffset(age));
     }
-    for (const object of chart.hit_objects) {
+    for (const [object_index, object] of chart.hit_objects.entries()) {
       if (object.absolute_time > song_time + preempt) break;
       if (object.kind !== "slider") continue;
       const remaining = object.absolute_time - song_time;
@@ -49,22 +54,30 @@ export class OsuPlayfieldRenderer {
       if (path) draw_slider?.(object, path, alpha, combo);
       const endpoint = path?.endPosition(object.repeat_count) ?? { x: object.x, y: object.y };
       this.drawCircle(viewport, endpoint, diameter, alpha, 0, 1, combo, null, write);
+      const slider_state = slider_states?.find((state) => state.object_index === object_index && state.active);
+      const head_fade_duration = slider_state?.head_successful ? HIT_FADE_OUT : MISS_FADE_OUT;
+      const head_alpha = slider_state
+        ? Math.min(alpha, Math.max(0, 1 - (song_time - slider_state.head_resolved_at) / head_fade_duration))
+        : slider_states !== undefined && circle_states[object_index] !== OsuCircleState.Pending ? 0
+        : alpha;
       const approach_alpha = remaining > 0
         ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
         : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
-      this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale,
+      this.drawCircle(viewport, object, diameter, head_alpha, slider_state ? 0 : approach_alpha, approach_scale,
         combo, object.combo_number, write);
       if (path && object.tick_distances.length > 0 && song_time < object.end_time) {
         this.drawSliderTicks(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
-      if (path && song_time >= object.absolute_time && song_time <= object.end_time) {
+      if (path && song_time >= object.absolute_time && (slider_states === undefined || slider_state)) {
         this.drawSliderBall(viewport, object, path, song_time, diameter, write);
+        if (slider_state?.tracking) this.drawSliderFollowCircle(viewport, slider_state, song_time, diameter, write);
       }
       if (path && object.repeat_count > 1 && song_time < object.end_time) {
         this.drawReverseArrow(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
     }
+    if (spinner_state?.active) this.drawSpinner(viewport, spinner_state, write);
     let low = 0;
     let high = chart.hit_objects.length;
     while (low < high) {
@@ -205,6 +218,29 @@ export class OsuPlayfieldRenderer {
     const rotation = Math.atan2(screen_y, screen_x);
     write(center.x - width / 2, center.y - height / 2, width, height, [1, 1, 1, 1], frame,
       false, undefined, false, rotation);
+  }
+
+  private drawSliderFollowCircle(viewport: OsuViewport, state: OsuSliderPresentationState, song_time: number,
+    circle_diameter: number, write: SpriteQuadWriter): void {
+    const sprite = this.skin.sliderFollowCircle;
+    if (!sprite || state.tracking_started_at === null) return;
+    const center = viewport.playfieldToScreen(state.position);
+    const scale = circle_diameter / OSU_HIT_OBJECT_TEXTURE_SIZE;
+    const age = Math.max(0, song_time - state.tracking_started_at);
+    const scale_progress = Math.min(1, age / FOLLOW_SCALE_IN);
+    const active_scale = 0.5 + 0.5 * (1 - (1 - scale_progress) * (1 - scale_progress));
+    const width = sprite.sourceSize.w * scale * active_scale;
+    const height = sprite.sourceSize.h * scale * active_scale;
+    write(center.x - width / 2, center.y - height / 2, width, height,
+      [1, 1, 1, Math.min(1, age / FOLLOW_FADE_IN)], sprite);
+  }
+
+  private drawSpinner(viewport: OsuViewport, state: OsuSpinnerPresentationState, write: SpriteQuadWriter): void {
+    const center = viewport.playfieldToScreen({ x: 256, y: 192 });
+    const diameter = 180 * viewport.scale;
+    const alpha = 0.25 + state.progress * 0.5;
+    write(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter,
+      [1, 1, 1, alpha], this.skin.approachCircle);
   }
 
   private drawCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number, alpha: number,

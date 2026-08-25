@@ -72,3 +72,16 @@ test("score judgment windows remain in chart-time units at changed music rates",
   double_time.receive(hit(0.049));
   assert.deepEqual(normal.getJudges(), double_time.getJudges());
 });
+
+test("scores stable slider parts and derives one accuracy judgment at the tail", () => {
+  const score = new OsuStandardScore(createOsuStandardTimingValues(5), 1);
+  score.receive({ kind: "slider-head", object_index: 0, time: 1, delta_time: 0, successful: true });
+  score.receive({ kind: "slider-point", point_kind: "tick", object_index: 0, time: 1.5, successful: true });
+  score.receive({ kind: "slider-point", point_kind: "repeat", object_index: 0, time: 2, successful: false });
+  score.receive({ kind: "slider-point", point_kind: "tail", object_index: 0, time: 2.964, successful: true });
+  score.receive({ kind: "slider-end", object_index: 0, time: 3, successful_parts: 3, total_parts: 4 });
+  assert.deepEqual(score.getJudges(), [0, 1, 0, 0]);
+  assert.equal(score.getScore(), 170);
+  assert.equal(score.getCombo(), 1);
+  assert.equal(score.getMaxCombo(), 2);
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { OsuChart } from "../src/chart/Chart";
+import type { OsuChart, OsuHitObject, OsuSlider } from "../src/chart/Chart";
 import { osuCircleHitRadius } from "../src/gameplay/OsuCircleGeometry";
 import { OsuCircleState } from "../src/gameplay/OsuCircleState";
 import { OsuRulesEngine } from "../src/gameplay/OsuRulesEngine";
@@ -30,6 +30,26 @@ function createChart(circles: readonly { x: number; y: number; absolute_time: nu
 
 function createEngine(circles: readonly { x: number; y: number; absolute_time: number }[]): OsuRulesEngine {
   return new OsuRulesEngine(createChart(circles), createOsuStandardTimingValues(5), 1);
+}
+
+const sample = { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" };
+
+function createObjectEngine(hit_objects: readonly OsuHitObject[]): OsuRulesEngine {
+  return new OsuRulesEngine({ ...createChart([]), object_count: hit_objects.length,
+    end_time: hit_objects.reduce((end, object) => Math.max(end,
+      object.kind === "circle" ? object.absolute_time : object.end_time), 0), hit_objects },
+  createOsuStandardTimingValues(5), 1);
+}
+
+function slider(overrides: Partial<OsuSlider> = {}): OsuSlider {
+  return {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, hit_sample: sample,
+    new_combo: false, combo_skip: 0, combo_number: 1, combo_color_index: 0,
+    curve_type: "linear", control_points: [{ x: 300, y: 100 }], repeat_count: 1,
+    pixel_length: 200, edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 },
+      { normal_set: 0, addition_set: 0 }], span_duration: 1, total_duration: 1, end_time: 2,
+    tick_distances: [100], ...overrides,
+  };
 }
 
 test("blocks a spatially acquired later circle while an earlier circle is live", () => {
@@ -158,4 +178,85 @@ test("advances the active circle cursor as deadlines pass", () => {
   engine.update(9_000);
   assert.equal(engine.first_active_circle_index, 9_000);
   assert.equal(engine.judgment_events.length, 9_000);
+});
+
+test("judges slider heads with circle windows and stable note lock", () => {
+  const engine = createObjectEngine([
+    { kind: "circle", x: 50, y: 50, absolute_time: 0.95, hit_sound: 0, hit_sample: sample,
+      new_combo: false, combo_skip: 0, combo_number: 1, combo_color_index: 0 },
+    slider(),
+  ]);
+  engine.setInput(100, 100, true, 1);
+  assert.equal(engine.click(100, 100, 1), "locked");
+  engine.update(1.1);
+  assert.equal(engine.click(100, 100, 1.1), "hit");
+  assert.equal(engine.judgment_events.at(-1)?.kind, "slider-head");
+  assert.equal(engine.slider_state?.object_index, 1);
+});
+
+test("does not start following from an early slider-head hit until slider time", () => {
+  const engine = createObjectEngine([slider()]);
+  engine.setInput(100, 100, true, 0.9);
+  assert.equal(engine.click(100, 100, 0.9), "hit");
+  assert.equal(engine.slider_state?.tracking, false);
+  assert.equal(engine.slider_state?.tracking_started_at, null);
+  engine.update(1);
+  assert.equal(engine.slider_state?.tracking, true);
+  assert.equal(engine.slider_state?.tracking_started_at, 1);
+});
+
+test("tracks slider ticks, repeats, and the lenient tail along the shared path", () => {
+  const object = slider({ repeat_count: 2, total_duration: 2, end_time: 3,
+    edge_sounds: [0, 0, 0], edge_sets: Array.from({ length: 3 }, () => ({ normal_set: 0, addition_set: 0 })) });
+  const engine = createObjectEngine([object]);
+  engine.setInput(100, 100, true, 1);
+  assert.equal(engine.click(100, 100, 1), "hit");
+
+  for (let step = 1; step <= 19; step += 1) {
+    const time = 1 + step / 10;
+    const progress = step <= 10 ? step / 10 : 2 - step / 10;
+    engine.setInput(100 + progress * 200, 100, true, time);
+  }
+  engine.setInput(107.2, 100, true, 2.964);
+  assert.equal(engine.slider_state?.active, true);
+  engine.update(3);
+
+  assert.deepEqual(engine.judgment_events.map((event) => event.kind === "slider-point" ? event.point_kind : event.kind),
+    ["slider-head", "tick", "repeat", "tick", "tail", "slider-end"]);
+  assert.equal(engine.score.judges?.["300"], 1);
+  assert.equal(engine.score.combo, 5);
+  assert.equal(engine.score.score, 458);
+  assert.equal(engine.slider_state, null);
+});
+
+test("uses the acquired follow radius and breaks combo on missed slider points", () => {
+  const engine = createObjectEngine([slider()]);
+  engine.setInput(100, 100, true, 1);
+  engine.click(100, 100, 1);
+  const radius = osuCircleHitRadius(5);
+  engine.setInput(140, 100 + radius * 2, true, 1.2);
+  assert.equal(engine.slider_state?.tracking, true);
+  engine.setInput(158, 100 + radius * 2.4, true, 1.29);
+  assert.equal(engine.slider_state?.tracking, false);
+  engine.update(1.5);
+  engine.setInput(280, 100, true, 1.9);
+  engine.update(1.964);
+  engine.update(2);
+  assert.equal(engine.score.judges?.["100"], 1);
+  assert.equal(engine.score.combo, 1);
+});
+
+test("starts and completes spinner rules from timestamped cursor samples", () => {
+  const spinner = { kind: "spinner" as const, x: 256, y: 192, absolute_time: 1, end_time: 2,
+    hit_sound: 0, hit_sample: sample, new_combo: false, combo_skip: 0, combo_number: null,
+    combo_color_index: 0 };
+  const engine = createObjectEngine([spinner]);
+  engine.setInput(356, 192, true, 1);
+  for (let index = 1; index <= 32; index += 1) {
+    const angle = index * Math.PI / 4;
+    engine.setInput(256 + Math.cos(angle) * 100, 192 + Math.sin(angle) * 100, true, 1 + index / 40);
+  }
+  engine.update(2);
+  assert.equal(engine.score.judges?.["300"], 1);
+  assert.equal(engine.spinner_state, null);
 });

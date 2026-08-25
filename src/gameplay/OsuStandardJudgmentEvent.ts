@@ -7,4 +7,33 @@ export type OsuStandardJudgmentEvent = {
   readonly kind: "miss";
   readonly object_index: number;
   readonly time: number;
+} | {
+  readonly kind: "slider-head";
+  readonly object_index: number;
+  readonly time: number;
+  readonly delta_time: number;
+  readonly successful: boolean;
+} | {
+  readonly kind: "slider-point";
+  readonly point_kind: "tick" | "repeat" | "tail";
+  readonly object_index: number;
+  readonly time: number;
+  readonly successful: boolean;
+} | {
+  readonly kind: "slider-end";
+  readonly object_index: number;
+  readonly time: number;
+  readonly successful_parts: number;
+  readonly total_parts: number;
+} | {
+  readonly kind: "spinner-spin";
+  readonly object_index: number;
+  readonly time: number;
+  readonly bonus: boolean;
+} | {
+  readonly kind: "spinner-end";
+  readonly object_index: number;
+  readonly time: number;
+  readonly rotations: number;
+  readonly required_rotations: number;
 };

@@ -117,6 +117,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     this.cursor_position = position;
     const time = this.clock.timeAt(performance_time).corrected;
     this.input_events.push({ type: "aim", time, x: position.x, y: position.y });
+    this.rules_engine.setInput(position.x, position.y,
+      this.action_sources.primary > 0 || this.action_sources.secondary > 0, time);
   }
 
   pressPointer(pointer_id: number, action: OsuAction, performance_time: number): void {
@@ -170,6 +172,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const time = this.clock.timeAt(performance_time).corrected;
     const pressed_now = current > 0;
     this.input_events.push({ type: "action", time, action, pressed: pressed_now });
+    this.rules_engine.setInput(this.cursor_position.x, this.cursor_position.y,
+      this.action_sources.primary > 0 || this.action_sources.secondary > 0, time);
     if (pressed_now) this.rules_engine.click(this.cursor_position.x, this.cursor_position.y, time);
   }
 
@@ -184,7 +188,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     this.rules_engine.update(song_time);
     this.renderer.draw(this.data.chart, this.rules_engine.circle_states,
       this.rules_engine.first_active_circle_index, this.rules_engine.circle_transients, song_time,
-      this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state);
+      this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
+      this.rules_engine.slider_states, this.rules_engine.spinner_state);
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

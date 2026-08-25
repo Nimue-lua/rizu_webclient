@@ -12,6 +12,18 @@ const BASE_SCORES = [300, 100, 50, 0] as const;
 export function classifyOsuStandardJudgment(windows: OsuStandardTimingValues,
   event: OsuStandardJudgmentEvent): OsuStandardJudge {
   if (event.kind === "miss") return "miss";
+  if (event.kind === "slider-end") {
+    if (event.successful_parts === event.total_parts) return "300";
+    if (event.successful_parts * 2 >= event.total_parts) return "100";
+    return event.successful_parts > 0 ? "50" : "miss";
+  }
+  if (event.kind === "spinner-end") {
+    if (event.rotations >= event.required_rotations + 2) return "300";
+    if (event.rotations >= event.required_rotations + 1) return "100";
+    if (event.rotations >= event.required_rotations) return "50";
+    return "miss";
+  }
+  if (event.kind !== "hit") return "miss";
   const delta = Math.abs(event.delta_time);
   if (delta < windows.hit_300) return "300";
   if (delta < windows.hit_100) return "100";
@@ -38,8 +50,22 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
   }
 
   receive(event: OsuStandardJudgmentEvent): void {
+    if (event.kind === "slider-head") {
+      this.addSliderPoint(30, event.successful, true);
+      return;
+    }
+    if (event.kind === "slider-point") {
+      this.addSliderPoint(event.point_kind === "tick" ? 10 : 30, event.successful,
+        event.point_kind !== "tail");
+      return;
+    }
+    if (event.kind === "spinner-spin") {
+      if (event.bonus) this.score += 1100;
+      else this.score += 100;
+      return;
+    }
     const judge_index = OSU_STANDARD_JUDGE_NAMES.indexOf(classifyOsuStandardJudgment(this.windows, event));
-    this.add(judge_index);
+    this.add(judge_index, event.kind !== "slider-end");
   }
 
   getScore(): number {
@@ -82,18 +108,30 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
     return this.last_judge_index === null ? null : OSU_STANDARD_JUDGE_NAMES[this.last_judge_index]!;
   }
 
-  private add(index: number): void {
+  private add(index: number, change_combo = true): void {
     const base_score = BASE_SCORES[index]!;
-    if (base_score === 0) {
+    if (base_score === 0 && change_combo) {
       this.combo = 0;
     } else {
       // Stable applies the combo bonus before incrementing combo. No-mod ScoreV1
       // uses an integer difficulty multiplier and integer division by 25.
       this.score += base_score + Math.max(0, this.combo - 1) * Math.floor(base_score / 25) * this.difficulty_multiplier;
-      this.combo += 1;
-      this.max_combo = Math.max(this.max_combo, this.combo);
+      if (change_combo) {
+        this.combo += 1;
+        this.max_combo = Math.max(this.max_combo, this.combo);
+      }
     }
     this.judge_counts[index] = this.judge_counts[index]! + 1;
     this.last_judge_index = index;
+  }
+
+  private addSliderPoint(base_score: number, successful: boolean, break_combo: boolean): void {
+    if (!successful) {
+      if (break_combo) this.combo = 0;
+      return;
+    }
+    this.score += base_score;
+    this.combo += 1;
+    this.max_combo = Math.max(this.max_combo, this.combo);
   }
 }
