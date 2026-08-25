@@ -2,7 +2,7 @@ import type { Sprite, SpriteQuadWriter } from "./Sprite";
 
 export function drawBitmapText(sprites: Readonly<Record<string, Sprite>>, text: string,
   glyphs: Readonly<Record<string, string>>, overlap: number, anchor_x: number, y: number, scale: number,
-  align: "left" | "center" | "right", write: SpriteQuadWriter): void {
+  align: "left" | "center" | "right", write: SpriteQuadWriter, alpha = 1): void {
   const constant_width = sprites[glyphs["5"] ?? ""]?.sourceSize.w ?? 40;
   const placements: { sprite: Sprite; x: number }[] = [];
   let x = 0;
@@ -18,6 +18,6 @@ export function drawBitmapText(sprites: Readonly<Record<string, Sprite>>, text: 
   const left = anchor_x - x * logical_scale * alignment;
   for (const placement of placements) {
     write(left + placement.x * logical_scale, y, placement.sprite.sourceSize.w * logical_scale,
-      placement.sprite.sourceSize.h * logical_scale, [1, 1, 1, 1], placement.sprite);
+      placement.sprite.sourceSize.h * logical_scale, [1, 1, 1, alpha], placement.sprite);
   }
 }

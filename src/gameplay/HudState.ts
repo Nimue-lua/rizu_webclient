@@ -9,6 +9,8 @@ export interface HudState {
 export interface GameplayPresentationState {
   readonly hud: HudState;
   readonly combo: number;
+  readonly comboAnimationAge: number;
+  readonly comboAnimationFrom: number;
   readonly judgment: string | null;
   readonly judgmentAge: number;
 }
@@ -18,6 +20,9 @@ export class HudStateDeriver {
   private previous_frame_time: number | null = null;
   private previous_judges_total = 0;
   private judgment_time = -Infinity;
+  private previous_combo = 0;
+  private combo_animation_from = 0;
+  private combo_animation_time = -Infinity;
 
   update(score: ScoreResult, frame_time: number): GameplayPresentationState {
     const delta_time = this.previous_frame_time === null ? 0 : frame_time - this.previous_frame_time;
@@ -27,12 +32,22 @@ export class HudStateDeriver {
       this.judgment_time = frame_time;
       this.previous_judges_total = judges_total;
     }
+    const combo = score.combo ?? 0;
+    if (combo > this.previous_combo) {
+      this.combo_animation_from = this.previous_combo;
+      this.combo_animation_time = frame_time;
+    } else if (combo < this.previous_combo) {
+      this.combo_animation_time = -Infinity;
+    }
+    this.previous_combo = combo;
     return {
       hud: {
         score: score.score ?? 0,
         accuracy: this.displayed_accuracy.update((score.accuracy ?? 0) * 100, delta_time),
       },
-      combo: score.combo ?? 0,
+      combo,
+      comboAnimationAge: frame_time - this.combo_animation_time,
+      comboAnimationFrom: this.combo_animation_from,
       judgment: score.last_judge ?? null,
       judgmentAge: frame_time - this.judgment_time,
     };
