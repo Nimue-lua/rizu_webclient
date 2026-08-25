@@ -60,6 +60,7 @@ export interface OsuSlider extends OsuHitObjectBase {
   readonly span_duration: number;
   readonly total_duration: number;
   readonly end_time: number;
+  readonly tick_distances: readonly number[];
 }
 
 export interface OsuSpinner extends OsuHitObjectBase {
@@ -88,6 +89,7 @@ export interface OsuChart {
   drain_length_seconds: number;
   primary_tempo: number;
   slider_multiplier: number;
+  slider_tick_rate: number;
   timing_points: readonly OsuTimingPoint[];
   hit_objects: readonly OsuHitObject[];
 }

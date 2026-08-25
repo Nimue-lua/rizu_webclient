@@ -119,7 +119,7 @@ const CURVE_TYPES: Readonly<Record<string, OsuSliderCurveType>> = {
 };
 
 function normalizeStandardHitObject(object: RawHitObject, timing_points: readonly RawTimingPoint[],
-  slider_multiplier: number): OsuHitObject {
+  slider_multiplier: number, slider_tick_rate: number, format_version: number): OsuHitObject {
   const line = object.fields.join(",");
   const common = { x: object.x, y: object.y, absolute_time: object.start_time, hit_sound: object.hit_sound };
   if ((object.type & 1) !== 0) {
@@ -146,6 +146,18 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
       : 0;
     const end_time = Math.floor(object.start_time * 1000 + exact_duration_ms) / 1000;
     const total_duration = end_time - object.start_time;
+    const velocity = total_duration > 0 ? pixel_length * repeat_count / total_duration : 0;
+    const base_tick_distance = 100 * slider_multiplier / slider_tick_rate;
+    const tick_distance = Math.min(pixel_length, format_version < 8
+      ? base_tick_distance
+      : base_tick_distance * timing.velocity);
+    const tick_distances: number[] = [];
+    if (tick_distance > 0 && velocity > 0) {
+      for (let distance = tick_distance; distance <= pixel_length; distance += tick_distance) {
+        if (pixel_length - distance <= velocity * 0.01) break;
+        tick_distances.push(distance);
+      }
+    }
     return {
       kind: "slider", ...common, curve_type, control_points, repeat_count, pixel_length,
       edge_sounds: parseEdgeSounds(object.fields[8], repeat_count + 1, object.hit_sound, line),
@@ -154,6 +166,7 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
       span_duration: total_duration / repeat_count,
       total_duration,
       end_time,
+      tick_distances,
     };
   }
   if ((object.type & 8) !== 0) {
@@ -200,6 +213,7 @@ export function parseOsuChart(source: string): Chart {
   let hp_drain_rate = 5;
   let approach_rate: number | null = null;
   let slider_multiplier = 1.4;
+  let slider_tick_rate = 1;
   const timing_points: RawTimingPoint[] = [];
   const hit_objects: RawHitObject[] = [];
   const breaks: BreakPeriod[] = [];
@@ -231,6 +245,9 @@ export function parseOsuChart(source: string): Chart {
       }
       if (section === "Difficulty" && property_match[1] === "SliderMultiplier") {
         slider_multiplier = Number(property_match[2]);
+      }
+      if (section === "Difficulty" && property_match[1] === "SliderTickRate") {
+        slider_tick_rate = Number(property_match[2]);
       }
       continue;
     }
@@ -300,6 +317,10 @@ export function parseOsuChart(source: string): Chart {
     throw new Error("Chart has an invalid SliderMultiplier");
   }
   slider_multiplier = Math.min(Math.max(slider_multiplier, 0.4), 3.6);
+  if (!Number.isFinite(slider_tick_rate) || slider_tick_rate <= 0) {
+    throw new Error("Chart has an invalid SliderTickRate");
+  }
+  slider_tick_rate = Math.min(Math.max(slider_tick_rate, 0.5), 8);
   approach_rate ??= overall_difficulty;
   if (!Number.isFinite(approach_rate) || approach_rate < 0 || approach_rate > 10) {
     throw new Error("Chart has an invalid ApproachRate");
@@ -308,7 +329,8 @@ export function parseOsuChart(source: string): Chart {
   sortTimingPoints(timing_points);
   const timing_changes = normalizeTimingChanges(timing_points);
   const standard_hit_objects = mode === 0
-    ? hit_objects.map((object) => normalizeStandardHitObject(object, timing_points, slider_multiplier))
+    ? hit_objects.map((object) => normalizeStandardHitObject(object, timing_points, slider_multiplier,
+      slider_tick_rate, format_version))
       .sort((left, right) => left.absolute_time - right.absolute_time)
     : [];
   const last_time = mode === 0
@@ -332,6 +354,7 @@ export function parseOsuChart(source: string): Chart {
       drain_length_seconds,
       primary_tempo,
       slider_multiplier,
+      slider_tick_rate,
       timing_points: normalizeOsuTimingPoints(timing_points),
       hit_objects: standard_hit_objects,
     };

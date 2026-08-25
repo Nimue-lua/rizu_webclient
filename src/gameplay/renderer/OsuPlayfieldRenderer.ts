@@ -52,6 +52,9 @@ export class OsuPlayfieldRenderer {
         : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
       this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale, write);
+      if (path && object.tick_distances.length > 0 && song_time < object.end_time) {
+        this.drawSliderTicks(viewport, object, path, song_time, diameter, alpha, preempt, write);
+      }
       if (path && song_time >= object.absolute_time && song_time <= object.end_time) {
         this.drawSliderBall(viewport, object, path, song_time, diameter, write);
       }
@@ -110,6 +113,38 @@ export class OsuPlayfieldRenderer {
           [1, 1, 1, alpha], this.skin.hitCircleOverlay);
       }
       this.drawJudgment(viewport, center, transient.kind === "hit" ? transient.judgment : "miss", age, write);
+    }
+  }
+
+  private drawSliderTicks(viewport: OsuViewport, slider: OsuSlider, path: OsuSliderPath, song_time: number,
+    circle_diameter: number, slider_alpha: number, preempt: number, write: SpriteQuadWriter): void {
+    const sprite = this.skin.sliderTick;
+    if (!sprite || slider.span_duration <= 0 || path.length <= 0) return;
+    const elapsed = Math.max(0, song_time - slider.absolute_time);
+    const span_index = Math.min(slider.repeat_count - 1, Math.floor(elapsed / slider.span_duration));
+    const span_start = slider.absolute_time + span_index * slider.span_duration;
+    const reverse = span_index % 2 === 1;
+    const distances = reverse ? [...slider.tick_distances].reverse() : slider.tick_distances;
+    const radius = circle_diameter / (2 * viewport.scale);
+    const start = path.positionAtDistance(0);
+    const end = path.positionAtDistance(path.length);
+    const scale = circle_diameter / OSU_HIT_OBJECT_TEXTURE_SIZE;
+    const width = sprite.sourceSize.w * scale;
+    const height = sprite.sourceSize.h * scale;
+    for (const distance of distances) {
+      const traversal_distance = reverse ? path.length - distance : distance;
+      const tick_time = span_start + traversal_distance / path.length * slider.span_duration;
+      if (song_time >= tick_time) continue;
+      const position = path.positionAtDistance(distance);
+      if (distanceSquared(position, start) < radius * radius || distanceSquared(position, end) < radius * radius) continue;
+      const first_appear = slider.absolute_time - preempt * 2 / 3 +
+        (tick_time - slider.absolute_time) / 2;
+      const appear_time = span_index === 0 ? first_appear : span_start + (tick_time - span_start) / 2 - 0.2;
+      const tick_alpha = Math.min(1, Math.max(0, (song_time - appear_time) / 0.15));
+      if (tick_alpha <= 0) continue;
+      const center = viewport.playfieldToScreen(position);
+      write(center.x - width / 2, center.y - height / 2, width, height,
+        [1, 1, 1, slider_alpha * tick_alpha], sprite);
     }
   }
 
@@ -215,4 +250,10 @@ export function stableShakeOffset(age: number): number {
 
 function interpolate(start: number, end: number, progress: number): number {
   return start + (end - start) * progress;
+}
+
+function distanceSquared(first: { x: number; y: number }, second: { x: number; y: number }): number {
+  const x = first.x - second.x;
+  const y = first.y - second.y;
+  return x * x + y * y;
 }
