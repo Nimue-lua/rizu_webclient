@@ -70,7 +70,10 @@ export function ResultScreen({ score, background_url, title, artist, chart_name,
         </div>
         <div className="result-circle-panel">
           {score?.judge_names && score.judges && (
-            <JudgeSegmentsCanvas judges={score.judge_names.map((name) => score.judges?.[name] ?? 0)} />
+            <JudgeSegmentsCanvas
+              judges={score.judge_names.map((name) => score.judges?.[name] ?? 0)}
+              judge_names={score.judge_names}
+            />
           )}
           {score?.grade && <span className="result-grade" style={{ color: grade_color }}>{score.grade}</span>}
           {score?.accuracy !== undefined && (

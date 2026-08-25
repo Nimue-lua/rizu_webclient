@@ -114,7 +114,10 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
   return null;
 }
 
-export function JudgeSegmentsCanvas({ judges }: { judges: readonly number[] }) {
+export function JudgeSegmentsCanvas({ judges, judge_names }: {
+  judges: readonly number[];
+  judge_names: readonly string[];
+}) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -147,7 +150,8 @@ export function JudgeSegmentsCanvas({ judges }: { judges: readonly number[] }) {
     gl.enableVertexAttribArray(position);
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     gl.uniform1fv(gl.getUniformLocation(program, "u_thresholds"), thresholds);
-    gl.uniform4fv(gl.getUniformLocation(program, "u_colors"), new Float32Array(JUDGE_COLORS.flat()));
+    const colors = JUDGE_COLORS.map((color, index) => judge_names[index] === "miss" ? JUDGE_COLORS[5] : color);
+    gl.uniform4fv(gl.getUniformLocation(program, "u_colors"), new Float32Array(colors.flat()));
     gl.uniform3f(gl.getUniformLocation(program, "u_panel_color"), 33 / 255, 28 / 255, 43 / 255);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -160,7 +164,7 @@ export function JudgeSegmentsCanvas({ judges }: { judges: readonly number[] }) {
       gl.deleteShader(vertex_shader);
       gl.deleteShader(fragment_shader);
     };
-  }, [judges]);
+  }, [judges, judge_names]);
 
   return <canvas ref={canvas_ref} className="judge-segments-canvas" />;
 }
