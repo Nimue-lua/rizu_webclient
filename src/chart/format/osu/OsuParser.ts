@@ -41,9 +41,11 @@ function normalizeTimingChanges(points: readonly RawTimingPoint[]): TimingChange
     if (point.uninherited && point.beat_length > 0 && !red_offsets.has(point.offset)) {
       red_offsets.add(point.offset);
       change.bpm = Math.min(60000 / point.beat_length, 1_000_000);
-    } else if (!point.uninherited && point.beat_length < 0 && !green_offsets.has(point.offset)) {
+    } else if (!point.uninherited && !green_offsets.has(point.offset)) {
       green_offsets.add(point.offset);
-      change.scroll_velocity = Math.min(Math.max(Math.abs(-100 / point.beat_length), 0.1), 10);
+      change.scroll_velocity = point.beat_length < 0
+        ? Math.min(Math.max(Math.abs(-100 / point.beat_length), 0.1), 10)
+        : 1;
     }
     changes.set(point.offset, change);
   }
@@ -126,7 +128,7 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
   if ((object.type & 2) !== 0) {
     const path_parts = (object.fields[5] ?? "").split("|");
     const curve_type = CURVE_TYPES[path_parts.shift() ?? ""];
-    if (!curve_type || path_parts.length === 0) throw new Error(`Invalid slider path: ${line}`);
+    if (!curve_type) throw new Error(`Invalid slider path: ${line}`);
     const control_points = path_parts.map((point) => {
       const [raw_x, raw_y, ...extra] = point.split(":");
       const x = Number(raw_x);
@@ -247,10 +249,12 @@ export function parseOsuChart(source: string): Chart {
     if (section === "TimingPoints") {
       const fields = line.split(",");
       const offset = Number(fields[0]) / 1000;
-      const beat_length = Number(fields[1]);
+      let beat_length = Number(fields[1]);
       const uninherited = fields[6] === undefined ? beat_length > 0 : Number(fields[6]) === 1;
+      // Stable treats a NaN inherited beat length as a neutral control point, which resets inherited SV to 1x.
+      if (!uninherited && fields[1]?.toLowerCase() === "nan") beat_length = 0;
       if (!Number.isFinite(offset) || !Number.isFinite(beat_length) || beat_length === 0) {
-        throw new Error(`Invalid timing point: ${line}`);
+        if (beat_length !== 0 || uninherited) throw new Error(`Invalid timing point: ${line}`);
       }
       timing_points.push({ offset, beat_length, uninherited, source_index: timing_points.length });
       continue;

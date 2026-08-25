@@ -118,6 +118,28 @@ CircleSize:4
   if (chart.mode === "osu") assert.deepEqual(chart.hit_objects.map((object) => object.x), [300, 100, 200]);
 });
 
+test("retains stable-compatible degenerate sliders without control points", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+[TimingPoints]
+0,500,4,2,0,100,1,0
+[HitObjects]
+128,160,1000,6,2,L,1,20,0|0,0:0|0:0,0:0:0:0:
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  const slider = chart.hit_objects[0];
+  assert.equal(slider?.kind, "slider");
+  if (slider?.kind === "slider") {
+    assert.equal(slider.curve_type, "linear");
+    assert.deepEqual(slider.control_points, []);
+    assert.equal(slider.end_time, 1.071);
+  }
+});
+
 test("rejects malformed standard sliders and spinners", () => {
   const prefix = `[General]\nMode:0\n[Difficulty]\nCircleSize:4\n[HitObjects]\n`;
   assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,Q|100:100,1,100`), /Invalid slider path/);
@@ -200,6 +222,42 @@ CircleSize:4
 64,192,100,1,0,0:0:0:0:
 `);
   assert.equal(chart.visual_points[0]?.current_speed, 2);
+});
+
+test("treats inherited NaN timing points as stable-compatible neutral SV resets", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+SliderMultiplier:1.4
+[TimingPoints]
+0,500,4,2,0,100,1,0
+100,-50,4,2,0,100,0,0
+200,NaN,4,2,0,100,0,0
+[HitObjects]
+64,64,150,2,0,L|164:64,1,100
+64,64,250,2,0,L|164:64,1,100
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  assert.deepEqual(chart.timing_points, [
+    { absolute_time: 0, beat_length: 0.5, uninherited: true, slider_velocity: 1 },
+    { absolute_time: 0.1, beat_length: -0.05, uninherited: false, slider_velocity: 2 },
+    { absolute_time: 0.2, beat_length: 0, uninherited: false, slider_velocity: 1 },
+  ]);
+  const sliders = chart.hit_objects.filter((object) => object.kind === "slider");
+  assert.equal(sliders[0]?.end_time, 0.328);
+  assert.equal(sliders[1]?.end_time, 0.607);
+});
+
+test("still rejects NaN uninherited timing points", () => {
+  assert.throws(() => parseOsuChart(`
+[Difficulty]
+CircleSize:4
+[TimingPoints]
+0,NaN,4,2,0,100,1,0
+`), /Invalid timing point/);
 });
 
 test("applies the normalized first timing point speed before its timestamp", () => {
