@@ -59,8 +59,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     };
     const viewport = this.createViewport(frame.logical_width, frame.logical_height);
     this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write);
-    this.combo.draw(state.combo, viewport.stage_left + 8 * viewport.scale,
-      viewport.stage_top + 472 * viewport.scale, write);
+    this.combo.draw(state.combo, 8, frame.logical_height - 8, write);
     const cursor_center = viewport.playfieldToScreen(cursor.position);
     const cursor_scale = cursor.primary || cursor.secondary ? 0.9 : 1;
     const cursor_width = this.skin.cursor.sourceSize.w * viewport.scale * cursor_scale;

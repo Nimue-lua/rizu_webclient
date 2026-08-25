@@ -22,9 +22,12 @@ test("mania overlay centers judgments and combo inside its lanes", () => {
 
 test("osu combo uses a lower-left anchored layout without a global judgment", () => {
   const digit = sprite("digit");
-  const combo = new OsuComboRenderer({ sprites: { digit },
-    comboGlyphs: Object.fromEntries([..."0123456789"].map((value) => [value, "digit"])), comboOverlap: 0 });
+  const x = sprite("x", 10, 30);
+  const combo = new OsuComboRenderer({ sprites: { digit, x },
+    comboGlyphs: { ...Object.fromEntries([..."0123456789"].map((value) => [value, "digit"])), x: "x" },
+    comboOverlap: 0 });
   const quads: unknown[][] = [];
   combo.draw(12, 8, 472, (...quad) => quads.push(quad));
   assert.deepEqual(quads[0]?.slice(0, 4), [8, 453.25, 12.5, 18.75]);
+  assert.deepEqual(quads[2]?.slice(0, 4), [33, 453.25, 6.25, 18.75]);
 });

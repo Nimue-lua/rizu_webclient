@@ -400,7 +400,7 @@ function resolveFontGlyphs(prefix: string, available: ReadonlyMap<string, Sprite
   defaults: ReadonlyMap<string, SpriteFile>): Readonly<Record<string, string>> {
   const glyphs: Record<string, string> = {};
   for (const [character, suffix] of [..."0123456789"].map((value) => [value, value] as const)
-    .concat([[".", "dot"], ["%", "percent"]])) {
+    .concat([[".", "dot"], ["%", "percent"], ["x", "x"]])) {
     const name = `${prefix}-${suffix}`;
     if (available.has(normalizedSpriteName(name)) || defaults.has(normalizedSpriteName(name))) glyphs[character] = name;
   }
