@@ -48,9 +48,12 @@ test("retains typed standard objects, slider data, and normalized durations", ()
   assert.equal(chart.object_count, 6);
   assert.equal(chart.drain_length_seconds, 3);
   assert.deepEqual(chart.timing_points, [
-    { absolute_time: 0, beat_length: 0.5, uninherited: true, slider_velocity: 1 },
-    { absolute_time: 1, beat_length: -0.05, uninherited: false, slider_velocity: 2 },
-    { absolute_time: 2, beat_length: 0.4, uninherited: true, slider_velocity: 1 },
+    { absolute_time: 0, beat_length: 0.5, uninherited: true, slider_velocity: 1,
+      sample_set: 2, sample_index: 0, volume: 100 },
+    { absolute_time: 1, beat_length: -0.05, uninherited: false, slider_velocity: 2,
+      sample_set: 2, sample_index: 0, volume: 100 },
+    { absolute_time: 2, beat_length: 0.4, uninherited: true, slider_velocity: 1,
+      sample_set: 2, sample_index: 0, volume: 100 },
   ]);
   assert.deepEqual(chart.hit_objects.map((object) => object.kind),
     ["circle", "slider", "slider", "slider", "slider", "spinner"]);
@@ -332,9 +335,12 @@ SliderMultiplier:1.4
   assert.equal(chart.mode, "osu");
   if (chart.mode !== "osu") return;
   assert.deepEqual(chart.timing_points, [
-    { absolute_time: 0, beat_length: 0.5, uninherited: true, slider_velocity: 1 },
-    { absolute_time: 0.1, beat_length: -0.05, uninherited: false, slider_velocity: 2 },
-    { absolute_time: 0.2, beat_length: 0, uninherited: false, slider_velocity: 1 },
+    { absolute_time: 0, beat_length: 0.5, uninherited: true, slider_velocity: 1,
+      sample_set: 2, sample_index: 0, volume: 100 },
+    { absolute_time: 0.1, beat_length: -0.05, uninherited: false, slider_velocity: 2,
+      sample_set: 2, sample_index: 0, volume: 100 },
+    { absolute_time: 0.2, beat_length: 0, uninherited: false, slider_velocity: 1,
+      sample_set: 2, sample_index: 0, volume: 100 },
   ]);
   const sliders = chart.hit_objects.filter((object) => object.kind === "slider");
   assert.equal(sliders[0]?.end_time, 0.328);

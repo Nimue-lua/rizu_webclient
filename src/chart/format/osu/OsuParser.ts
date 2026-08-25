@@ -6,6 +6,9 @@ interface RawTimingPoint {
   offset: number;
   beat_length: number;
   uninherited: boolean;
+  sample_set: number | null;
+  sample_index: number;
+  volume: number;
   source_index: number;
 }
 
@@ -57,7 +60,7 @@ function normalizeTimingChanges(points: readonly RawTimingPoint[]): TimingChange
   return [...changes.values()].sort((left, right) => left.time - right.time);
 }
 
-function normalizeOsuTimingPoints(points: readonly RawTimingPoint[]): OsuTimingPoint[] {
+function normalizeOsuTimingPoints(points: readonly RawTimingPoint[], default_sample_set: number): OsuTimingPoint[] {
   return points.map((point) => ({
     absolute_time: point.offset,
     beat_length: point.beat_length / 1000,
@@ -65,6 +68,9 @@ function normalizeOsuTimingPoints(points: readonly RawTimingPoint[]): OsuTimingP
     slider_velocity: !point.uninherited && point.beat_length < 0
       ? Math.min(Math.max(-100 / point.beat_length, 0.1), 10)
       : 1,
+    sample_set: point.sample_set ?? default_sample_set,
+    sample_index: point.sample_index,
+    volume: point.volume,
   }));
 }
 
@@ -250,6 +256,7 @@ export function parseOsuChart(source: string): Chart {
   let approach_rate: number | null = null;
   let slider_multiplier = 1.4;
   let slider_tick_rate = 1;
+  let sample_set = 1;
   const combo_colors = new Map<number, readonly [number, number, number, number]>();
   const timing_points: RawTimingPoint[] = [];
   const hit_objects: RawHitObject[] = [];
@@ -270,6 +277,9 @@ export function parseOsuChart(source: string): Chart {
       if (section === "General" && property_match[1] === "Mode") mode = Number(property_match[2]);
       if (section === "General" && property_match[1] === "StackLeniency") {
         stack_leniency = Number(property_match[2]);
+      }
+      if (section === "General" && property_match[1] === "SampleSet") {
+        sample_set = { normal: 1, soft: 2, drum: 3 }[property_match[2]!.toLowerCase()] ?? 1;
       }
       if (section === "Difficulty" && property_match[1] === "CircleSize") {
         circle_size = Number(property_match[2]);
@@ -320,12 +330,21 @@ export function parseOsuChart(source: string): Chart {
       const offset = Number(fields[0]) / 1000;
       let beat_length = Number(fields[1]);
       const uninherited = fields[6] === undefined ? beat_length > 0 : Number(fields[6]) === 1;
+      const raw_sample_set = fields[3] === undefined ? null : Number(fields[3]);
+      const timing_sample_set = raw_sample_set === 0 ? 2 : raw_sample_set;
+      const sample_index = fields[4] === undefined ? 0 : Number(fields[4]);
+      const volume = fields[5] === undefined ? 100 : Number(fields[5]);
       // Stable treats a NaN inherited beat length as a neutral control point, which resets inherited SV to 1x.
       if (!uninherited && fields[1]?.toLowerCase() === "nan") beat_length = 0;
       if (!Number.isFinite(offset) || !Number.isFinite(beat_length) || beat_length === 0) {
         if (beat_length !== 0 || uninherited) throw new Error(`Invalid timing point: ${line}`);
       }
-      timing_points.push({ offset, beat_length, uninherited, source_index: timing_points.length });
+      if (timing_sample_set !== null && (!Number.isInteger(timing_sample_set) || timing_sample_set < 1 || timing_sample_set > 3) ||
+        !Number.isInteger(sample_index) || sample_index < 0 || !Number.isFinite(volume) || volume < 0) {
+        throw new Error(`Invalid timing point: ${line}`);
+      }
+      timing_points.push({ offset, beat_length, uninherited, sample_set: timing_sample_set,
+        sample_index, volume, source_index: timing_points.length });
       continue;
     }
 
@@ -411,8 +430,9 @@ export function parseOsuChart(source: string): Chart {
       primary_tempo,
       slider_multiplier,
       slider_tick_rate,
+      sample_set,
       combo_colors: normalized_combo_colors,
-      timing_points: normalizeOsuTimingPoints(timing_points),
+      timing_points: normalizeOsuTimingPoints(timing_points, sample_set),
       hit_objects: standard_hit_objects,
     };
   }

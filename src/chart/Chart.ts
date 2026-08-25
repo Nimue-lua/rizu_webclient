@@ -79,6 +79,9 @@ export interface OsuTimingPoint {
   readonly beat_length: number;
   readonly uninherited: boolean;
   readonly slider_velocity: number;
+  readonly sample_set: number;
+  readonly sample_index: number;
+  readonly volume: number;
 }
 
 export interface OsuChart {
@@ -95,6 +98,7 @@ export interface OsuChart {
   primary_tempo: number;
   slider_multiplier: number;
   slider_tick_rate: number;
+  sample_set: number;
   combo_colors: readonly (readonly [number, number, number, number])[];
   timing_points: readonly OsuTimingPoint[];
   hit_objects: readonly OsuHitObject[];

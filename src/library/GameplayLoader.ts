@@ -69,7 +69,7 @@ export class HttpGameplayLoader implements GameplayLoader {
       Promise.resolve(parseOsuChart(chart_source)),
     ]);
     if (chart.mode === "osu") {
-      const note_skin = await loadOsuStandardSkinUrl(skin_url, signal);
+      const note_skin = await loadOsuStandardSkinUrl(skin_url, audio_context, signal);
       return { mode: "osu", audio_buffer, audio_context, chart, note_skin };
     }
     const note_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal);

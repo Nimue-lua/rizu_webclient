@@ -33,6 +33,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly comboGlyphs: Readonly<Record<string, string>>;
   readonly scoreOverlap: number;
   readonly comboOverlap: number;
+  readonly layeredHitSounds: boolean;
+  readonly hitSounds: Readonly<Record<string, AudioBuffer | null>>;
 }
 
 export function parseSkinIni(source: string): SkinIni {
@@ -208,6 +210,16 @@ function spriteFiles(files: Readonly<Record<string, Uint8Array>>, directory: str
   return sprites;
 }
 
+function audioFiles(files: Readonly<Record<string, Uint8Array>>, directory: string): ReadonlyMap<string, Uint8Array> {
+  const sounds = new Map<string, Uint8Array>();
+  for (const [path, bytes] of Object.entries(files)) {
+    if (!path.toLowerCase().startsWith(directory.toLowerCase()) || !/\.(wav|mp3|ogg)$/i.test(path)) continue;
+    const name = path.slice(directory.length).replace(/\\/g, "/").replace(/\.(wav|mp3|ogg)$/i, "").toLowerCase();
+    if (!sounds.has(name)) sounds.set(name, bytes);
+  }
+  return sounds;
+}
+
 function normalizedSpriteName(name: string): string {
   return name.replace(/\\/g, "/").replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
 }
@@ -242,19 +254,29 @@ async function defaultSpriteFiles(signal?: AbortSignal): Promise<ReadonlyMap<str
   return spriteFiles(files, ini_path.slice(0, ini_path.lastIndexOf("/") + 1));
 }
 
+async function defaultAudioFiles(signal?: AbortSignal): Promise<ReadonlyMap<string, Uint8Array>> {
+  const files = await defaultArchive(signal);
+  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  if (!ini_path) throw new Error("Default osu skin archive is missing skin.ini");
+  return audioFiles(files, ini_path.slice(0, ini_path.lastIndexOf("/") + 1));
+}
+
 export async function loadOsuManiaSkinUrl(url: string, column_count: number, signal?: AbortSignal): Promise<NoteSkin> {
   const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
   return loadOsuManiaSkin(files, column_count, signal);
 }
 
-export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal): Promise<OsuStandardSkin> {
+export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioContext,
+  signal?: AbortSignal): Promise<OsuStandardSkin> {
   const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
   const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
   if (!ini_path) throw new Error("osu skin archive is missing skin.ini");
   const directory = ini_path.slice(0, ini_path.lastIndexOf("/") + 1);
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));
   const available = spriteFiles(files, directory);
+  const available_audio = audioFiles(files, directory);
   const defaults = await defaultSpriteFiles(signal);
+  const default_audio = await defaultAudioFiles(signal);
   const fonts = ini.sections.Fonts ?? {};
   const scoreGlyphs = resolveFontGlyphs(fonts.ScorePrefix ?? "score", available, defaults);
   const comboGlyphs = resolveFontGlyphs(fonts.ComboPrefix ?? "score", available, defaults);
@@ -281,6 +303,16 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     }] as const;
   }));
   const sprites = Object.fromEntries(decoded) as Record<string, Sprite>;
+  const sound_names = ["normal", "soft", "drum"].flatMap((set) =>
+    ["hitnormal", "hitwhistle", "hitfinish", "hitclap", "slidertick"].map((sound) => `${set}-${sound}`));
+  const decoded_sounds = await Promise.all(sound_names.flatMap((name) => {
+    const bytes = available_audio.get(name) ?? default_audio.get(name);
+    if (!bytes) return [];
+    if (bytes.byteLength === 0) return [Promise.resolve([name, null] as const)];
+    const data = new Uint8Array(bytes).buffer;
+    return [audio_context.decodeAudioData(data).then((buffer) => [name, buffer] as const)
+      .catch(() => [name, null] as const)];
+  }));
   const skin_combo_colors = Array.from({ length: 8 }, (_, index) =>
     optionalColorValue(ini.sections.Colours ?? {}, `Combo${index + 1}`)).filter((color) => color !== null);
   const default_combo_colors = [[1, 192 / 255, 0, 1], [0, 202 / 255, 0, 1],
@@ -310,6 +342,8 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     comboGlyphs,
     scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
     comboOverlap: numberValue(fonts, "ComboOverlap", 0),
+    layeredHitSounds: booleanValue(ini.sections.General ?? {}, "LayeredHitSounds") ?? true,
+    hitSounds: Object.fromEntries(decoded_sounds),
   };
 }
 
