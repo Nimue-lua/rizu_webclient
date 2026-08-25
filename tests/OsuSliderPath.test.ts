@@ -20,6 +20,8 @@ test("trims and extends linear paths to declared pixel length", () => {
   assert.equal(trimmed.length, 40);
   const extended = OsuSliderPath.create(slider("linear", [{ x: 20, y: 0 }], 50), 14);
   assert.deepEqual(extended.points, [{ x: 0, y: 0 }, { x: 50, y: 0 }]);
+  assert.deepEqual(extended.directionAtProgress(0.5), { x: 1, y: 0 });
+  assert.equal(extended.angleAtProgress(1), 0);
 });
 
 test("builds stable perfect-circle and Catmull paths", () => {

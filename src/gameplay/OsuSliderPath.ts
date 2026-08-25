@@ -82,6 +82,40 @@ export class OsuSliderPath {
     return this.positionAtDistance(Math.min(Math.max(progress, 0), 1) * this.length);
   }
 
+  directionAtDistance(distance_value: number): Point {
+    if (this.points.length < 2 || this.length === 0) return { x: 1, y: 0 };
+    const target = Math.min(Math.max(Number.isFinite(distance_value) ? distance_value : 0, 0), this.length);
+    let low = 1;
+    let high = this.cumulative_lengths.length - 1;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.cumulative_lengths[middle]! < target) low = middle + 1;
+      else high = middle;
+    }
+    let start_index = low - 1;
+    let end_index = low;
+    while (end_index < this.points.length && this.cumulative_lengths[end_index] === this.cumulative_lengths[start_index]) {
+      end_index += 1;
+    }
+    if (end_index >= this.points.length) {
+      end_index = this.points.length - 1;
+      start_index = end_index - 1;
+    }
+    const start = this.points[start_index]!;
+    const end = this.points[end_index]!;
+    const length = distance(start, end);
+    return length > 0 ? { x: (end.x - start.x) / length, y: (end.y - start.y) / length } : { x: 1, y: 0 };
+  }
+
+  directionAtProgress(progress: number): Point {
+    return this.directionAtDistance(Math.min(Math.max(progress, 0), 1) * this.length);
+  }
+
+  angleAtProgress(progress: number): number {
+    const direction = this.directionAtProgress(progress);
+    return Math.atan2(direction.y, direction.x);
+  }
+
   endPosition(repeat_count: number): Point {
     return repeat_count % 2 === 0 ? this.points[0]! : this.points.at(-1)!;
   }

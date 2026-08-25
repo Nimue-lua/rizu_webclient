@@ -19,6 +19,7 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly comboColor: readonly [number, number, number, number];
   readonly sliderBorderColor: readonly [number, number, number, number];
   readonly sliderTrackOverride: readonly [number, number, number, number] | null;
+  readonly sliderBallFrames: readonly Sprite[];
   readonly judgments: Readonly<Record<string, readonly string[]>>;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
   readonly comboGlyphs: Readonly<Record<string, string>>;
@@ -250,9 +251,10 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
   const scoreGlyphs = resolveFontGlyphs(fonts.ScorePrefix ?? "score", available, defaults);
   const comboGlyphs = resolveFontGlyphs(fonts.ComboPrefix ?? "score", available, defaults);
   const judgments = resolveStandardJudgments(available, defaults);
+  const slider_ball_names = resolveSliderBallFrames(available, defaults);
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", cursor_name,
-    ...Object.values(scoreGlyphs), ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
+    ...slider_ball_names, ...Object.values(scoreGlyphs), ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
@@ -276,12 +278,25 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     comboColor: colorValue(ini.sections.Colours ?? {}, "Combo1", [1, 0.4, 0.4, 1]),
     sliderBorderColor: colorValue(ini.sections.Colours ?? {}, "SliderBorder", [1, 1, 1, 1]),
     sliderTrackOverride: optionalColorValue(ini.sections.Colours ?? {}, "SliderTrackOverride"),
+    sliderBallFrames: slider_ball_names.map((name) => sprites[name]!),
     judgments,
     scoreGlyphs,
     comboGlyphs,
     scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
     comboOverlap: numberValue(fonts, "ComboOverlap", 0),
   };
+}
+
+export function resolveSliderBallFrameNames(available: ReadonlySet<string>, defaults: ReadonlySet<string>): string[] {
+  const source = available.has("sliderb0") || available.has("sliderb") ? available : defaults;
+  const frames: string[] = [];
+  for (let frame = 0; source.has(`sliderb${frame}`); frame += 1) frames.push(`sliderb${frame}`);
+  if (frames.length === 0 && source.has("sliderb")) frames.push("sliderb");
+  return frames;
+}
+
+function resolveSliderBallFrames(available: ReadonlyMap<string, SpriteFile>, defaults: ReadonlyMap<string, SpriteFile>): string[] {
+  return resolveSliderBallFrameNames(new Set(available.keys()), new Set(defaults.keys()));
 }
 
 export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array>>, column_count: number,

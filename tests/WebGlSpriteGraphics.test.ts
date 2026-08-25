@@ -20,6 +20,7 @@ function createGl() {
     deleted_vertex_arrays: 0,
     deleted_programs: 0,
     draw_textures: [] as object[],
+    uploaded_vertices: [] as Float32Array[],
     current_texture: null as object | null,
   };
   const handle = () => ({ id: ++id });
@@ -42,7 +43,8 @@ function createGl() {
     bindTexture(_target: number, texture: object | null) { calls.current_texture = texture; },
     texParameteri() {}, texImage2D() {}, getError: () => 0,
     deleteTexture(texture: object) { calls.deleted_textures.push(texture); }, enable() {}, blendFunc() {},
-    viewport() {}, clearColor() {}, clear() {}, useProgram() {}, uniform2f() {}, uniform1i() {}, bufferData() {},
+    viewport() {}, clearColor() {}, clear() {}, useProgram() {}, uniform2f() {}, uniform1i() {},
+    bufferData(_target: number, data: Float32Array) { calls.uploaded_vertices.push(data); },
     drawArrays() { if (calls.current_texture) calls.draw_textures.push(calls.current_texture); },
   } as unknown as WebGL2RenderingContext;
   return { gl, calls };
@@ -50,7 +52,7 @@ function createGl() {
 
 function command(sprite: Sprite, batch?: string): SpriteDrawCommand {
   return { x: 0, y: 0, width: 10, height: 10, color: [1, 1, 1, 1], sprite,
-    flipY: false, rotateCounterClockwise: false, batch };
+    flipY: false, rotateCounterClockwise: false, rotationRadians: 0, batch };
 }
 
 test("uploads aliased sprites once and destroys every GPU resource once", () => {
@@ -67,6 +69,20 @@ test("uploads aliased sprites once and destroys every GPU resource once", () => 
   assert.equal(fake.calls.deleted_buffers, 1);
   assert.equal(fake.calls.deleted_vertex_arrays, 1);
   assert.equal(fake.calls.deleted_programs, 1);
+});
+
+test("rotates sprite geometry around its center by an arbitrary angle", () => {
+  const sprite = createSprite("rotated");
+  const fake = createGl();
+  const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
+    getContext: () => fake.gl } as unknown as HTMLCanvasElement;
+  const graphics = new WebGlSpriteGraphics(canvas, { sprites: { sprite } }, () => 1);
+  graphics.submit([{ ...command(sprite), x: 10, y: 20, width: 20, height: 10, rotationRadians: Math.PI / 2 }]);
+  const vertices = fake.calls.uploaded_vertices.at(-1)!;
+  assert.ok(Math.abs(vertices[0]! - 25) < 1e-9);
+  assert.ok(Math.abs(vertices[1]! - 15) < 1e-9);
+  assert.ok(Math.abs(vertices[8]! - 25) < 1e-9);
+  assert.ok(Math.abs(vertices[9]! - 35) < 1e-9);
 });
 
 test("preserves unbatched order and groups sprites only within a contiguous batch", () => {

@@ -15,6 +15,7 @@ const SLIDER_FADE_OUT = 0.24;
 const JUDGMENT_FADE_IN = 0.12;
 const JUDGMENT_HOLD = 0.5;
 const JUDGMENT_LIFETIME = 1.1;
+const OSU_HIT_OBJECT_TEXTURE_SIZE = 128;
 
 export class OsuPlayfieldRenderer {
   constructor(private readonly skin: OsuStandardSkin) {}
@@ -50,6 +51,9 @@ export class OsuPlayfieldRenderer {
         : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
       this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale, write);
+      if (path && song_time >= object.absolute_time && song_time <= object.end_time) {
+        this.drawSliderBall(viewport, object, path, song_time, diameter, write);
+      }
     }
     let low = 0;
     let high = chart.hit_objects.length;
@@ -103,6 +107,34 @@ export class OsuPlayfieldRenderer {
       }
       this.drawJudgment(viewport, center, transient.kind === "hit" ? transient.judgment : "miss", age, write);
     }
+  }
+
+  private drawSliderBall(viewport: OsuViewport, slider: OsuSlider, path: OsuSliderPath, song_time: number,
+    circle_diameter: number, write: SpriteQuadWriter): void {
+    const frames = this.skin.sliderBallFrames ?? [];
+    if (frames.length === 0 || slider.span_duration <= 0) return;
+    const elapsed = Math.min(Math.max(song_time - slider.absolute_time, 0), slider.total_duration);
+    const span_index = Math.min(slider.repeat_count - 1, Math.floor(elapsed / slider.span_duration));
+    const span_elapsed = elapsed - span_index * slider.span_duration;
+    const span_progress = Math.min(1, Math.max(0, span_elapsed / slider.span_duration));
+    const progress = span_index % 2 === 0 ? span_progress : 1 - span_progress;
+    const center = viewport.playfieldToScreen(path.positionAtProgress(progress));
+    const velocity = path.length / slider.span_duration;
+    const frame_delay = Math.max(2.5 / Math.max(velocity, Number.EPSILON), 1 / 60);
+    const animation_frame = Math.floor(elapsed / frame_delay);
+    const frame_index = span_index % 2 === 0
+      ? animation_frame % frames.length
+      : (frames.length - 1 - animation_frame % frames.length + frames.length) % frames.length;
+    const frame = frames[frame_index]!;
+    const circle_scale = circle_diameter / OSU_HIT_OBJECT_TEXTURE_SIZE;
+    const width = frame.sourceSize.w * circle_scale;
+    const height = frame.sourceSize.h * circle_scale;
+    const direction = path.directionAtProgress(progress);
+    const screen_x = (viewport.x_flip ? -1 : 1) * direction.x;
+    const screen_y = (viewport.y_flip ? -1 : 1) * direction.y;
+    const rotation = Math.atan2(screen_y, screen_x);
+    write(center.x - width / 2, center.y - height / 2, width, height, [1, 1, 1, 1], frame,
+      false, undefined, false, rotation);
   }
 
   private drawCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number, alpha: number,

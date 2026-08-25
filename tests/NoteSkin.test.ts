@@ -5,6 +5,7 @@ import {
   optionalColorValue,
   parseOsuManiaConfig,
   parseSkinIni,
+  resolveSliderBallFrameNames,
   resolveOsuManiaTail,
 } from "../src/gameplay/renderer/OsuSkin";
 import { destroyNoteSkin, type NoteSkin } from "../src/gameplay/renderer/NoteSkin";
@@ -23,6 +24,13 @@ test("parses optional osu slider colors without inventing an override", () => {
     [10 / 255, 20 / 255, 30 / 255, 1]);
   assert.equal(optionalColorValue({}, "SliderTrackOverride"), null);
   assert.equal(optionalColorValue({ SliderTrackOverride: "bad" }, "SliderTrackOverride"), null);
+});
+
+test("discovers contiguous slider ball animation frames with static fallback", () => {
+  assert.deepEqual(resolveSliderBallFrameNames(new Set(["sliderb0", "sliderb1", "sliderb3"]), new Set(["sliderb"])),
+    ["sliderb0", "sliderb1"]);
+  assert.deepEqual(resolveSliderBallFrameNames(new Set(["sliderb"]), new Set(["sliderb0"])), ["sliderb"]);
+  assert.deepEqual(resolveSliderBallFrameNames(new Set(), new Set(["sliderb0", "sliderb1"])), ["sliderb0", "sliderb1"]);
 });
 
 test("maps the matching osu mania section to playfield geometry and sprites", () => {

@@ -64,8 +64,10 @@ export class OsuRenderer implements OsuGameplayRenderer {
     const commands: SpriteDrawCommand[] = [];
     this.active_commands = commands;
     const write = (x: number, y: number, width: number, height: number,
-      color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"]) => {
-      commands.push({ x, y, width, height, color, sprite, flipY: false, rotateCounterClockwise: false });
+      color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
+      flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number) => {
+      commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
+        rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
     };
     const viewport = this.createViewport(frame.logical_width, frame.logical_height);
     let uploads = 0;
@@ -109,6 +111,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
 
   private readonly writeHudCommand = (x: number, y: number, width: number, height: number,
     color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"]) => {
-    this.active_commands?.push({ x, y, width, height, color, sprite, flipY: false, rotateCounterClockwise: false });
+    this.active_commands?.push({ x, y, width, height, color, sprite, flipY: false,
+      rotateCounterClockwise: false, rotationRadians: 0 });
   };
 }

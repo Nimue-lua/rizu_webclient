@@ -189,11 +189,19 @@ export class WebGlSpriteGraphics {
       if (command.rotateCounterClockwise) {
         [top_left, top_right, bottom_left, bottom_right] = [top_right, bottom_right, top_left, bottom_left];
       }
-      for (const [px, py, u, v] of [[command.x, command.y, ...top_left],
+      const center_x = command.x + command.width / 2;
+      const center_y = command.y + command.height / 2;
+      const cosine = Math.cos(command.rotationRadians);
+      const sine = Math.sin(command.rotationRadians);
+      const corners = [[command.x, command.y, ...top_left],
         [command.x + command.width, command.y, ...top_right], [command.x, command.y + command.height, ...bottom_left],
         [command.x, command.y + command.height, ...bottom_left], [command.x + command.width, command.y, ...top_right],
-        [command.x + command.width, command.y + command.height, ...bottom_right]]) {
-        vertices.push(px, py, u, v, ...command.color);
+        [command.x + command.width, command.y + command.height, ...bottom_right]];
+      for (const [px, py, u, v] of corners) {
+        const dx = px! - center_x;
+        const dy = py! - center_y;
+        vertices.push(center_x + dx * cosine - dy * sine, center_y + dx * sine + dy * cosine,
+          u!, v!, ...command.color);
       }
     }
     if (vertices.length === 0) return;

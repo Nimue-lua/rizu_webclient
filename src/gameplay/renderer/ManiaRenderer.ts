@@ -40,9 +40,9 @@ export class ManiaRenderer {
     this.active_commands = commands;
     const write = (x: number, y: number, width: number, height: number,
       color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
-      flip_y?: boolean, batch?: string, rotate_ccw?: boolean) => {
+      flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number) => {
       commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
-        rotateCounterClockwise: rotate_ccw ?? false, batch });
+        rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
     };
     this.playfield.draw(layout, notes, scroll_speed, pressed_columns, write);
     const left = layout.columnLeft[0]!;
@@ -67,8 +67,8 @@ export class ManiaRenderer {
 
   private readonly writeHudCommand = (x: number, y: number, width: number, height: number,
     color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
-    flip_y?: boolean, batch?: string, rotate_ccw?: boolean) => {
+    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number) => {
     this.active_commands?.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
-      rotateCounterClockwise: rotate_ccw ?? false, batch });
+      rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
   };
 }
