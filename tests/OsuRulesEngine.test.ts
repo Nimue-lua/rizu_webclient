@@ -34,6 +34,7 @@ test("blocks a spatially acquired later circle while an earlier circle is live",
   assert.equal(engine.click(256, 192, 1.1), "locked");
   assert.deepEqual([...engine.circle_states], [OsuCircleState.Pending, OsuCircleState.Pending]);
   assert.equal(engine.judgment_events.length, 0);
+  assert.deepEqual(engine.circle_transients, [{ kind: "shake", object_index: 1, start_time: 1.1 }]);
 });
 
 test("unlocks a later circle exactly at the earlier late-50 deadline", () => {
@@ -106,6 +107,36 @@ test("uses strict score boundaries and automatic miss timing", () => {
   assert.equal(automatic.circle_states[0], OsuCircleState.Missed);
   assert.equal(automatic.judgment_events.length, 1);
   assert.equal(automatic.judgment_events[0]?.time, 1.15);
+});
+
+test("exposes bounded renderer-ready hit and miss animations", () => {
+  const hit = createEngine([{ x: 256, y: 192, absolute_time: 1 }]);
+  hit.click(256, 192, 1.05);
+  assert.deepEqual(hit.circle_transients, [{
+    kind: "hit", object_index: 0, start_time: 1.05, judgment: "100",
+  }]);
+  hit.update(2.15);
+  assert.equal(hit.circle_transients.length, 0);
+
+  const miss = createEngine([{ x: 256, y: 192, absolute_time: 1 }]);
+  miss.update(1.16);
+  assert.deepEqual(miss.circle_transients, [{ kind: "miss", object_index: 0, start_time: 1.16 }]);
+
+  const aborted = createEngine(Array.from({ length: 10_000 }, (_, index) => ({
+    x: 256, y: 192, absolute_time: index,
+  })));
+  aborted.update(Number.POSITIVE_INFINITY);
+  assert.equal(aborted.circle_transients.length, 0);
+});
+
+test("restarts rather than accumulating repeated shake animations", () => {
+  const engine = createEngine([
+    { x: 206, y: 192, absolute_time: 1 },
+    { x: 256, y: 192, absolute_time: 1.1 },
+  ]);
+  engine.click(256, 192, 1.05);
+  engine.click(256, 192, 1.06);
+  assert.deepEqual(engine.circle_transients, [{ kind: "shake", object_index: 1, start_time: 1.06 }]);
 });
 
 test("advances the active circle cursor as deadlines pass", () => {

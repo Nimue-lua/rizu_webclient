@@ -9,6 +9,16 @@ export type OsuStandardGrade = "X" | "S" | "A" | "B" | "C" | "D";
 
 const BASE_SCORES = [300, 100, 50, 0] as const;
 
+export function classifyOsuStandardJudgment(windows: OsuStandardTimingValues,
+  event: OsuStandardJudgmentEvent): OsuStandardJudge {
+  if (event.kind === "miss") return "miss";
+  const delta = Math.abs(event.delta_time);
+  if (delta < windows.hit_300) return "300";
+  if (delta < windows.hit_100) return "100";
+  if (delta < windows.hit_50) return "50";
+  return "miss";
+}
+
 export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, IScoreSource,
   IAccuracySource, IGradeSource, IComboSource, IJudgesSource {
   readonly key = "osu_standard_v1";
@@ -28,16 +38,7 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
   }
 
   receive(event: OsuStandardJudgmentEvent): void {
-    let judge_index: number;
-    if (event.kind === "miss") {
-      judge_index = 3;
-    } else {
-      const delta = Math.abs(event.delta_time);
-      if (delta < this.windows.hit_300) judge_index = 0;
-      else if (delta < this.windows.hit_100) judge_index = 1;
-      else if (delta < this.windows.hit_50) judge_index = 2;
-      else judge_index = 3;
-    }
+    const judge_index = OSU_STANDARD_JUDGE_NAMES.indexOf(classifyOsuStandardJudgment(this.windows, event));
     this.add(judge_index);
   }
 

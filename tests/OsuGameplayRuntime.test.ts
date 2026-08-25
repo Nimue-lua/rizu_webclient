@@ -72,7 +72,7 @@ function createHarness() {
     performance_now: () => 1000,
     create_renderer: () => ({
       clientToPlayfield: (point, bounds) => ({ x: point.x - bounds.left, y: point.y - bounds.top }),
-      draw: (_chart, _circle_states, _first_active_index, _time, _state, cursor) => cursor_states.push(cursor),
+      draw: (_chart, _circle_states, _first_active_index, _transients, _time, _state, cursor) => cursor_states.push(cursor),
       destroy: () => { destroy_calls += 1; },
     }),
   };

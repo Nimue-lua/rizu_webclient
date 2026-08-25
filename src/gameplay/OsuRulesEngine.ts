@@ -1,20 +1,23 @@
 import type { OsuChart } from "../chart/Chart";
 import { osuApproachPreempt, osuCircleHitRadius } from "./OsuCircleGeometry";
+import type { OsuCircleTransient } from "./OsuCirclePresentation";
 import { OsuCircleState } from "./OsuCircleState";
 import type { OsuStandardJudgmentEvent } from "./OsuStandardJudgmentEvent";
 import { ScoreEngine } from "./scoring/ScoreEngine";
 import type { ScoreResult } from "./scoring/ScoreResult";
-import { OsuStandardScore } from "./scoring/systems/OsuStandardScore";
+import { classifyOsuStandardJudgment, OsuStandardScore } from "./scoring/systems/OsuStandardScore";
 import type { OsuStandardTimingValues } from "./timing/OsuStandardOdTimings";
 
 export type OsuClickOutcome = "hit" | "miss" | "locked" | "too-early" | "spatial-miss";
 
 const STABLE_HITTABLE_RANGE = 0.4;
 const BOUNDARY_EPSILON = 1e-9;
+const TRANSIENT_LIFETIME = 1.1;
 
 export class OsuRulesEngine {
   readonly circle_states: Uint8Array;
   readonly judgment_events: OsuStandardJudgmentEvent[] = [];
+  readonly circle_transients: OsuCircleTransient[] = [];
   private readonly score_engine: ScoreEngine<OsuStandardJudgmentEvent>;
   private readonly hit_radius_squared: number;
   private next_timeout_index = 0;
@@ -36,6 +39,7 @@ export class OsuRulesEngine {
   }
 
   update(song_time: number): void {
+    this.pruneTransients(song_time);
     while (this.next_timeout_index < this.chart.circles.length) {
       const index = this.next_timeout_index;
       const circle = this.chart.circles[index]!;
@@ -46,7 +50,7 @@ export class OsuRulesEngine {
           kind: "miss",
           object_index: index,
           time: circle.absolute_time + this.timings.late_miss,
-        });
+        }, song_time);
       }
     }
   }
@@ -60,11 +64,15 @@ export class OsuRulesEngine {
     const first_live = this.findFirstLive(song_time);
     if (first_live !== undefined && first_live !== candidate &&
       this.chart.circles[first_live]!.absolute_time < circle.absolute_time) {
+      this.shake(candidate, song_time);
       return "locked";
     }
 
     const delta_time = this.snapTimingDelta(song_time - circle.absolute_time);
-    if (Math.abs(delta_time) >= STABLE_HITTABLE_RANGE) return "too-early";
+    if (Math.abs(delta_time) >= STABLE_HITTABLE_RANGE) {
+      this.shake(candidate, song_time);
+      return "too-early";
+    }
 
     const missed = Math.abs(delta_time) >= this.timings.hit_50;
     this.resolve(candidate, missed ? OsuCircleState.Missed : OsuCircleState.Hit, {
@@ -72,7 +80,7 @@ export class OsuRulesEngine {
       object_index: candidate,
       time: song_time,
       delta_time,
-    });
+    }, song_time);
     return missed ? "miss" : "hit";
   }
 
@@ -114,10 +122,31 @@ export class OsuRulesEngine {
     return false;
   }
 
-  private resolve(index: number, state: OsuCircleState, event: OsuStandardJudgmentEvent): void {
+  private resolve(index: number, state: OsuCircleState, event: OsuStandardJudgmentEvent,
+    presentation_time: number): void {
     this.circle_states[index] = state;
     this.judgment_events.push(event);
     this.score_engine.receive(event);
+    if (!Number.isFinite(presentation_time)) return;
+    const judgment = classifyOsuStandardJudgment(this.timings, event);
+    this.circle_transients.push(judgment === "miss"
+      ? { kind: "miss", object_index: index, start_time: presentation_time }
+      : { kind: "hit", object_index: index, start_time: presentation_time, judgment });
+  }
+
+  private shake(index: number, song_time: number): void {
+    const previous = this.circle_transients.findIndex((transient) =>
+      transient.kind === "shake" && transient.object_index === index);
+    if (previous >= 0) this.circle_transients.splice(previous, 1);
+    this.circle_transients.push({ kind: "shake", object_index: index, start_time: song_time });
+  }
+
+  private pruneTransients(song_time: number): void {
+    for (let index = this.circle_transients.length - 1; index >= 0; index -= 1) {
+      const transient = this.circle_transients[index]!;
+      const lifetime = transient.kind === "shake" ? 0.12 : TRANSIENT_LIFETIME;
+      if (song_time - transient.start_time >= lifetime - BOUNDARY_EPSILON) this.circle_transients.splice(index, 1);
+    }
   }
 
   private snapTimingDelta(delta_time: number): number {

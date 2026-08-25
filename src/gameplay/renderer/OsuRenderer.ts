@@ -9,10 +9,12 @@ import type { SpriteDrawCommand } from "./Sprite";
 import { WebGlSpriteGraphics } from "./WebGlSpriteGraphics";
 import { OsuViewport, type ClientBounds, type Point } from "../OsuViewport";
 import type { OsuCursorState } from "../OsuInputEvent";
+import type { OsuCircleTransient } from "../OsuCirclePresentation";
 
 export interface OsuGameplayRenderer {
   clientToPlayfield(point: Point, bounds: ClientBounds): Point;
-  draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number, song_time: number,
+  draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
+    circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState): void;
   destroy(): void;
 }
@@ -44,7 +46,8 @@ export class OsuRenderer implements OsuGameplayRenderer {
     return this.createViewport(frame.logical_width, frame.logical_height).clientToPlayfield(point, bounds);
   }
 
-  draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number, song_time: number,
+  draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
+    circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState): void {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
@@ -55,7 +58,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
       commands.push({ x, y, width, height, color, sprite, flipY: false, rotateCounterClockwise: false });
     };
     const viewport = this.createViewport(frame.logical_width, frame.logical_height);
-    this.playfield.draw(viewport, chart, circle_states, first_active_index, song_time, write);
+    this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write);
     this.combo.draw(state.combo, viewport.stage_left + 8 * viewport.scale,
       viewport.stage_top + 472 * viewport.scale, write);
     const cursor_center = viewport.playfieldToScreen(cursor.position);
