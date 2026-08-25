@@ -5,13 +5,11 @@ import type { GameplaySession, OsuPointerInput } from "./GameplaySession";
 import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
 import { HudStateDeriver } from "./HudState";
 import type { OsuAction, OsuCursorState, OsuInputEvent } from "./OsuInputEvent";
-import type { OsuStandardJudgmentEvent } from "./OsuStandardJudgmentEvent";
+import { OsuRulesEngine } from "./OsuRulesEngine";
 import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 import { OsuRenderer, type OsuGameplayRenderer } from "./renderer/OsuRenderer";
-import { ScoreEngine } from "./scoring/ScoreEngine";
 import { calculateOsuStandardDifficultyMultiplier } from "./scoring/OsuStandardDifficulty";
 import type { ScoreResult } from "./scoring/ScoreResult";
-import { OsuStandardScore } from "./scoring/systems/OsuStandardScore";
 import { resolveOsuStandardTimingValues } from "./timing/TimingValuesFactory";
 import { Timings } from "./timing/Timings";
 
@@ -42,7 +40,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly clock: AudioGameplayClock;
   private readonly music_rate: number;
   private readonly hud_state = new HudStateDeriver();
-  private readonly score_engine: ScoreEngine<OsuStandardJudgmentEvent>;
+  private readonly rules_engine: OsuRulesEngine;
   private readonly dependencies: OsuGameplayRuntimeDependencies;
   private readonly key_actions = new Map<string, OsuAction>();
   private readonly pressed_keys = new Set<string>();
@@ -65,9 +63,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
       replay_base.overall_difficulty ?? chart.overall_difficulty ?? 5,
       replay_base.circle_size ?? chart.circle_size, chart.object_count, chart.drain_length_seconds);
-    this.score_engine = new ScoreEngine([
-      new OsuStandardScore(timing_configuration.values, difficulty_multiplier),
-    ]);
+    this.rules_engine = new OsuRulesEngine(chart, timing_configuration.values, difficulty_multiplier);
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,
       audio_buffer: data.audio_buffer,
@@ -147,6 +143,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.code === "Escape") {
+      this.rules_engine.update(Number.POSITIVE_INFINITY);
       this.finishGameplay();
       return;
     }
@@ -170,20 +167,24 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     this.action_sources[action] = Math.max(0, previous + (pressed ? 1 : -1));
     const current = this.action_sources[action];
     if ((previous === 0) === (current === 0)) return;
-    this.input_events.push({ type: "action", time: this.clock.timeAt(performance_time).corrected,
-      action, pressed: current > 0 });
+    const time = this.clock.timeAt(performance_time).corrected;
+    const pressed_now = current > 0;
+    this.input_events.push({ type: "action", time, action, pressed: pressed_now });
+    if (pressed_now) this.rules_engine.click(this.cursor_position.x, this.cursor_position.y, time);
   }
 
   private finishGameplay(): void {
     if (this.finished) return;
     this.finished = true;
-    this.finish(this.score_engine.getResult());
+    this.finish(this.rules_engine.score);
   }
 
   private readonly render = (timestamp: number) => {
     const song_time = this.clock.timeAt(timestamp).monotonic;
-    this.renderer.draw(this.data.chart, song_time,
-      this.hud_state.update(this.score_engine.getResult(), timestamp / 1000), this.cursor_state);
+    this.rules_engine.update(song_time);
+    this.renderer.draw(this.data.chart, this.rules_engine.circle_states,
+      this.rules_engine.first_active_circle_index, song_time,
+      this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state);
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

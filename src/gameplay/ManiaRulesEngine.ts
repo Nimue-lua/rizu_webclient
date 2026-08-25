@@ -29,6 +29,11 @@ interface LinkedNote {
   end?: ManiaNoteEvent;
 }
 
+interface MissDeadline {
+  index: number;
+  time: number;
+}
+
 const TIME_EPSILON = 1e-9;
 
 function isActive(state: NoteState, hold: boolean): boolean {
@@ -51,6 +56,10 @@ export class ManiaRulesEngine {
   private readonly constant_scroll: boolean;
   private readonly head_press_times: Float64Array;
   private readonly head_release_times: Float64Array;
+  private readonly head_miss_deadlines: readonly MissDeadline[];
+  private readonly tail_miss_deadlines: readonly MissDeadline[];
+  private head_miss_cursor = 0;
+  private tail_miss_cursor = 0;
 
   constructor(chart: ManiaChart, hit_registration: ManiaHitRegistration = "earliest", music_rate = 1,
     constant_scroll = false, tap_only = false, timing_identity?: { timings: Timings; subtimings: Subtimings | null }) {
@@ -78,6 +87,14 @@ export class ManiaRulesEngine {
     this.hit_registration = hit_registration;
     this.music_rate = music_rate;
     this.constant_scroll = constant_scroll;
+    this.head_miss_deadlines = this.linked_notes.map((note, index) => ({
+      index,
+      time: note.start.absolute_time + (note.end ? this.timings.long_note_start : this.timings.short_note).miss[1] * music_rate,
+    })).sort(compareMissDeadlines);
+    this.tail_miss_deadlines = this.linked_notes.flatMap((note, index) => note.end ? [{
+      index,
+      time: note.end.absolute_time + this.timings.long_note_end.miss[1] * music_rate,
+    }] : []).sort(compareMissDeadlines);
   }
 
   get score(): ScoreResult {
@@ -201,7 +218,22 @@ export class ManiaRulesEngine {
   }
 
   private updateMisses(song_time: number): void {
-    for (let index = 0; index < this.linked_notes.length; index += 1) {
+    const due_indices: number[] = [];
+    while (this.head_miss_cursor < this.head_miss_deadlines.length &&
+      song_time > this.head_miss_deadlines[this.head_miss_cursor]!.time + TIME_EPSILON) {
+      due_indices.push(this.head_miss_deadlines[this.head_miss_cursor]!.index);
+      this.head_miss_cursor += 1;
+    }
+    while (this.tail_miss_cursor < this.tail_miss_deadlines.length &&
+      song_time > this.tail_miss_deadlines[this.tail_miss_cursor]!.time + TIME_EPSILON) {
+      due_indices.push(this.tail_miss_deadlines[this.tail_miss_cursor]!.index);
+      this.tail_miss_cursor += 1;
+    }
+    due_indices.sort((left, right) => left - right);
+    let previous_index = -1;
+    for (const index of due_indices) {
+      if (index === previous_index) continue;
+      previous_index = index;
       const note = this.linked_notes[index]!;
       let state = this.note_states[index] as NoteState;
       if (!isActive(state, note.end !== undefined)) continue;
@@ -259,4 +291,8 @@ export class ManiaRulesEngine {
     linked_notes.sort((left, right) => left.start.absolute_time - right.start.absolute_time);
     return linked_notes;
   }
+}
+
+function compareMissDeadlines(left: MissDeadline, right: MissDeadline): number {
+  return left.time - right.time || left.index - right.index;
 }

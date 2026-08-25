@@ -4,6 +4,7 @@ import type { OsuGameplayData } from "../src/library/GameplayLoader";
 import { OsuGameplayRuntime, type OsuGameplayRuntimeDependencies } from "../src/gameplay/OsuGameplayRuntime";
 import { createOsuReplayBase } from "../src/replay/ReplayBase";
 import type { OsuCursorState } from "../src/gameplay/OsuInputEvent";
+import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
 
 class FakeEventTarget {
   private readonly listeners = new Map<string, Set<EventListener>>();
@@ -45,6 +46,7 @@ function createHarness() {
   const events = new FakeEventTarget();
   const frames = new FakeAnimationFrames();
   const cursor_states: OsuCursorState[] = [];
+  const results: ScoreResult[] = [];
   let destroy_calls = 0;
   const gain = { gain: { value: 1 }, connect() {}, disconnect() {} };
   const source = { buffer: null, playbackRate: { value: 1 }, connect() {}, start() {}, stop() {}, disconnect() {} };
@@ -70,13 +72,13 @@ function createHarness() {
     performance_now: () => 1000,
     create_renderer: () => ({
       clientToPlayfield: (point, bounds) => ({ x: point.x - bounds.left, y: point.y - bounds.top }),
-      draw: (_chart, _time, _state, cursor) => cursor_states.push(cursor),
+      draw: (_chart, _circle_states, _first_active_index, _time, _state, cursor) => cursor_states.push(cursor),
       destroy: () => { destroy_calls += 1; },
     }),
   };
   const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 0,
-    createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], () => {}, dependencies);
-  return { runtime, events, frames, cursor_states, get destroy_calls() { return destroy_calls; } };
+    createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], (result) => results.push(result), dependencies);
+  return { runtime, events, frames, cursor_states, results, get destroy_calls() { return destroy_calls; } };
 }
 
 test("records aim and actions at corrected event time between render frames", () => {
@@ -127,6 +129,18 @@ test("cancels pointer actions and renders the current cursor state", () => {
   harness.frames.run(1300);
   assert.equal(harness.runtime.cursor_state.secondary, false);
   assert.deepEqual(harness.cursor_states[0], harness.runtime.cursor_state);
+});
+
+test("feeds corrected circle clicks into osu scoring and renderer state", () => {
+  const harness = createHarness();
+  harness.runtime.start();
+  harness.runtime.aimPointer(1, 256, 192, { left: 0, top: 0, width: 640, height: 480 }, 3100);
+  harness.runtime.pressPointer(1, "primary", 3100);
+  harness.frames.run(3100);
+  harness.events.dispatch("keydown", key("Escape", 3200));
+
+  assert.equal(harness.results[0]?.judges?.["300"], 1);
+  assert.equal(harness.cursor_states.length, 1);
 });
 
 test("registers and cleans up keyboard, animation, audio, and renderer resources", () => {

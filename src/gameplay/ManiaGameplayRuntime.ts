@@ -54,6 +54,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private finished = false;
   private destroyed = false;
   private readonly hud_state = new HudStateDeriver();
+  private readonly gameplay_end_time: number;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
@@ -61,6 +62,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
+    this.gameplay_end_time = getGameplayEndTime(data, this.music_rate);
     this.finish = finish;
     this.dependencies = dependencies;
     const timing_identity = replay_base.timings.name === "sphere" && replay_base.subtimings === null
@@ -161,7 +163,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.pressed_keys.clear();
     this.pointer_columns.clear();
     this.pressed_columns.fill(0);
-    this.rules_engine.update(getGameplayEndTime(this.data, this.music_rate), 0, 0);
+    this.rules_engine.update(this.gameplay_end_time, 0, 0);
     this.finishGameplay();
   }
 
@@ -179,7 +181,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     const score = this.rules_engine.score;
     this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed,
       this.pressed_columns, this.hud_state.update(score, timestamp / 1000));
-    if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
+    if (song_time >= this.gameplay_end_time) {
       this.finishGameplay();
       return;
     }

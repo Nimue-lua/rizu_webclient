@@ -12,7 +12,8 @@ import type { OsuCursorState } from "../OsuInputEvent";
 
 export interface OsuGameplayRenderer {
   clientToPlayfield(point: Point, bounds: ClientBounds): Point;
-  draw(chart: OsuChart, song_time: number, state: GameplayPresentationState, cursor: OsuCursorState): void;
+  draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number, song_time: number,
+    state: GameplayPresentationState, cursor: OsuCursorState): void;
   destroy(): void;
 }
 
@@ -43,7 +44,8 @@ export class OsuRenderer implements OsuGameplayRenderer {
     return this.createViewport(frame.logical_width, frame.logical_height).clientToPlayfield(point, bounds);
   }
 
-  draw(chart: OsuChart, song_time: number, state: GameplayPresentationState, cursor: OsuCursorState): void {
+  draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number, song_time: number,
+    state: GameplayPresentationState, cursor: OsuCursorState): void {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
     const commands: SpriteDrawCommand[] = [];
@@ -53,7 +55,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
       commands.push({ x, y, width, height, color, sprite, flipY: false, rotateCounterClockwise: false });
     };
     const viewport = this.createViewport(frame.logical_width, frame.logical_height);
-    this.playfield.draw(viewport, chart, song_time, write);
+    this.playfield.draw(viewport, chart, circle_states, first_active_index, song_time, write);
     this.combo.draw(state.combo, viewport.stage_left + 8 * viewport.scale,
       viewport.stage_top + 472 * viewport.scale, write);
     const cursor_center = viewport.playfieldToScreen(cursor.position);
