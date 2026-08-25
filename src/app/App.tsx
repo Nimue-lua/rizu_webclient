@@ -33,6 +33,7 @@ import {
 
 type Screen = "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
+const OSU_HIT_SOUND_VOLUME_KEY = "rizu.osu-hit-sound-volume";
 const MUSIC_OFFSET_KEY = "rizu.music-offset";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
@@ -63,6 +64,11 @@ export function App() {
     const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     return Number.isFinite(stored_value) && stored_value >= 0 && stored_value <= 1 ? stored_value : 0.2;
+  });
+  const [osu_hit_sound_volume, setOsuHitSoundVolume] = useState(() => {
+    const stored_setting = localStorage.getItem(OSU_HIT_SOUND_VOLUME_KEY);
+    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
+    return Number.isFinite(stored_value) && stored_value >= 0 && stored_value <= 1 ? stored_value : 1;
   });
   const [music_offset, setMusicOffset] = useState(() => {
     const stored_setting = localStorage.getItem(MUSIC_OFFSET_KEY);
@@ -115,6 +121,11 @@ export function App() {
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
     setMasterVolume(value);
+  };
+
+  const changeOsuHitSoundVolume = (value: number) => {
+    localStorage.setItem(OSU_HIT_SOUND_VOLUME_KEY, String(value));
+    setOsuHitSoundVolume(value);
   };
 
   const changeMusicOffset = (value: number) => {
@@ -261,6 +272,7 @@ export function App() {
           <GameplayScreen
             assets={assets}
             master_volume={master_volume}
+            osu_hit_sound_volume={osu_hit_sound_volume}
             music_offset={music_offset}
             scroll_speed={scroll_speed}
             cursor_scale={cursor_scale}
@@ -332,12 +344,14 @@ export function App() {
           {settings_open && (
             <SettingsScreen
               master_volume={master_volume}
+              osu_hit_sound_volume={osu_hit_sound_volume}
               music_offset={music_offset}
               scroll_speed={scroll_speed}
               scroll_speed_type={scroll_speed_type}
               cursor_scale={cursor_scale}
               hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
+              onOsuHitSoundVolumeChange={changeOsuHitSoundVolume}
               onMusicOffsetChange={changeMusicOffset}
               onScrollSpeedChange={changeScrollSpeed}
               onScrollSpeedTypeChange={changeScrollSpeedType}

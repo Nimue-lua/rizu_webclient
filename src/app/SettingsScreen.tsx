@@ -9,12 +9,14 @@ import {
 
 interface SettingsScreenProps {
   master_volume: number;
+  osu_hit_sound_volume: number;
   music_offset: number;
   scroll_speed: number;
   scroll_speed_type: ScrollSpeedType;
   cursor_scale: number;
   hit_registration: ManiaHitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
+  onOsuHitSoundVolumeChange: (volume: number) => void;
   onMusicOffsetChange: (music_offset: number) => void;
   onScrollSpeedChange: (scroll_speed: number) => void;
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
@@ -29,12 +31,14 @@ function sliderStyle(value: number, minimum: number, maximum: number): CSSProper
 
 export function SettingsScreen({
   master_volume,
+  osu_hit_sound_volume,
   music_offset,
   scroll_speed,
   scroll_speed_type,
   cursor_scale,
   hit_registration,
   onMasterVolumeChange,
+  onOsuHitSoundVolumeChange,
   onMusicOffsetChange,
   onScrollSpeedChange,
   onScrollSpeedTypeChange,
@@ -64,6 +68,7 @@ export function SettingsScreen({
   }, [onExit]);
 
   const master_volume_percent = Math.round(master_volume * 100);
+  const osu_hit_sound_volume_percent = Math.round(osu_hit_sound_volume * 100);
   const displayed_scroll_speed = scrollSpeedToDisplay(scroll_speed_type, scroll_speed);
   const scroll_speed_range = scroll_speed_type === "osu"
     ? { minimum: 1, maximum: 40, step: 1 }
@@ -108,6 +113,20 @@ export function SettingsScreen({
             onChange={(event) => onMasterVolumeChange(Number(event.target.value) / 100)}
           />
           <small>Controls preview and gameplay audio.</small>
+        </label>
+        <label className="settings-control" htmlFor="osu-hit-sound-volume">
+          <span>osu! hit sound volume <output htmlFor="osu-hit-sound-volume">{osu_hit_sound_volume_percent}%</output></span>
+          <input
+            id="osu-hit-sound-volume"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={osu_hit_sound_volume_percent}
+            style={sliderStyle(osu_hit_sound_volume_percent, 0, 100)}
+            onChange={(event) => onOsuHitSoundVolumeChange(Number(event.target.value) / 100)}
+          />
+          <small>Controls osu! gameplay hit sounds independently from music.</small>
         </label>
         <label className="settings-control" htmlFor="music-offset">
           <span>Music offset <output htmlFor="music-offset">{music_offset} ms</output></span>

@@ -10,6 +10,7 @@ import { ManiaTouchControls } from "./ManiaTouchControls";
 interface GameplayScreenProps {
   assets: GameplayData;
   master_volume: number;
+  osu_hit_sound_volume: number;
   music_offset: number;
   scroll_speed: number;
   cursor_scale: number;
@@ -19,7 +20,8 @@ interface GameplayScreenProps {
   onFinish: (score: ScoreResult) => void;
 }
 
-export function GameplayScreen({ assets, master_volume, music_offset, scroll_speed, cursor_scale, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
+export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
+  replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
@@ -29,7 +31,7 @@ export function GameplayScreen({ assets, master_volume, music_offset, scroll_spe
     const canvas = canvas_ref.current;
     if (!canvas) return;
 
-    const binding = createGameplaySession({ canvas, data: assets, master_volume, music_offset, scroll_speed,
+    const binding = createGameplaySession({ canvas, data: assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed,
       cursor_scale, replay_base, input_bindings, hit_registration, finish: onFinish });
     session_ref.current = binding.session;
     mania_input_ref.current = binding.mode === "mania" ? binding.pointer_input : null;
@@ -42,7 +44,8 @@ export function GameplayScreen({ assets, master_volume, music_offset, scroll_spe
       osu_input_ref.current = null;
       binding.session.destroy();
     };
-  }, [assets, cursor_scale, hit_registration, input_bindings, master_volume, music_offset, onFinish, replay_base, scroll_speed]);
+  }, [assets, cursor_scale, hit_registration, input_bindings, master_volume, music_offset, onFinish,
+    osu_hit_sound_volume, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">

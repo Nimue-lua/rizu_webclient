@@ -57,7 +57,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private played_judgment_events = 0;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
-    master_volume: number, music_offset: number, cursor_scale: number, replay_base: OsuReplayBaseValues,
+    master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number, replay_base: OsuReplayBaseValues,
     input_bindings: readonly (string | null)[], private readonly finish: (score: ScoreResult) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.dependencies = dependencies;
@@ -78,7 +78,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       rate: this.music_rate,
       performance_now: dependencies.performance_now,
     });
-    this.hit_sound_player = new OsuHitSoundPlayer(data.audio_context, chart, data.note_skin, master_volume,
+    this.hit_sound_player = new OsuHitSoundPlayer(data.audio_context, chart, data.note_skin,
+      master_volume * hit_sound_volume,
       timing_configuration.values);
     this.clock = new AudioGameplayClock({
       rate: this.music_rate,
