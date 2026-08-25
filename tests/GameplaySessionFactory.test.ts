@@ -35,6 +35,7 @@ function createOptions(data: ManiaGameplayData | OsuGameplayData): GameplaySessi
     master_volume: 0.5,
     music_offset: 10,
     scroll_speed: 1.2,
+    cursor_scale: 1.25,
     replay_base: new ReplayBase(),
     input_bindings: ["KeyA"],
     hit_registration: "nearest",
@@ -109,6 +110,7 @@ test("creates an osu session without exposing mania column input", () => {
   assert.equal(harness.osu_options[0]?.data, options.data);
   assert.equal(harness.osu_options[0]?.replay_base.mode, "osu");
   assert.equal(harness.osu_options[0]?.replay_base.rate, options.replay_base.rate);
+  assert.equal(harness.osu_options[0]?.cursor_scale, options.cursor_scale);
   assert.deepEqual(harness.osu_options[0]?.replay_base.timings, { name: "osu_std_od", data: 5 });
   assert.deepEqual(harness.osu_options[0]?.replay_base.timing_values,
     { hit_300: 0.05, hit_100: 0.1, hit_50: 0.15, early_miss: 0.4, late_miss: 0.15 });

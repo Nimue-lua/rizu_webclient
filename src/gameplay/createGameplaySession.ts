@@ -15,6 +15,7 @@ export interface GameplaySessionOptions {
   master_volume: number;
   music_offset: number;
   scroll_speed: number;
+  cursor_scale: number;
   replay_base: ReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
@@ -32,7 +33,7 @@ const default_dependencies: GameplaySessionFactoryDependencies = {
     options.music_offset, options.scroll_speed, options.replay_base, options.input_bindings,
     options.hit_registration, options.finish),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
-    options.music_offset, options.replay_base, options.input_bindings, options.finish),
+    options.music_offset, options.cursor_scale, options.replay_base, options.input_bindings, options.finish),
 };
 
 export function createGameplaySession(options: GameplaySessionOptions,

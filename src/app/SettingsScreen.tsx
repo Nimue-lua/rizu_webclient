@@ -12,11 +12,13 @@ interface SettingsScreenProps {
   music_offset: number;
   scroll_speed: number;
   scroll_speed_type: ScrollSpeedType;
+  cursor_scale: number;
   hit_registration: ManiaHitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
   onMusicOffsetChange: (music_offset: number) => void;
   onScrollSpeedChange: (scroll_speed: number) => void;
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
+  onCursorScaleChange: (cursor_scale: number) => void;
   onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
   onExit: () => void;
 }
@@ -30,11 +32,13 @@ export function SettingsScreen({
   music_offset,
   scroll_speed,
   scroll_speed_type,
+  cursor_scale,
   hit_registration,
   onMasterVolumeChange,
   onMusicOffsetChange,
   onScrollSpeedChange,
   onScrollSpeedTypeChange,
+  onCursorScaleChange,
   onHitRegistrationChange,
   onExit,
 }: SettingsScreenProps) {
@@ -158,6 +162,20 @@ export function SettingsScreen({
             <option value="nearest">Nearest note</option>
           </select>
           <small>Chooses between the first active note and the note nearest to the music time.</small>
+        </label>
+        <label className="settings-control" htmlFor="settings-cursor-scale">
+          <span>osu! cursor scale <output htmlFor="settings-cursor-scale">{Math.round(cursor_scale * 100)}%</output></span>
+          <input
+            id="settings-cursor-scale"
+            type="range"
+            min="25"
+            max="200"
+            step="5"
+            value={Math.round(cursor_scale * 100)}
+            style={sliderStyle(cursor_scale * 100, 25, 200)}
+            onChange={(event) => onCursorScaleChange(Number(event.target.value) / 100)}
+          />
+          <small>Scales the cursor during osu! gameplay.</small>
         </label>
         </section>
       </main>

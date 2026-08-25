@@ -36,6 +36,7 @@ const MASTER_VOLUME_KEY = "rizu.master-volume";
 const MUSIC_OFFSET_KEY = "rizu.music-offset";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
+const CURSOR_SCALE_KEY = "rizu.cursor-scale";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const MUSIC_RATE_KEY = "rizu.music-rate";
 const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
@@ -75,6 +76,11 @@ export function App() {
   });
   const [scroll_speed_type, setScrollSpeedType] = useState<ScrollSpeedType>(() =>
     localStorage.getItem(SCROLL_SPEED_TYPE_KEY) === "osu" ? "osu" : "default");
+  const [cursor_scale, setCursorScale] = useState(() => {
+    const stored_setting = localStorage.getItem(CURSOR_SCALE_KEY);
+    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
+    return Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 2 ? stored_value : 1;
+  });
   const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
   const [replay_base, setReplayBase] = useState(() => {
@@ -125,6 +131,12 @@ export function App() {
   const changeScrollSpeedType = (value: ScrollSpeedType) => {
     localStorage.setItem(SCROLL_SPEED_TYPE_KEY, value);
     setScrollSpeedType(value);
+  };
+
+  const changeCursorScale = (value: number) => {
+    const scale = Math.min(2, Math.max(0.25, Math.round(value * 20) / 20));
+    localStorage.setItem(CURSOR_SCALE_KEY, String(scale));
+    setCursorScale(scale);
   };
 
   const changeHitRegistration = (value: ManiaHitRegistration) => {
@@ -251,6 +263,7 @@ export function App() {
             master_volume={master_volume}
             music_offset={music_offset}
             scroll_speed={scroll_speed}
+            cursor_scale={cursor_scale}
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
@@ -322,11 +335,13 @@ export function App() {
               music_offset={music_offset}
               scroll_speed={scroll_speed}
               scroll_speed_type={scroll_speed_type}
+              cursor_scale={cursor_scale}
               hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
               onMusicOffsetChange={changeMusicOffset}
               onScrollSpeedChange={changeScrollSpeed}
               onScrollSpeedTypeChange={changeScrollSpeedType}
+              onCursorScaleChange={changeCursorScale}
               onHitRegistrationChange={changeHitRegistration}
               onExit={() => setSettingsOpen(false)}
             />

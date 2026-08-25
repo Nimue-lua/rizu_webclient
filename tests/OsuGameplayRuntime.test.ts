@@ -79,7 +79,7 @@ function createHarness() {
     }),
   };
   const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 0,
-    createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], (result) => results.push(result), dependencies);
+    1, createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], (result) => results.push(result), dependencies);
   return { runtime, events, frames, cursor_states, results, get destroy_calls() { return destroy_calls; } };
 }
 

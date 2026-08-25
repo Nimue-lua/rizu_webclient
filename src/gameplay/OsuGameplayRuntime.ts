@@ -19,7 +19,7 @@ export interface OsuGameplayRuntimeDependencies {
   cancel_animation_frame: (handle: number) => void;
   performance_now: () => number;
   create_renderer: (canvas: HTMLCanvasElement, data: OsuGameplayData,
-    replay_base: OsuReplayBaseValues) => OsuGameplayRenderer;
+    replay_base: OsuReplayBaseValues, cursor_scale: number) => OsuGameplayRenderer;
 }
 
 function createDefaultDependencies(): OsuGameplayRuntimeDependencies {
@@ -28,8 +28,8 @@ function createDefaultDependencies(): OsuGameplayRuntimeDependencies {
     request_animation_frame: (callback) => window.requestAnimationFrame(callback),
     cancel_animation_frame: (handle) => window.cancelAnimationFrame(handle),
     performance_now: () => performance.now(),
-    create_renderer: (canvas, data, replay_base) => new OsuRenderer(canvas, data.note_skin, undefined,
-      replay_base.x_flip, replay_base.y_flip),
+    create_renderer: (canvas, data, replay_base, cursor_scale) => new OsuRenderer(canvas, data.note_skin, undefined,
+      replay_base.x_flip, replay_base.y_flip, cursor_scale),
   };
 }
 
@@ -52,11 +52,11 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private destroyed = false;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
-    master_volume: number, music_offset: number, replay_base: OsuReplayBaseValues,
+    master_volume: number, music_offset: number, cursor_scale: number, replay_base: OsuReplayBaseValues,
     input_bindings: readonly (string | null)[], private readonly finish: (score: ScoreResult) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.dependencies = dependencies;
-    this.renderer = dependencies.create_renderer(canvas, data, replay_base);
+    this.renderer = dependencies.create_renderer(canvas, data, replay_base, cursor_scale);
     this.music_rate = replay_base.rate;
     const timing_configuration = resolveOsuStandardTimingValues(Timings.fromValue(replay_base.timings));
     const chart = data.chart;

@@ -38,14 +38,16 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private readonly skin: OsuStandardSkin;
   private readonly x_flip: boolean;
   private readonly y_flip: boolean;
+  private readonly cursor_scale: number;
   private readonly slider_paths = new Map<OsuSlider, OsuSliderPath>();
   private readonly rejected_slider_paths = new WeakSet<OsuSlider>();
 
   constructor(canvas: HTMLCanvasElement, skin: OsuStandardSkin, hud?: GameplayHudRenderer,
-    x_flip = false, y_flip = false) {
+    x_flip = false, y_flip = false, cursor_scale = 1) {
     this.skin = skin;
     this.x_flip = x_flip;
     this.y_flip = y_flip;
+    this.cursor_scale = cursor_scale;
     this.playfield = new OsuPlayfieldRenderer(skin);
     this.combo = new OsuComboRenderer(skin);
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
@@ -94,7 +96,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
         this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha), slider_states, spinner_state);
     this.combo.draw(state.combo, 8, frame.logical_height - 8, write);
     const cursor_center = viewport.playfieldToScreen(cursor.position);
-    const cursor_scale = cursor.primary || cursor.secondary ? 0.9 : 1;
+    const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
     const cursor_width = this.skin.cursor.sourceSize.w * viewport.scale * cursor_scale;
     const cursor_height = this.skin.cursor.sourceSize.h * viewport.scale * cursor_scale;
     write(cursor_center.x - cursor_width / 2, cursor_center.y - cursor_height / 2,
