@@ -15,6 +15,7 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly hitCircle: Sprite;
   readonly hitCircleOverlay: Sprite;
   readonly approachCircle: Sprite;
+  readonly cursor: Sprite;
   readonly comboColor: readonly [number, number, number, number];
   readonly judgments: Readonly<Record<string, readonly string[]>>;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
@@ -240,7 +241,8 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
   const scoreGlyphs = resolveFontGlyphs(fonts.ScorePrefix ?? "score", available, defaults);
   const comboGlyphs = resolveFontGlyphs(fonts.ComboPrefix ?? "score", available, defaults);
   const judgments = resolveStandardJudgments(available, defaults);
-  const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle",
+  const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
+  const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", cursor_name,
     ...Object.values(scoreGlyphs), ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
@@ -261,6 +263,7 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     hitCircle: sprites.hitcircle!,
     hitCircleOverlay: sprites.hitcircleoverlay!,
     approachCircle: sprites.approachcircle!,
+    cursor: sprites[cursor_name]!,
     comboColor: colorValue(ini.sections.Colours ?? {}, "Combo1", [1, 0.4, 0.4, 1]),
     judgments,
     scoreGlyphs,

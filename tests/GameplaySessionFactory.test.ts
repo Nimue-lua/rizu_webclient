@@ -3,7 +3,7 @@ import test from "node:test";
 import type { ManiaGameplayData, OsuGameplayData } from "../src/library/GameplayLoader";
 import { createGameplaySession, type GameplaySessionFactoryDependencies,
   type GameplaySessionOptions } from "../src/gameplay/createGameplaySession";
-import type { GameplaySession, ManiaPointerInput } from "../src/gameplay/GameplaySession";
+import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../src/gameplay/GameplaySession";
 import { ReplayBase } from "../src/replay/ReplayBase";
 
 function createManiaData(): ManiaGameplayData {
@@ -45,7 +45,7 @@ function createDependencies() {
   const mania_options: Array<GameplaySessionOptions & { data: ManiaGameplayData }> = [];
   const osu_options: Array<GameplaySessionOptions & { data: OsuGameplayData }> = [];
   const mania_sessions: Array<GameplaySession & ManiaPointerInput & { starts: number; destroys: number }> = [];
-  const osu_sessions: Array<GameplaySession & { starts: number; destroys: number }> = [];
+  const osu_sessions: Array<GameplaySession & OsuPointerInput & { starts: number; destroys: number }> = [];
   const dependencies: GameplaySessionFactoryDependencies = {
     create_mania: (options) => {
       mania_options.push(options);
@@ -67,6 +67,10 @@ function createDependencies() {
         destroys: 0,
         start() { this.starts += 1; },
         destroy() { this.destroys += 1; },
+        aimPointer() {},
+        pressPointer() {},
+        releasePointer() {},
+        cancelPointer() {},
       };
       osu_sessions.push(session);
       return session;
@@ -109,7 +113,7 @@ test("creates an osu session without exposing mania column input", () => {
     { hit_300: 0.05, hit_100: 0.1, hit_50: 0.15, early_miss: 0.4, late_miss: 0.15 });
   assert.equal("subtimings" in harness.osu_options[0]!.replay_base, false);
   assert.equal("const" in harness.osu_options[0]!.replay_base, false);
-  assert.equal("pointer_input" in binding, false);
+  assert.equal(binding.pointer_input, binding.session);
 });
 
 test("each factory call creates an independently owned play attempt", () => {

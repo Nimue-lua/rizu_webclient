@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { approachPreempt, circleDiameter, OsuPlayfieldRenderer } from "../src/gameplay/renderer/OsuPlayfieldRenderer";
 import type { OsuStandardSkin } from "../src/gameplay/renderer/OsuSkin";
+import { OsuViewport } from "../src/gameplay/OsuViewport";
 
 test("calculates osu approach preempt and circle size", () => {
   assert.equal(approachPreempt(0), 1.8);
@@ -11,7 +12,12 @@ test("calculates osu approach preempt and circle size", () => {
 });
 
 test("centers the 640 by 480 stage and only scales it down", () => {
-  const renderer = new OsuPlayfieldRenderer(null as unknown as OsuStandardSkin);
-  assert.deepEqual(renderer.getLayout(1280, 720), { width: 1280, height: 720, scale: 1, left: 320, top: 120 });
-  assert.deepEqual(renderer.getLayout(320, 240), { width: 320, height: 240, scale: 0.5, left: 0, top: 0 });
+  const wide = new OsuViewport(1280, 720);
+  assert.equal(wide.scale, 1);
+  assert.equal(wide.stage_left, 320);
+  assert.equal(wide.stage_top, 120);
+  const small = new OsuViewport(320, 240);
+  assert.equal(small.scale, 0.5);
+  assert.equal(small.stage_left, 0);
+  assert.equal(small.stage_top, 0);
 });

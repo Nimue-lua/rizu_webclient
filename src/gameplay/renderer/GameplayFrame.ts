@@ -18,7 +18,7 @@ export function resizeGameplayCanvas(canvas: HTMLCanvasElement, device_pixel_rat
   return {
     framebuffer_width,
     framebuffer_height,
-    logical_width: GAMEPLAY_LOGICAL_HEIGHT * framebuffer_width / framebuffer_height,
+    logical_width: GAMEPLAY_LOGICAL_HEIGHT * Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight),
     logical_height: GAMEPLAY_LOGICAL_HEIGHT,
   };
 }
