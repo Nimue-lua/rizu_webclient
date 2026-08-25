@@ -233,6 +233,23 @@ OverallDifficulty:7
   if (chart.mode === "osu") assert.equal(chart.approach_rate, 7);
 });
 
+test("parses and clamps stable StackLeniency with a 0.7 default", () => {
+  const parseLeniency = (value: string) => parseOsuChart(`
+[General]
+Mode:0
+${value}
+[Difficulty]
+CircleSize:4
+`);
+  const default_chart = parseLeniency("");
+  const low_chart = parseLeniency("StackLeniency:-1");
+  const high_chart = parseLeniency("StackLeniency:2");
+  assert.equal(default_chart.mode === "osu" ? default_chart.stack_leniency : null, 0.7);
+  assert.equal(low_chart.mode === "osu" ? low_chart.stack_leniency : null, 0);
+  assert.equal(high_chart.mode === "osu" ? high_chart.stack_leniency : null, 1);
+  assert.throws(() => parseLeniency("StackLeniency:nope"), /invalid StackLeniency/);
+});
+
 test("parses overall difficulty for gameplay timings", () => {
   const chart = parseOsuChart(`
 [Difficulty]

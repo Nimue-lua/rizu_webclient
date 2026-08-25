@@ -6,6 +6,7 @@ import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
 import { HudStateDeriver } from "./HudState";
 import type { OsuAction, OsuCursorState, OsuInputEvent } from "./OsuInputEvent";
 import { OsuRulesEngine } from "./OsuRulesEngine";
+import { applyOsuHitObjectStacking } from "./OsuHitObjectStacking";
 import { WebAudioPlayback } from "./audio/WebAudioPlayback";
 import { OsuRenderer, type OsuGameplayRenderer } from "./renderer/OsuRenderer";
 import { calculateOsuStandardDifficultyMultiplier } from "./scoring/OsuStandardDifficulty";
@@ -41,6 +42,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly music_rate: number;
   private readonly hud_state = new HudStateDeriver();
   private readonly rules_engine: OsuRulesEngine;
+  private readonly chart: OsuGameplayData["chart"];
   private readonly dependencies: OsuGameplayRuntimeDependencies;
   private readonly key_actions = new Map<string, OsuAction>();
   private readonly pressed_keys = new Set<string>();
@@ -56,10 +58,12 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     input_bindings: readonly (string | null)[], private readonly finish: (score: ScoreResult) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.dependencies = dependencies;
-    this.renderer = dependencies.create_renderer(canvas, data, replay_base, cursor_scale);
     this.music_rate = replay_base.rate;
     const timing_configuration = resolveOsuStandardTimingValues(Timings.fromValue(replay_base.timings));
-    const chart = data.chart;
+    const chart = applyOsuHitObjectStacking(data.chart, replay_base.approach_rate ?? data.chart.approach_rate,
+      replay_base.circle_size ?? data.chart.circle_size);
+    this.chart = chart;
+    this.renderer = dependencies.create_renderer(canvas, { ...data, chart }, replay_base, cursor_scale);
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
       replay_base.overall_difficulty ?? chart.overall_difficulty ?? 5,
       replay_base.circle_size ?? chart.circle_size, chart.object_count, chart.drain_length_seconds);
@@ -186,7 +190,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly render = (timestamp: number) => {
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.rules_engine.update(song_time);
-    this.renderer.draw(this.data.chart, this.rules_engine.circle_states,
+    this.renderer.draw(this.chart, this.rules_engine.circle_states,
       this.rules_engine.first_active_circle_index, this.rules_engine.circle_transients, song_time,
       this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
       this.rules_engine.slider_states, this.rules_engine.spinner_state);

@@ -243,6 +243,7 @@ export function parseOsuChart(source: string): Chart {
   const format_version = format_match ? Number(format_match[1]) : 14;
   let section = "";
   let mode = 3;
+  let stack_leniency = 0.7;
   let circle_size: number | null = null;
   let overall_difficulty = 5;
   let hp_drain_rate = 5;
@@ -267,6 +268,9 @@ export function parseOsuChart(source: string): Chart {
     const property_match = line.match(/^([A-Za-z]+\d*):\s?(.*)$/);
     if (property_match) {
       if (section === "General" && property_match[1] === "Mode") mode = Number(property_match[2]);
+      if (section === "General" && property_match[1] === "StackLeniency") {
+        stack_leniency = Number(property_match[2]);
+      }
       if (section === "Difficulty" && property_match[1] === "CircleSize") {
         circle_size = Number(property_match[2]);
       }
@@ -350,6 +354,8 @@ export function parseOsuChart(source: string): Chart {
   }
 
   if (mode !== 0 && mode !== 3) throw new Error(`Unsupported osu mode: ${mode}`);
+  if (!Number.isFinite(stack_leniency)) throw new Error("Chart has an invalid StackLeniency");
+  stack_leniency = Math.min(Math.max(stack_leniency, 0), 1);
   if (circle_size === null || !Number.isFinite(circle_size) || circle_size <= 0 || circle_size > 10) {
     throw new Error("Chart has an invalid CircleSize");
   }
@@ -394,6 +400,7 @@ export function parseOsuChart(source: string): Chart {
     return {
       mode: "osu",
       format_version,
+      stack_leniency,
       approach_rate,
       circle_size,
       end_time: last_time,
