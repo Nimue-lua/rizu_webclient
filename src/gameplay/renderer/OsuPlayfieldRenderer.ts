@@ -34,6 +34,15 @@ export class OsuPlayfieldRenderer {
     const preempt = osuApproachPreempt(chart.approach_rate);
     const diameter = osuCircleDiameter(chart.circle_size) * viewport.scale;
     const shake_offsets = new Map<number, number>();
+    const visible_sliders = new Map<number, {
+      object_index: number;
+      object: OsuSlider;
+      path: OsuSliderPath | undefined;
+      alpha: number;
+      combo: readonly [number, number, number, number];
+      remaining: number;
+      age: number;
+    }>();
     for (const transient of circle_transients) {
       if (transient.kind !== "shake") continue;
       const age = song_time - transient.start_time;
@@ -52,6 +61,39 @@ export class OsuPlayfieldRenderer {
       const combo = this.comboColor(chart, object.combo_color_index);
       const path = slider_path?.(object);
       if (path) draw_slider?.(object, path, alpha, combo);
+      visible_sliders.set(object_index, { object_index, object, path, alpha, combo, remaining, age });
+    }
+    if (spinner_state?.active) this.drawSpinner(viewport, spinner_state, write);
+    let low = 0;
+    let high = chart.hit_objects.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (chart.hit_objects[middle]!.absolute_time <= song_time + preempt) low = middle + 1;
+      else high = middle;
+    }
+    for (let index = low - 1; index >= 0; index -= 1) {
+      const object = chart.hit_objects[index]!;
+      if (object.kind === "circle") {
+        if (index < first_active_index || circle_states[index] !== OsuCircleState.Pending) continue;
+        const remaining = object.absolute_time - song_time;
+        const age = preempt - remaining;
+        const circle_alpha = Math.min(1, age / CIRCLE_FADE_IN);
+        const approach_alpha = remaining > 0
+          ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
+          : 0;
+        const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
+        const position = {
+          x: object.x + (shake_offsets.get(index) ?? 0),
+          y: object.y,
+        };
+        this.drawCircle(viewport, position, diameter, circle_alpha, approach_alpha, approach_scale,
+          this.comboColor(chart, object.combo_color_index ?? 0), object.combo_number ?? null, write);
+        continue;
+      }
+      if (object.kind !== "slider") continue;
+      const visible = visible_sliders.get(index);
+      if (!visible) continue;
+      const { object_index, path, alpha, combo, remaining, age } = visible;
       const endpoint = path?.endPosition(object.repeat_count) ?? { x: object.x, y: object.y };
       this.drawSliderEndCircle(viewport, endpoint, diameter, alpha, combo, write);
       const slider_state = slider_states?.find((state) => state.object_index === object_index && state.active);
@@ -73,40 +115,16 @@ export class OsuPlayfieldRenderer {
       if (path && object.tick_distances.length > 0 && song_time < object.end_time) {
         this.drawSliderTicks(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
-      if (path && song_time >= object.absolute_time && (slider_states === undefined || slider_state)) {
-        this.drawSliderBall(viewport, object, path, song_time, diameter, write);
-        if (slider_state?.tracking) this.drawSliderFollowCircle(viewport, slider_state, song_time, diameter, write);
-      }
       if (path && object.repeat_count > 1 && song_time < object.end_time) {
         this.drawReverseArrow(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
     }
-    if (spinner_state?.active) this.drawSpinner(viewport, spinner_state, write);
-    let low = 0;
-    let high = chart.hit_objects.length;
-    while (low < high) {
-      const middle = (low + high) >>> 1;
-      if (chart.hit_objects[middle]!.absolute_time <= song_time + preempt) low = middle + 1;
-      else high = middle;
-    }
-    for (let index = low - 1; index >= first_active_index; index -= 1) {
-      const circle = chart.hit_objects[index]!;
-      if (circle.kind !== "circle") continue;
-      if (circle_states[index] !== OsuCircleState.Pending) continue;
-      const remaining = circle.absolute_time - song_time;
-      if (remaining > preempt) continue;
-      const age = preempt - remaining;
-      const circle_alpha = Math.min(1, age / CIRCLE_FADE_IN);
-      const approach_alpha = remaining > 0
-        ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
-        : 0;
-      const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
-      const position = {
-        x: circle.x + (shake_offsets.get(index) ?? 0),
-        y: circle.y,
-      };
-      this.drawCircle(viewport, position, diameter, circle_alpha, approach_alpha, approach_scale,
-        this.comboColor(chart, circle.combo_color_index ?? 0), circle.combo_number ?? null, write);
+
+    for (const { object_index, object, path } of visible_sliders.values()) {
+      const slider_state = slider_states?.find((state) => state.object_index === object_index && state.active);
+      if (!path || song_time < object.absolute_time || (slider_states !== undefined && !slider_state)) continue;
+      this.drawSliderBall(viewport, object, path, song_time, diameter, write);
+      if (slider_state?.tracking) this.drawSliderFollowCircle(viewport, slider_state, song_time, diameter, write);
     }
 
     for (const transient of circle_transients) {

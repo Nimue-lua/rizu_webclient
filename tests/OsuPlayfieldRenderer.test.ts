@@ -170,6 +170,41 @@ test("requests visible slider bodies and draws repeat-aware head and end circles
   assert.equal((quads[0] as unknown[])[5], slider_end);
 });
 
+test("orders circles around slider bodies and foreground graphics by object time", () => {
+  const hit_circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const slider_end = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: hit_circle, hitCircleOverlay: hit_circle, approachCircle: hit_circle,
+    sliderEndCircle: slider_end, sliderEndCircleOverlay: null,
+    comboColor: [1, 1, 1, 1] } as unknown as OsuStandardSkin;
+  const slider: OsuSlider = {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
+    control_points: [{ x: 200, y: 100 }], repeat_count: 1, pixel_length: 100,
+    edge_sounds: [0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+    span_duration: 1, total_duration: 1, end_time: 2, tick_distances: [],
+  };
+  const early_circle = { kind: "circle" as const, x: 50, y: 100, absolute_time: 0.75, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } };
+  const late_circle = { kind: "circle" as const, x: 150, y: 100, absolute_time: 1.5, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } };
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 3, drain_length_seconds: 2, end_time: 2, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [],
+    hit_objects: [early_circle, slider, late_circle] } as const;
+  const path = OsuSliderPath.create(slider, 14);
+  const order: string[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart,
+    new Uint8Array(3), 0, [], 1.25,
+    (...quad) => order.push(quad[0] === 64 + early_circle.x - 32 ? "early-circle"
+      : quad[0] === 64 + late_circle.x - 32 ? "late-circle" : "slider-foreground"),
+    () => path, () => order.push("slider-body"));
+
+  assert.equal(order[0], "slider-body");
+  assert.ok(order.indexOf("late-circle") > order.indexOf("slider-body"));
+  assert.ok(order.indexOf("slider-foreground") > order.lastIndexOf("late-circle"));
+  assert.ok(order.indexOf("early-circle") > order.lastIndexOf("slider-foreground"));
+});
+
 test("fades slider bodies and circles for 240ms after their end", () => {
   const sprite = {} as OsuStandardSkin["hitCircle"];
   const skin = { hitCircle: sprite, hitCircleOverlay: sprite, approachCircle: sprite,
