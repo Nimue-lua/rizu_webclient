@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { parseOsuChart } from "../src/chart/format/osu/OsuParser";
 
@@ -35,37 +36,94 @@ CircleSize:4
   });
 });
 
-test("parses osu circles and ignores sliders and spinners", () => {
+test("retains typed standard objects, slider data, and normalized durations", () => {
+  const source = readFileSync(new URL("fixtures/osu/standard-objects.osu", import.meta.url), "utf8");
+  const chart = parseOsuChart(source);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+
+  assert.equal(chart.slider_multiplier, 2);
+  assert.equal(chart.end_time, 3.6);
+  assert.equal(chart.object_count, 6);
+  assert.equal(chart.drain_length_seconds, 3);
+  assert.deepEqual(chart.timing_points, [
+    { absolute_time: 0, beat_length: 0.5, uninherited: true, slider_velocity: 1 },
+    { absolute_time: 1, beat_length: -0.05, uninherited: false, slider_velocity: 2 },
+    { absolute_time: 2, beat_length: 0.4, uninherited: true, slider_velocity: 1 },
+  ]);
+  assert.deepEqual(chart.hit_objects.map((object) => object.kind),
+    ["circle", "slider", "slider", "slider", "slider", "spinner"]);
+
+  const circle = chart.hit_objects[0]!;
+  assert.deepEqual(circle, {
+    kind: "circle", x: 64, y: 64, absolute_time: 0.5, hit_sound: 2,
+    hit_sample: { normal_set: 1, addition_set: 2, index: 3, volume: 40, filename: "circle.wav" },
+  });
+  const sliders = chart.hit_objects.filter((object) => object.kind === "slider");
+  assert.deepEqual(sliders.map((slider) => slider.curve_type), ["linear", "bezier", "perfect", "catmull"]);
+  assert.deepEqual(sliders[0], {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 4,
+    curve_type: "linear", control_points: [{ x: 200, y: 100 }], repeat_count: 2, pixel_length: 200,
+    edge_sounds: [2, 8, 4],
+    edge_sets: [{ normal_set: 1, addition_set: 2 }, { normal_set: 2, addition_set: 3 },
+      { normal_set: 3, addition_set: 1 }],
+    hit_sample: { normal_set: 2, addition_set: 3, index: 4, volume: 60, filename: "slider.wav" },
+    span_duration: 0.25, total_duration: 0.5, end_time: 1.5,
+  });
+  assert.ok(Math.abs((sliders[2]?.span_duration ?? 0) - 0.2) < 1e-12);
+  assert.equal(sliders[3]?.end_time, 2.7);
+  assert.deepEqual(chart.hit_objects[5], {
+    kind: "spinner", x: 256, y: 192, absolute_time: 3, hit_sound: 0, end_time: 3.6,
+    hit_sample: { normal_set: 3, addition_set: 1, index: 2, volume: 70, filename: "spinner.wav" },
+  });
+});
+
+test("uses the active red point and inherited SV and floors stable slider end time", () => {
   const chart = parseOsuChart(`
 [General]
 Mode:0
 [Difficulty]
-CircleSize:4.2
-HPDrainRate:6.5
-OverallDifficulty:6
-ApproachRate:8
+CircleSize:4
+SliderMultiplier:1.4
+[TimingPoints]
+0,500,4,2,0,100,1,0
+1000,-80,4,2,0,100,0,0
+1500,250,4,2,0,100,1,0
 [HitObjects]
-400,300,1500,1,0,0:0:0:0:
-100,200,500,2,0,B|200:200,1,100
-256,192,1000,5,0,0:0:0:0:
-256,192,2000,8,0,2500
+64,64,1250,2,0,L|164:64,3,101
+64,64,1600,2,0,L|164:64,1,100
+64,64,1700,1,0,0:0:0:0:
 `);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  const [first, second] = chart.hit_objects.filter((object) => object.kind === "slider");
+  assert.equal(first?.end_time, 2.115);
+  assert.ok(Math.abs((first?.span_duration ?? 0) - 0.28833333333333333) < 1e-12);
+  assert.equal(second?.end_time, 1.778);
+  assert.equal(chart.end_time, 2.115);
+});
 
-  assert.deepEqual(chart, {
-    mode: "osu",
-    approach_rate: 8,
-    circle_size: 4.2,
-    end_time: 2,
-    overall_difficulty: 6,
-    hp_drain_rate: 6.5,
-    object_count: 4,
-    drain_length_seconds: 1,
-    primary_tempo: 120,
-    circles: [
-      { x: 256, y: 192, absolute_time: 1 },
-      { x: 400, y: 300, absolute_time: 1.5 },
-    ],
-  });
+test("preserves source order for same-time standard objects", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+[HitObjects]
+300,100,1000,1,0,0:0:0:0:
+100,100,1000,8,0,1200,0:0:0:0:
+200,100,1000,1,0,0:0:0:0:
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode === "osu") assert.deepEqual(chart.hit_objects.map((object) => object.x), [300, 100, 200]);
+});
+
+test("rejects malformed standard sliders and spinners", () => {
+  const prefix = `[General]\nMode:0\n[Difficulty]\nCircleSize:4\n[HitObjects]\n`;
+  assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,Q|100:100,1,100`), /Invalid slider path/);
+  assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,L|bad:100,1,100`), /Invalid slider path/);
+  assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,L|100:100,0,100`), /Invalid slider/);
+  assert.throws(() => parseOsuChart(`${prefix}64,64,1000,8,0,999`), /Invalid spinner/);
 });
 
 test("uses overall difficulty as approach rate for old osu charts", () => {

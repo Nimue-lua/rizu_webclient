@@ -21,10 +21,59 @@ export interface ManiaChart {
   visual_points: readonly VisualPoint[];
 }
 
-export interface OsuCircle {
-  x: number;
-  y: number;
-  absolute_time: number;
+export interface OsuHitSample {
+  readonly normal_set: number;
+  readonly addition_set: number;
+  readonly index: number;
+  readonly volume: number;
+  readonly filename: string;
+}
+
+interface OsuHitObjectBase {
+  readonly x: number;
+  readonly y: number;
+  readonly absolute_time: number;
+  readonly hit_sound: number;
+  readonly hit_sample: OsuHitSample;
+}
+
+export interface OsuCircle extends OsuHitObjectBase {
+  readonly kind: "circle";
+}
+
+export type OsuSliderCurveType = "linear" | "bezier" | "perfect" | "catmull";
+
+export interface OsuSliderEdgeSet {
+  readonly normal_set: number;
+  readonly addition_set: number;
+}
+
+export interface OsuSlider extends OsuHitObjectBase {
+  readonly kind: "slider";
+  readonly curve_type: OsuSliderCurveType;
+  readonly control_points: readonly Readonly<{ x: number; y: number }>[];
+  /** The .osu repeat field is the number of spans, including the first span. */
+  readonly repeat_count: number;
+  readonly pixel_length: number;
+  readonly edge_sounds: readonly number[];
+  readonly edge_sets: readonly OsuSliderEdgeSet[];
+  readonly span_duration: number;
+  readonly total_duration: number;
+  readonly end_time: number;
+}
+
+export interface OsuSpinner extends OsuHitObjectBase {
+  readonly kind: "spinner";
+  readonly end_time: number;
+}
+
+export type OsuHitObject = OsuCircle | OsuSlider | OsuSpinner;
+
+export interface OsuTimingPoint {
+  readonly absolute_time: number;
+  readonly beat_length: number;
+  readonly uninherited: boolean;
+  readonly slider_velocity: number;
 }
 
 export interface OsuChart {
@@ -37,7 +86,9 @@ export interface OsuChart {
   object_count: number;
   drain_length_seconds: number;
   primary_tempo: number;
-  circles: readonly OsuCircle[];
+  slider_multiplier: number;
+  timing_points: readonly OsuTimingPoint[];
+  hit_objects: readonly OsuHitObject[];
 }
 
 export type Chart = ManiaChart | OsuChart;

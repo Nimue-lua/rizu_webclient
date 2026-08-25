@@ -1,17 +1,23 @@
-import type { Chart, ManiaNoteEvent, OsuCircle } from "../../Chart";
+import type { Chart, ManiaNoteEvent, OsuHitObject, OsuHitSample, OsuSliderCurveType,
+  OsuTimingPoint } from "../../Chart";
 import { createVisualPoints, type TimingChange } from "../../VisualTimeline";
 
-interface OsuTimingPoint {
+interface RawTimingPoint {
   offset: number;
   beat_length: number;
+  uninherited: boolean;
+  source_index: number;
 }
 
-interface ParsedHitObject {
+interface RawHitObject {
   x: number;
   y: number;
   type: number;
+  hit_sound: number;
   start_time: number;
   end_time?: number;
+  fields: readonly string[];
+  source_index: number;
 }
 
 interface BreakPeriod {
@@ -19,8 +25,12 @@ interface BreakPeriod {
   end_time: number;
 }
 
-function normalizeTimingPoints(points: OsuTimingPoint[]): TimingChange[] {
-  points.sort((left, right) => left.offset - right.offset || right.beat_length - left.beat_length);
+function sortTimingPoints(points: RawTimingPoint[]): void {
+  points.sort((left, right) => left.offset - right.offset || Number(right.uninherited) - Number(left.uninherited)
+    || left.source_index - right.source_index);
+}
+
+function normalizeTimingChanges(points: readonly RawTimingPoint[]): TimingChange[] {
   const changes = new Map<number, TimingChange>();
   const red_offsets = new Set<number>();
   const green_offsets = new Set<number>();
@@ -28,10 +38,10 @@ function normalizeTimingPoints(points: OsuTimingPoint[]): TimingChange[] {
   for (let index = points.length - 1; index >= 0; index -= 1) {
     const point = points[index]!;
     const change = changes.get(point.offset) ?? { time: point.offset };
-    if (point.beat_length > 0 && !red_offsets.has(point.offset)) {
+    if (point.uninherited && point.beat_length > 0 && !red_offsets.has(point.offset)) {
       red_offsets.add(point.offset);
       change.bpm = Math.min(60000 / point.beat_length, 1_000_000);
-    } else if (point.beat_length < 0 && !green_offsets.has(point.offset)) {
+    } else if (!point.uninherited && point.beat_length < 0 && !green_offsets.has(point.offset)) {
       green_offsets.add(point.offset);
       change.scroll_velocity = Math.min(Math.max(Math.abs(-100 / point.beat_length), 0.1), 10);
     }
@@ -43,6 +53,113 @@ function normalizeTimingPoints(points: OsuTimingPoint[]): TimingChange[] {
     change.scroll_velocity ??= 1;
   }
   return [...changes.values()].sort((left, right) => left.time - right.time);
+}
+
+function normalizeOsuTimingPoints(points: readonly RawTimingPoint[]): OsuTimingPoint[] {
+  return points.map((point) => ({
+    absolute_time: point.offset,
+    beat_length: point.beat_length / 1000,
+    uninherited: point.uninherited,
+    slider_velocity: !point.uninherited && point.beat_length < 0
+      ? Math.min(Math.max(-100 / point.beat_length, 0.1), 10)
+      : 1,
+  }));
+}
+
+function parseHitSample(value: string | undefined, line: string): OsuHitSample {
+  const fields = (value ?? "").split(":");
+  const values = fields.slice(0, 4).map((field) => field === "" || field === undefined ? 0 : Number(field));
+  if (values.some((field) => !Number.isInteger(field) || field < 0)) throw new Error(`Invalid hit sample: ${line}`);
+  return {
+    normal_set: values[0] ?? 0,
+    addition_set: values[1] ?? 0,
+    index: values[2] ?? 0,
+    volume: values[3] ?? 0,
+    filename: fields.slice(4).join(":"),
+  };
+}
+
+function parseEdgeSounds(value: string | undefined, count: number, hit_sound: number, line: string): number[] {
+  const parsed = value ? value.split("|").map(Number) : [];
+  if (parsed.some((sound) => !Number.isInteger(sound) || sound < 0)) throw new Error(`Invalid slider edge sounds: ${line}`);
+  return Array.from({ length: count }, (_, index) => parsed[index] ?? hit_sound);
+}
+
+function parseEdgeSets(value: string | undefined, count: number, line: string): { normal_set: number; addition_set: number }[] {
+  const parsed = value ? value.split("|").map((edge) => {
+    const [normal_set = "0", addition_set = "0"] = edge.split(":");
+    return { normal_set: Number(normal_set), addition_set: Number(addition_set) };
+  }) : [];
+  if (parsed.some((edge) => !Number.isInteger(edge.normal_set) || edge.normal_set < 0 ||
+    !Number.isInteger(edge.addition_set) || edge.addition_set < 0)) {
+    throw new Error(`Invalid slider edge sets: ${line}`);
+  }
+  return Array.from({ length: count }, (_, index) => parsed[index] ?? { normal_set: 0, addition_set: 0 });
+}
+
+function activeSliderTiming(points: readonly RawTimingPoint[], start_time: number): { beat_length: number; velocity: number } {
+  let red_index = -1;
+  let inherited_index = -1;
+  for (let index = 0; index < points.length && points[index]!.offset <= start_time; index += 1) {
+    if (points[index]!.uninherited) red_index = index;
+    else inherited_index = index;
+  }
+  const red = points[red_index];
+  const inherited = points[inherited_index];
+  const velocity = inherited_index > red_index && inherited && inherited.beat_length < 0
+    ? Math.min(Math.max(-100 / inherited.beat_length, 0.1), 10)
+    : 1;
+  return { beat_length: red?.beat_length && red.beat_length > 0 ? red.beat_length : 0, velocity };
+}
+
+const CURVE_TYPES: Readonly<Record<string, OsuSliderCurveType>> = {
+  L: "linear", B: "bezier", P: "perfect", C: "catmull",
+};
+
+function normalizeStandardHitObject(object: RawHitObject, timing_points: readonly RawTimingPoint[],
+  slider_multiplier: number): OsuHitObject {
+  const line = object.fields.join(",");
+  const common = { x: object.x, y: object.y, absolute_time: object.start_time, hit_sound: object.hit_sound };
+  if ((object.type & 1) !== 0) {
+    return { kind: "circle", ...common, hit_sample: parseHitSample(object.fields[5], line) };
+  }
+  if ((object.type & 2) !== 0) {
+    const path_parts = (object.fields[5] ?? "").split("|");
+    const curve_type = CURVE_TYPES[path_parts.shift() ?? ""];
+    if (!curve_type || path_parts.length === 0) throw new Error(`Invalid slider path: ${line}`);
+    const control_points = path_parts.map((point) => {
+      const [raw_x, raw_y, ...extra] = point.split(":");
+      const x = Number(raw_x);
+      const y = Number(raw_y);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || extra.length !== 0) throw new Error(`Invalid slider path: ${line}`);
+      return { x, y };
+    });
+    const repeat_count = Number(object.fields[6]);
+    const pixel_length = Number(object.fields[7]);
+    if (!Number.isInteger(repeat_count) || repeat_count < 1 || repeat_count > 9000 ||
+      !Number.isFinite(pixel_length) || pixel_length < 0) throw new Error(`Invalid slider: ${line}`);
+    const timing = activeSliderTiming(timing_points, object.start_time);
+    const exact_duration_ms = timing.beat_length > 0
+      ? pixel_length * repeat_count * timing.beat_length / (slider_multiplier * 100 * timing.velocity)
+      : 0;
+    const end_time = Math.floor(object.start_time * 1000 + exact_duration_ms) / 1000;
+    const total_duration = end_time - object.start_time;
+    return {
+      kind: "slider", ...common, curve_type, control_points, repeat_count, pixel_length,
+      edge_sounds: parseEdgeSounds(object.fields[8], repeat_count + 1, object.hit_sound, line),
+      edge_sets: parseEdgeSets(object.fields[9], repeat_count + 1, line),
+      hit_sample: parseHitSample(object.fields[10], line),
+      span_duration: total_duration / repeat_count,
+      total_duration,
+      end_time,
+    };
+  }
+  if ((object.type & 8) !== 0) {
+    const end_time = Number(object.fields[5]) / 1000;
+    if (!Number.isFinite(end_time) || end_time < object.start_time) throw new Error(`Invalid spinner: ${line}`);
+    return { kind: "spinner", ...common, end_time, hit_sample: parseHitSample(object.fields[6], line) };
+  }
+  throw new Error(`Unsupported osu hit object: ${line}`);
 }
 
 function computePrimaryTempo(changes: readonly TimingChange[], last_time: number): number {
@@ -78,8 +195,9 @@ export function parseOsuChart(source: string): Chart {
   let overall_difficulty = 5;
   let hp_drain_rate = 5;
   let approach_rate: number | null = null;
-  const timing_points: OsuTimingPoint[] = [];
-  const hit_objects: ParsedHitObject[] = [];
+  let slider_multiplier = 1.4;
+  const timing_points: RawTimingPoint[] = [];
+  const hit_objects: RawHitObject[] = [];
   const breaks: BreakPeriod[] = [];
 
   for (const raw_line of source.split("\n")) {
@@ -107,6 +225,9 @@ export function parseOsuChart(source: string): Chart {
       if (section === "Difficulty" && property_match[1] === "ApproachRate") {
         approach_rate = Number(property_match[2]);
       }
+      if (section === "Difficulty" && property_match[1] === "SliderMultiplier") {
+        slider_multiplier = Number(property_match[2]);
+      }
       continue;
     }
 
@@ -127,10 +248,11 @@ export function parseOsuChart(source: string): Chart {
       const fields = line.split(",");
       const offset = Number(fields[0]) / 1000;
       const beat_length = Number(fields[1]);
+      const uninherited = fields[6] === undefined ? beat_length > 0 : Number(fields[6]) === 1;
       if (!Number.isFinite(offset) || !Number.isFinite(beat_length) || beat_length === 0) {
         throw new Error(`Invalid timing point: ${line}`);
       }
-      timing_points.push({ offset, beat_length });
+      timing_points.push({ offset, beat_length, uninherited, source_index: timing_points.length });
       continue;
     }
 
@@ -140,11 +262,15 @@ export function parseOsuChart(source: string): Chart {
       const y = Number(fields[1]);
       const start_time = Number(fields[2]) / 1000;
       const type = Number(fields[3]);
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(start_time) || !Number.isInteger(type)) {
+      const hit_sound = Number(fields[4]);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(start_time) || !Number.isInteger(type) ||
+        !Number.isInteger(hit_sound) || hit_sound < 0) {
         throw new Error(`Invalid hit object: ${line}`);
       }
 
-      const hit_object: ParsedHitObject = { x, y, type, start_time };
+      const hit_object: RawHitObject = {
+        x, y, type, hit_sound, start_time, fields, source_index: hit_objects.length,
+      };
       if ((type & 128) !== 0) {
         const end_time = Number(fields[5]?.split(":", 1)[0]) / 1000;
         if (!Number.isFinite(end_time) || end_time < start_time) throw new Error(`Invalid hold note: ${line}`);
@@ -164,23 +290,30 @@ export function parseOsuChart(source: string): Chart {
   if (!Number.isFinite(hp_drain_rate) || hp_drain_rate < 0 || hp_drain_rate > 10) {
     throw new Error("Chart has an invalid HPDrainRate");
   }
+  if (!Number.isFinite(slider_multiplier) || slider_multiplier <= 0) {
+    throw new Error("Chart has an invalid SliderMultiplier");
+  }
+  slider_multiplier = Math.min(Math.max(slider_multiplier, 0.4), 3.6);
   approach_rate ??= overall_difficulty;
   if (!Number.isFinite(approach_rate) || approach_rate < 0 || approach_rate > 10) {
     throw new Error("Chart has an invalid ApproachRate");
   }
 
-  const timing_changes = normalizeTimingPoints(timing_points);
-  const last_time = hit_objects.reduce((last, object) => Math.max(last, object.end_time ?? object.start_time), 0);
+  sortTimingPoints(timing_points);
+  const timing_changes = normalizeTimingChanges(timing_points);
+  const standard_hit_objects = mode === 0
+    ? hit_objects.map((object) => normalizeStandardHitObject(object, timing_points, slider_multiplier))
+      .sort((left, right) => left.absolute_time - right.absolute_time)
+    : [];
+  const last_time = mode === 0
+    ? standard_hit_objects.reduce((last, object) => Math.max(last, object.kind === "circle" ? object.absolute_time : object.end_time), 0)
+    : hit_objects.reduce((last, object) => Math.max(last, object.end_time ?? object.start_time), 0);
   const first_time = hit_objects.reduce((first, object) => Math.min(first, object.start_time), Number.POSITIVE_INFINITY);
   const break_time = breaks.reduce((total, period) => total + Math.max(0,
     Math.min(period.end_time, last_time) - Math.max(period.start_time, Number.isFinite(first_time) ? first_time : 0)), 0);
   const drain_length_seconds = hit_objects.length === 0 ? 0 : Math.max(0, Math.trunc(last_time - first_time - break_time));
   const primary_tempo = computePrimaryTempo(timing_changes, last_time);
   if (mode === 0) {
-    const circles: OsuCircle[] = hit_objects
-      .filter((object) => (object.type & 1) !== 0)
-      .map((object) => ({ x: object.x, y: object.y, absolute_time: object.start_time }))
-      .sort((left, right) => left.absolute_time - right.absolute_time);
     return {
       mode: "osu",
       approach_rate,
@@ -191,7 +324,9 @@ export function parseOsuChart(source: string): Chart {
       object_count: hit_objects.length,
       drain_length_seconds,
       primary_tempo,
-      circles,
+      slider_multiplier,
+      timing_points: normalizeOsuTimingPoints(timing_points),
+      hit_objects: standard_hit_objects,
     };
   }
   const key_count = Math.floor(circle_size);

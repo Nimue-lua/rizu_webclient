@@ -43,7 +43,9 @@ test("renders pending circles through their late window and hides resolved circl
     drain_length_seconds: 1,
     end_time: 1,
     primary_tempo: 120,
-    circles: [{ x: 256, y: 192, absolute_time: 1 }],
+    slider_multiplier: 1.4, timing_points: [],
+    hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 1, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }],
   } as const;
   const viewport = new OsuViewport(640, 480);
   const pending_quads: unknown[] = [];
@@ -65,11 +67,13 @@ test("draws only the supplied active circle range", () => {
     approachCircle: sprite,
     comboColor: [1, 1, 1],
   } as unknown as OsuStandardSkin;
-  const circles = Array.from({ length: 10_000 }, (_, index) => ({ x: 256, y: 192, absolute_time: index }));
+  const circles = Array.from({ length: 10_000 }, (_, index) => ({ kind: "circle" as const,
+    x: 256, y: 192, absolute_time: index, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }));
   const chart = {
     mode: "osu", approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
     object_count: circles.length, drain_length_seconds: circles.length, end_time: circles.length,
-    primary_tempo: 120, circles,
+    primary_tempo: 120, slider_multiplier: 1.4, timing_points: [], hit_objects: circles,
   } as const;
   const quads: unknown[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart,
@@ -88,7 +92,9 @@ test("matches stable hit fade-out and note-lock shake", () => {
   const chart = {
     mode: "osu", approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
     object_count: 1, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
-    circles: [{ x: 256, y: 192, absolute_time: 1 }],
+    slider_multiplier: 1.4, timing_points: [],
+    hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 1, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }],
   } as const;
   const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart,
@@ -118,7 +124,9 @@ test("renders the stable miss shell fade and local hit0 animation", () => {
   const chart = {
     mode: "osu", approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
     object_count: 1, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
-    circles: [{ x: 256, y: 192, absolute_time: 1 }],
+    slider_multiplier: 1.4, timing_points: [],
+    hit_objects: [{ kind: "circle", x: 256, y: 192, absolute_time: 1, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }],
   } as const;
   const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart,

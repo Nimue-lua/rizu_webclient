@@ -28,14 +28,15 @@ export class OsuPlayfieldRenderer {
       if (age >= 0 && age < 0.12) shake_offsets.set(transient.object_index, stableShakeOffset(age));
     }
     let low = 0;
-    let high = chart.circles.length;
+    let high = chart.hit_objects.length;
     while (low < high) {
       const middle = (low + high) >>> 1;
-      if (chart.circles[middle]!.absolute_time <= song_time + preempt) low = middle + 1;
+      if (chart.hit_objects[middle]!.absolute_time <= song_time + preempt) low = middle + 1;
       else high = middle;
     }
     for (let index = low - 1; index >= first_active_index; index -= 1) {
-      const circle = chart.circles[index]!;
+      const circle = chart.hit_objects[index]!;
+      if (circle.kind !== "circle") continue;
       if (circle_states[index] !== OsuCircleState.Pending) continue;
       const remaining = circle.absolute_time - song_time;
       if (remaining > preempt) continue;
@@ -61,8 +62,8 @@ export class OsuPlayfieldRenderer {
       if (transient.kind === "shake") continue;
       const age = song_time - transient.start_time;
       if (age < 0 || age >= JUDGMENT_LIFETIME) continue;
-      const circle = chart.circles[transient.object_index];
-      if (!circle) continue;
+      const circle = chart.hit_objects[transient.object_index];
+      if (!circle || circle.kind !== "circle") continue;
       const center = viewport.playfieldToScreen(circle);
       const combo = this.skin.comboColor;
       if (transient.kind === "hit" && age < HIT_FADE_OUT) {

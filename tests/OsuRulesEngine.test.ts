@@ -7,6 +7,8 @@ import { OsuRulesEngine } from "../src/gameplay/OsuRulesEngine";
 import { createOsuStandardTimingValues } from "../src/gameplay/timing/OsuStandardOdTimings";
 
 function createChart(circles: readonly { x: number; y: number; absolute_time: number }[]): OsuChart {
+  const hit_objects = circles.map((circle) => ({ kind: "circle" as const, ...circle, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } }));
   return {
     mode: "osu",
     approach_rate: 5,
@@ -17,7 +19,9 @@ function createChart(circles: readonly { x: number; y: number; absolute_time: nu
     drain_length_seconds: 10,
     end_time: circles.at(-1)?.absolute_time ?? 0,
     primary_tempo: 120,
-    circles,
+    slider_multiplier: 1.4,
+    timing_points: [],
+    hit_objects,
   };
 }
 

@@ -7,7 +7,7 @@ const RESULT_DELAY = 1.2;
 export function getAudioStartDelay(data: GameplayData, music_rate: number): number {
   const first_note_time = data.mode === "mania"
     ? data.chart.notes.reduce((first, note) => note.weight >= 0 ? Math.min(first, note.absolute_time) : first, Infinity)
-    : data.chart.circles[0]?.absolute_time ?? Infinity;
+    : data.chart.hit_objects[0]?.absolute_time ?? Infinity;
   if (!Number.isFinite(first_note_time)) return AUDIO_SCHEDULE_MARGIN;
   return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN - first_note_time / music_rate);
 }

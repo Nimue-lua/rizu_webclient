@@ -24,7 +24,7 @@ export class OsuRulesEngine {
 
   constructor(private readonly chart: OsuChart, private readonly timings: OsuStandardTimingValues,
     difficulty_multiplier: number) {
-    this.circle_states = new Uint8Array(chart.circles.length);
+    this.circle_states = new Uint8Array(chart.hit_objects.length);
     this.score_engine = new ScoreEngine([new OsuStandardScore(timings, difficulty_multiplier)]);
     const hit_radius = osuCircleHitRadius(chart.circle_size);
     this.hit_radius_squared = hit_radius * hit_radius;
@@ -40,9 +40,13 @@ export class OsuRulesEngine {
 
   update(song_time: number): void {
     this.pruneTransients(song_time);
-    while (this.next_timeout_index < this.chart.circles.length) {
+    while (this.next_timeout_index < this.chart.hit_objects.length) {
       const index = this.next_timeout_index;
-      const circle = this.chart.circles[index]!;
+      const circle = this.chart.hit_objects[index]!;
+      if (circle.kind !== "circle") {
+        this.next_timeout_index += 1;
+        continue;
+      }
       if (song_time <= circle.absolute_time + this.timings.late_miss) break;
       this.next_timeout_index += 1;
       if (this.circle_states[index] === OsuCircleState.Pending) {
@@ -60,10 +64,11 @@ export class OsuRulesEngine {
     const candidate = this.findCandidate(x, y, song_time);
     if (candidate === undefined) return this.isBeforeAppearance(x, y, song_time) ? "too-early" : "spatial-miss";
 
-    const circle = this.chart.circles[candidate]!;
+    const circle = this.chart.hit_objects[candidate]!;
+    if (circle.kind !== "circle") throw new Error("Osu circle candidate has an invalid object type");
     const first_live = this.findFirstLive(song_time);
     if (first_live !== undefined && first_live !== candidate &&
-      this.chart.circles[first_live]!.absolute_time < circle.absolute_time) {
+      this.chart.hit_objects[first_live]!.absolute_time < circle.absolute_time) {
       this.shake(candidate, song_time);
       return "locked";
     }
@@ -88,7 +93,8 @@ export class OsuRulesEngine {
     const preempt = osuApproachPreempt(this.chart.approach_rate);
     const end = this.upperBound(song_time + preempt);
     for (let index = this.next_timeout_index; index < end; index += 1) {
-      const circle = this.chart.circles[index]!;
+      const circle = this.chart.hit_objects[index]!;
+      if (circle.kind !== "circle") continue;
       if (this.circle_states[index] !== OsuCircleState.Pending ||
         song_time < circle.absolute_time - preempt ||
         song_time > circle.absolute_time + this.timings.hit_50) continue;
@@ -100,8 +106,9 @@ export class OsuRulesEngine {
   }
 
   private findFirstLive(song_time: number): number | undefined {
-    for (let index = this.next_timeout_index; index < this.chart.circles.length; index += 1) {
-      const circle = this.chart.circles[index]!;
+    for (let index = this.next_timeout_index; index < this.chart.hit_objects.length; index += 1) {
+      const circle = this.chart.hit_objects[index]!;
+      if (circle.kind !== "circle") continue;
       if (this.circle_states[index] === OsuCircleState.Pending &&
         circle.absolute_time + this.timings.hit_50 > song_time) return index;
     }
@@ -111,8 +118,9 @@ export class OsuRulesEngine {
   private isBeforeAppearance(x: number, y: number, song_time: number): boolean {
     const preempt = osuApproachPreempt(this.chart.approach_rate);
     const start = this.upperBound(song_time + preempt);
-    for (let index = start; index < this.chart.circles.length; index += 1) {
-      const circle = this.chart.circles[index]!;
+    for (let index = start; index < this.chart.hit_objects.length; index += 1) {
+      const circle = this.chart.hit_objects[index]!;
+      if (circle.kind !== "circle") continue;
       if (this.circle_states[index] !== OsuCircleState.Pending ||
         song_time >= circle.absolute_time - preempt) continue;
       const dx = x - circle.x;
@@ -160,10 +168,10 @@ export class OsuRulesEngine {
 
   private upperBound(absolute_time: number): number {
     let low = 0;
-    let high = this.chart.circles.length;
+    let high = this.chart.hit_objects.length;
     while (low < high) {
       const middle = (low + high) >>> 1;
-      if (this.chart.circles[middle]!.absolute_time <= absolute_time) low = middle + 1;
+      if (this.chart.hit_objects[middle]!.absolute_time <= absolute_time) low = middle + 1;
       else high = middle;
     }
     return low;
