@@ -6,6 +6,7 @@
   "scripts": {
     "cache:charts": "node server/cache-charts.mjs",
     "deploy": "bash deploy.sh",
+    "upload:songs": "bash upload-songs.sh",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",

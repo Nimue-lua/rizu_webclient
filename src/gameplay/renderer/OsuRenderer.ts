@@ -92,8 +92,12 @@ export class OsuRenderer implements OsuGameplayRenderer {
       return path;
     };
     this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write,
-      sliderPath, (slider, _path, alpha, color) => this.slider_graphics.draw(slider, viewport, frame,
-        this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha), slider_states, spinner_state);
+      sliderPath, (slider, _path, alpha, color) => {
+        this.graphics.submit(commands);
+        commands.length = 0;
+        this.slider_graphics.draw(slider, viewport, frame,
+          this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha);
+      }, slider_states, spinner_state);
     this.combo.draw(state.combo, state.comboAnimationAge, state.comboAnimationFrom,
       8, frame.logical_height - 8, write);
     const cursor_center = viewport.playfieldToScreen(cursor.position);
