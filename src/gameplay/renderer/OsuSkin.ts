@@ -20,6 +20,7 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly sliderBorderColor: readonly [number, number, number, number];
   readonly sliderTrackOverride: readonly [number, number, number, number] | null;
   readonly sliderBallFrames: readonly Sprite[];
+  readonly reverseArrow: Sprite;
   readonly judgments: Readonly<Record<string, readonly string[]>>;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
   readonly comboGlyphs: Readonly<Record<string, string>>;
@@ -253,7 +254,7 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
   const judgments = resolveStandardJudgments(available, defaults);
   const slider_ball_names = resolveSliderBallFrames(available, defaults);
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
-  const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", cursor_name,
+  const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", cursor_name,
     ...slider_ball_names, ...Object.values(scoreGlyphs), ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
@@ -279,6 +280,7 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     sliderBorderColor: colorValue(ini.sections.Colours ?? {}, "SliderBorder", [1, 1, 1, 1]),
     sliderTrackOverride: optionalColorValue(ini.sections.Colours ?? {}, "SliderTrackOverride"),
     sliderBallFrames: slider_ball_names.map((name) => sprites[name]!),
+    reverseArrow: sprites.reversearrow!,
     judgments,
     scoreGlyphs,
     comboGlyphs,

@@ -16,6 +16,7 @@ const JUDGMENT_FADE_IN = 0.12;
 const JUDGMENT_HOLD = 0.5;
 const JUDGMENT_LIFETIME = 1.1;
 const OSU_HIT_OBJECT_TEXTURE_SIZE = 128;
+const REVERSE_ARROW_FADE_IN = 0.15;
 
 export class OsuPlayfieldRenderer {
   constructor(private readonly skin: OsuStandardSkin) {}
@@ -53,6 +54,9 @@ export class OsuPlayfieldRenderer {
       this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale, write);
       if (path && song_time >= object.absolute_time && song_time <= object.end_time) {
         this.drawSliderBall(viewport, object, path, song_time, diameter, write);
+      }
+      if (path && object.repeat_count > 1 && song_time < object.end_time) {
+        this.drawReverseArrow(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
     }
     let low = 0;
@@ -107,6 +111,33 @@ export class OsuPlayfieldRenderer {
       }
       this.drawJudgment(viewport, center, transient.kind === "hit" ? transient.judgment : "miss", age, write);
     }
+  }
+
+  private drawReverseArrow(viewport: OsuViewport, slider: OsuSlider, path: OsuSliderPath, song_time: number,
+    circle_diameter: number, slider_alpha: number, preempt: number, write: SpriteQuadWriter): void {
+    const sprite = this.skin.reverseArrow;
+    if (!sprite || slider.span_duration <= 0) return;
+    const elapsed = Math.max(0, song_time - slider.absolute_time);
+    const span_index = Math.min(slider.repeat_count - 1, Math.floor(elapsed / slider.span_duration));
+    if (span_index >= slider.repeat_count - 1) return;
+    const at_end = span_index % 2 === 0;
+    const progress = at_end ? 1 : 0;
+    const center = viewport.playfieldToScreen(path.positionAtProgress(progress));
+    const direction = path.directionAtProgress(progress);
+    const outgoing_x = (at_end ? -1 : 1) * direction.x * (viewport.x_flip ? -1 : 1);
+    const outgoing_y = (at_end ? -1 : 1) * direction.y * (viewport.y_flip ? -1 : 1);
+    const rotation = Math.atan2(outgoing_y, outgoing_x);
+    const repeat_time = slider.absolute_time + (span_index + 1) * slider.span_duration;
+    const appear_time = span_index === 0
+      ? slider.absolute_time - preempt
+      : slider.absolute_time + span_index * slider.span_duration;
+    const fade_alpha = Math.min(1, Math.max(0, (song_time - appear_time) / REVERSE_ARROW_FADE_IN));
+    if (song_time >= repeat_time || fade_alpha <= 0) return;
+    const scale = circle_diameter / OSU_HIT_OBJECT_TEXTURE_SIZE;
+    const width = sprite.sourceSize.w * scale;
+    const height = sprite.sourceSize.h * scale;
+    write(center.x - width / 2, center.y - height / 2, width, height,
+      [1, 1, 1, slider_alpha * fade_alpha], sprite, false, undefined, false, rotation);
   }
 
   private drawSliderBall(viewport: OsuViewport, slider: OsuSlider, path: OsuSliderPath, song_time: number,
