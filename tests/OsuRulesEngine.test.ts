@@ -22,6 +22,7 @@ function createChart(circles: readonly { x: number; y: number; absolute_time: nu
     primary_tempo: 120,
     slider_multiplier: 1.4,
     slider_tick_rate: 1,
+    combo_colors: [],
     timing_points: [],
     hit_objects,
   };

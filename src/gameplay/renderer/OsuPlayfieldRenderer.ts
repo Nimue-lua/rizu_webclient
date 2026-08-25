@@ -24,7 +24,8 @@ export class OsuPlayfieldRenderer {
   draw(viewport: OsuViewport, chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
     circle_transients: readonly OsuCircleTransient[], song_time: number, write: SpriteQuadWriter,
     slider_path?: (slider: OsuSlider) => OsuSliderPath | undefined,
-    draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number) => void): void {
+    draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number,
+      color: readonly [number, number, number, number]) => void): void {
     const preempt = osuApproachPreempt(chart.approach_rate);
     const diameter = osuCircleDiameter(chart.circle_size) * viewport.scale;
     const shake_offsets = new Map<number, number>();
@@ -43,15 +44,17 @@ export class OsuPlayfieldRenderer {
       const fade_in_alpha = Math.min(1, Math.max(0, age / CIRCLE_FADE_IN));
       const fade_out_alpha = end_age > 0 ? Math.max(0, 1 - end_age / SLIDER_FADE_OUT) : 1;
       const alpha = fade_in_alpha * fade_out_alpha;
+      const combo = this.comboColor(chart, object.combo_color_index);
       const path = slider_path?.(object);
-      if (path) draw_slider?.(object, path, alpha);
+      if (path) draw_slider?.(object, path, alpha, combo);
       const endpoint = path?.endPosition(object.repeat_count) ?? { x: object.x, y: object.y };
-      this.drawCircle(viewport, endpoint, diameter, alpha, 0, 1, write);
+      this.drawCircle(viewport, endpoint, diameter, alpha, 0, 1, combo, null, write);
       const approach_alpha = remaining > 0
         ? Math.min(0.9, age / Math.min(preempt, APPROACH_FADE_IN) * 0.9)
         : 0;
       const approach_scale = 1 + 3 * Math.max(0, remaining) / preempt;
-      this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale, write);
+      this.drawCircle(viewport, object, diameter, alpha, approach_alpha, approach_scale,
+        combo, object.combo_number, write);
       if (path && object.tick_distances.length > 0 && song_time < object.end_time) {
         this.drawSliderTicks(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
@@ -85,7 +88,8 @@ export class OsuPlayfieldRenderer {
         x: circle.x + (shake_offsets.get(index) ?? 0),
         y: circle.y,
       };
-      this.drawCircle(viewport, position, diameter, circle_alpha, approach_alpha, approach_scale, write);
+      this.drawCircle(viewport, position, diameter, circle_alpha, approach_alpha, approach_scale,
+        this.comboColor(chart, circle.combo_color_index ?? 0), circle.combo_number ?? null, write);
     }
 
     for (const transient of circle_transients) {
@@ -95,7 +99,7 @@ export class OsuPlayfieldRenderer {
       const circle = chart.hit_objects[transient.object_index];
       if (!circle || circle.kind !== "circle") continue;
       const center = viewport.playfieldToScreen(circle);
-      const combo = this.skin.comboColor;
+      const combo = this.comboColor(chart, circle.combo_color_index ?? 0);
       if (transient.kind === "hit" && age < HIT_FADE_OUT) {
         const progress = age / HIT_FADE_OUT;
         const scale = 1 + 0.4 * (2 * progress - progress * progress);
@@ -204,14 +208,37 @@ export class OsuPlayfieldRenderer {
   }
 
   private drawCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number, alpha: number,
-    approach_alpha: number, approach_scale: number, write: SpriteQuadWriter): void {
+    approach_alpha: number, approach_scale: number, combo: readonly [number, number, number, number],
+    combo_number: number | null, write: SpriteQuadWriter): void {
     const center = viewport.playfieldToScreen(position);
     const addCentered = (size: number, color: readonly [number, number, number, number], sprite: OsuStandardSkin["hitCircle"]) =>
       write(center.x - size / 2, center.y - size / 2, size, size, color, sprite);
-    const combo = this.skin.comboColor;
     addCentered(diameter, [combo[0], combo[1], combo[2], alpha], this.skin.hitCircle);
+    if (combo_number !== null) this.drawComboNumber(center, combo_number, diameter, alpha, write);
     addCentered(diameter, [1, 1, 1, alpha], this.skin.hitCircleOverlay);
     addCentered(diameter * approach_scale, [combo[0], combo[1], combo[2], approach_alpha], this.skin.approachCircle);
+  }
+
+  private drawComboNumber(center: { x: number; y: number }, combo_number: number, diameter: number, alpha: number,
+    write: SpriteQuadWriter): void {
+    const digits = String(combo_number).split("").map((digit) => this.skin.hitCircleGlyphs?.[digit]).filter(Boolean);
+    if (digits.length === 0) return;
+    const scale = diameter / OSU_HIT_OBJECT_TEXTURE_SIZE * 0.8;
+    const overlap = this.skin.hitCircleOverlap ?? -2;
+    const width = digits.reduce((total, digit, index) => total + digit!.sourceSize.w - (index > 0 ? overlap : 0), 0) * scale;
+    const height = digits[0]!.sourceSize.h * scale;
+    let x = center.x - width / 2;
+    for (const [index, digit] of digits.entries()) {
+      if (index > 0) x -= overlap * scale;
+      const digit_width = digit!.sourceSize.w * scale;
+      write(x, center.y - height / 2, digit_width, digit!.sourceSize.h * scale, [1, 1, 1, alpha], digit!);
+      x += digit_width;
+    }
+  }
+
+  private comboColor(chart: OsuChart, index: number): readonly [number, number, number, number] {
+    const colors = (chart.combo_colors?.length ?? 0) > 0 ? chart.combo_colors : this.skin.comboColors ?? [this.skin.comboColor];
+    return colors[index % colors.length] ?? this.skin.comboColor;
   }
 
   private drawJudgment(viewport: OsuViewport, center: { x: number; y: number }, judgment: string,

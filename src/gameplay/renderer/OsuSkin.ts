@@ -17,6 +17,9 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly approachCircle: Sprite;
   readonly cursor: Sprite;
   readonly comboColor: readonly [number, number, number, number];
+  readonly comboColors: readonly (readonly [number, number, number, number])[];
+  readonly hitCircleGlyphs: Readonly<Record<string, Sprite>>;
+  readonly hitCircleOverlap: number;
   readonly sliderBorderColor: readonly [number, number, number, number];
   readonly sliderTrackOverride: readonly [number, number, number, number] | null;
   readonly sliderBallFrames: readonly Sprite[];
@@ -252,12 +255,14 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
   const fonts = ini.sections.Fonts ?? {};
   const scoreGlyphs = resolveFontGlyphs(fonts.ScorePrefix ?? "score", available, defaults);
   const comboGlyphs = resolveFontGlyphs(fonts.ComboPrefix ?? "score", available, defaults);
+  const hit_circle_glyph_names = resolveFontGlyphs(fonts.HitCirclePrefix ?? "default", available, defaults);
   const judgments = resolveStandardJudgments(available, defaults);
   const slider_ball_names = resolveSliderBallFrames(available, defaults);
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow",
     "sliderscorepoint", cursor_name,
-    ...slider_ball_names, ...Object.values(scoreGlyphs), ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
+    ...slider_ball_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
+    ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
@@ -272,13 +277,22 @@ export async function loadOsuStandardSkinUrl(url: string, signal?: AbortSignal):
     }] as const;
   }));
   const sprites = Object.fromEntries(decoded) as Record<string, Sprite>;
+  const skin_combo_colors = Array.from({ length: 8 }, (_, index) =>
+    optionalColorValue(ini.sections.Colours ?? {}, `Combo${index + 1}`)).filter((color) => color !== null);
+  const default_combo_colors = [[1, 192 / 255, 0, 1], [0, 202 / 255, 0, 1],
+    [18 / 255, 124 / 255, 1, 1], [242 / 255, 24 / 255, 57 / 255, 1]] as const;
+  const combo_colors = skin_combo_colors.length > 0 ? skin_combo_colors : default_combo_colors;
   return {
     sprites,
     hitCircle: sprites.hitcircle!,
     hitCircleOverlay: sprites.hitcircleoverlay!,
     approachCircle: sprites.approachcircle!,
     cursor: sprites[cursor_name]!,
-    comboColor: colorValue(ini.sections.Colours ?? {}, "Combo1", [1, 0.4, 0.4, 1]),
+    comboColor: combo_colors[0]!,
+    comboColors: combo_colors,
+    hitCircleGlyphs: Object.fromEntries(Object.entries(hit_circle_glyph_names)
+      .map(([character, name]) => [character, sprites[name]!])),
+    hitCircleOverlap: numberValue(fonts, "HitCircleOverlap", -2),
     sliderBorderColor: colorValue(ini.sections.Colours ?? {}, "SliderBorder", [1, 1, 1, 1]),
     sliderTrackOverride: optionalColorValue(ini.sections.Colours ?? {}, "SliderTrackOverride"),
     sliderBallFrames: slider_ball_names.map((name) => sprites[name]!),

@@ -58,12 +58,14 @@ test("retains typed standard objects, slider data, and normalized durations", ()
   const circle = chart.hit_objects[0]!;
   assert.deepEqual(circle, {
     kind: "circle", x: 64, y: 64, absolute_time: 0.5, hit_sound: 2,
+    new_combo: false, combo_skip: 0, combo_number: 1, combo_color_index: 1,
     hit_sample: { normal_set: 1, addition_set: 2, index: 3, volume: 40, filename: "circle.wav" },
   });
   const sliders = chart.hit_objects.filter((object) => object.kind === "slider");
   assert.deepEqual(sliders.map((slider) => slider.curve_type), ["linear", "bezier", "perfect", "catmull"]);
   assert.deepEqual(sliders[0], {
     kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 4,
+    new_combo: false, combo_skip: 0, combo_number: 2, combo_color_index: 1,
     curve_type: "linear", control_points: [{ x: 200, y: 100 }], repeat_count: 2, pixel_length: 200,
     edge_sounds: [2, 8, 4],
     edge_sets: [{ normal_set: 1, addition_set: 2 }, { normal_set: 2, addition_set: 3 },
@@ -75,8 +77,38 @@ test("retains typed standard objects, slider data, and normalized durations", ()
   assert.equal(sliders[3]?.end_time, 2.7);
   assert.deepEqual(chart.hit_objects[5], {
     kind: "spinner", x: 256, y: 192, absolute_time: 3, hit_sound: 0, end_time: 3.6,
+    new_combo: false, combo_skip: 0, combo_number: null, combo_color_index: 1,
     hit_sample: { normal_set: 3, addition_set: 1, index: 2, volume: 70, filename: "spinner.wav" },
   });
+});
+
+test("assigns beatmap combo colors, skips, numbers, and spinner resets in file order", () => {
+  const chart = parseOsuChart(`osu file format v14
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+[Colours]
+Combo1:255,0,0
+Combo3:0,0,255
+[HitObjects]
+64,64,1000,1,0,0:0:0:0:
+128,64,1100,1,0,0:0:0:0:
+192,64,1200,21,0,0:0:0:0:
+256,192,1300,8,0,1400,0:0:0:0:
+256,64,1500,1,0,0:0:0:0:
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  assert.deepEqual(chart.combo_colors, [[1, 0, 0, 1], [0, 0, 1, 1]]);
+  assert.deepEqual(chart.hit_objects.map((object) => ({ number: object.combo_number,
+    color: object.combo_color_index, new_combo: object.new_combo, skip: object.combo_skip })), [
+    { number: 1, color: 1, new_combo: false, skip: 0 },
+    { number: 2, color: 1, new_combo: false, skip: 0 },
+    { number: 1, color: 1, new_combo: true, skip: 1 },
+    { number: null, color: 1, new_combo: false, skip: 0 },
+    { number: 1, color: 0, new_combo: false, skip: 0 },
+  ]);
 });
 
 test("uses the active red point and inherited SV and floors stable slider end time", () => {

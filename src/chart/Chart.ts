@@ -35,6 +35,10 @@ interface OsuHitObjectBase {
   readonly absolute_time: number;
   readonly hit_sound: number;
   readonly hit_sample: OsuHitSample;
+  readonly new_combo: boolean;
+  readonly combo_skip: number;
+  readonly combo_number: number | null;
+  readonly combo_color_index: number;
 }
 
 export interface OsuCircle extends OsuHitObjectBase {
@@ -90,6 +94,7 @@ export interface OsuChart {
   primary_tempo: number;
   slider_multiplier: number;
   slider_tick_rate: number;
+  combo_colors: readonly (readonly [number, number, number, number])[];
   timing_points: readonly OsuTimingPoint[];
   hit_objects: readonly OsuHitObject[];
 }

@@ -121,7 +121,10 @@ const CURVE_TYPES: Readonly<Record<string, OsuSliderCurveType>> = {
 function normalizeStandardHitObject(object: RawHitObject, timing_points: readonly RawTimingPoint[],
   slider_multiplier: number, slider_tick_rate: number, format_version: number): OsuHitObject {
   const line = object.fields.join(",");
-  const common = { x: object.x, y: object.y, absolute_time: object.start_time, hit_sound: object.hit_sound };
+  const new_combo = (object.type & 4) !== 0;
+  const common = { x: object.x, y: object.y, absolute_time: object.start_time, hit_sound: object.hit_sound,
+    new_combo, combo_skip: new_combo ? object.type >>> 4 & 7 : 0, combo_number: null,
+    combo_color_index: 0 };
   if ((object.type & 1) !== 0) {
     return { kind: "circle", ...common, hit_sample: parseHitSample(object.fields[5], line) };
   }
@@ -177,6 +180,38 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
   throw new Error(`Unsupported osu hit object: ${line}`);
 }
 
+function assignStandardCombos(objects: readonly OsuHitObject[], color_count: number,
+  format_version: number, breaks: readonly BreakPeriod[]): OsuHitObject[] {
+  let color_cursor = 0;
+  let combo_number = 0;
+  let force_new = false;
+  let break_index = 0;
+  return objects.map((object, object_index) => {
+    while (break_index < breaks.length && breaks[break_index]!.end_time < object.absolute_time) {
+      force_new = true;
+      break_index += 1;
+    }
+    let assigned_number: number | null = null;
+    if (object.kind === "spinner") {
+      if (format_version <= 8 || object.new_combo) {
+        if (format_version > 8 && object.new_combo) color_cursor += object.combo_skip;
+        force_new = true;
+      } else {
+        // Stable's loader still starts a new combo after every parsed spinner.
+        force_new = true;
+      }
+    } else if (force_new || object.new_combo || object_index === 0) {
+      assigned_number = combo_number = 1;
+      color_cursor += object.combo_skip + 1;
+      force_new = false;
+    } else {
+      assigned_number = ++combo_number;
+    }
+    return { ...object, combo_number: assigned_number,
+      combo_color_index: color_count > 0 ? color_cursor % color_count : color_cursor };
+  });
+}
+
 function computePrimaryTempo(changes: readonly TimingChange[], last_time: number): number {
   const tempo_changes = changes.filter((change) => change.bpm !== undefined);
   if (tempo_changes.length === 0) return 120;
@@ -214,6 +249,7 @@ export function parseOsuChart(source: string): Chart {
   let approach_rate: number | null = null;
   let slider_multiplier = 1.4;
   let slider_tick_rate = 1;
+  const combo_colors = new Map<number, readonly [number, number, number, number]>();
   const timing_points: RawTimingPoint[] = [];
   const hit_objects: RawHitObject[] = [];
   const breaks: BreakPeriod[] = [];
@@ -228,7 +264,7 @@ export function parseOsuChart(source: string): Chart {
       continue;
     }
 
-    const property_match = line.match(/^([A-Za-z]+):\s?(.*)$/);
+    const property_match = line.match(/^([A-Za-z]+\d*):\s?(.*)$/);
     if (property_match) {
       if (section === "General" && property_match[1] === "Mode") mode = Number(property_match[2]);
       if (section === "Difficulty" && property_match[1] === "CircleSize") {
@@ -248,6 +284,16 @@ export function parseOsuChart(source: string): Chart {
       }
       if (section === "Difficulty" && property_match[1] === "SliderTickRate") {
         slider_tick_rate = Number(property_match[2]);
+      }
+      if (section === "Colours") {
+        const combo_match = /^Combo([1-8])$/.exec(property_match[1]!);
+        if (combo_match) {
+          const values = property_match[2]!.split(",").map((value) => Number(value.trim()));
+          if (values.length < 3 || values.some((value) => !Number.isFinite(value) || value < 0 || value > 255)) {
+            throw new Error(`Invalid combo color: ${line}`);
+          }
+          combo_colors.set(Number(combo_match[1]), [values[0]! / 255, values[1]! / 255, values[2]! / 255, 1]);
+        }
       }
       continue;
     }
@@ -328,11 +374,14 @@ export function parseOsuChart(source: string): Chart {
 
   sortTimingPoints(timing_points);
   const timing_changes = normalizeTimingChanges(timing_points);
-  const standard_hit_objects = mode === 0
+  const parsed_standard_hit_objects = mode === 0
     ? hit_objects.map((object) => normalizeStandardHitObject(object, timing_points, slider_multiplier,
       slider_tick_rate, format_version))
       .sort((left, right) => left.absolute_time - right.absolute_time)
     : [];
+  const normalized_combo_colors = [...combo_colors.entries()].sort(([left], [right]) => left - right).map(([, color]) => color);
+  const standard_hit_objects = assignStandardCombos(parsed_standard_hit_objects,
+    normalized_combo_colors.length, format_version, breaks);
   const last_time = mode === 0
     ? standard_hit_objects.reduce((last, object) => Math.max(last, object.kind === "circle" ? object.absolute_time : object.end_time), 0)
     : hit_objects.reduce((last, object) => Math.max(last, object.end_time ?? object.start_time), 0);
@@ -355,6 +404,7 @@ export function parseOsuChart(source: string): Chart {
       primary_tempo,
       slider_multiplier,
       slider_tick_rate,
+      combo_colors: normalized_combo_colors,
       timing_points: normalizeOsuTimingPoints(timing_points),
       hit_objects: standard_hit_objects,
     };
