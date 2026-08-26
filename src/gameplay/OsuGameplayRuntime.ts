@@ -201,7 +201,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.rules_engine.update(song_time);
     this.playHitSounds();
-    this.renderer.draw(this.chart, this.rules_engine.circle_states,
+      this.renderer.draw(this.chart, this.rules_engine.circle_states,
       this.rules_engine.first_active_circle_index, this.rules_engine.circle_transients, song_time,
       this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
       this.rules_engine.slider_states, this.rules_engine.spinner_state);

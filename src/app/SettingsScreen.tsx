@@ -14,6 +14,7 @@ interface SettingsScreenProps {
   scroll_speed: number;
   scroll_speed_type: ScrollSpeedType;
   cursor_scale: number;
+  osu_raw_input: boolean;
   hit_registration: ManiaHitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
   onOsuHitSoundVolumeChange: (volume: number) => void;
@@ -21,6 +22,7 @@ interface SettingsScreenProps {
   onScrollSpeedChange: (scroll_speed: number) => void;
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
   onCursorScaleChange: (cursor_scale: number) => void;
+  onOsuRawInputChange: (enabled: boolean) => void;
   onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
   onExit: () => void;
 }
@@ -36,6 +38,7 @@ export function SettingsScreen({
   scroll_speed,
   scroll_speed_type,
   cursor_scale,
+  osu_raw_input,
   hit_registration,
   onMasterVolumeChange,
   onOsuHitSoundVolumeChange,
@@ -43,6 +46,7 @@ export function SettingsScreen({
   onScrollSpeedChange,
   onScrollSpeedTypeChange,
   onCursorScaleChange,
+  onOsuRawInputChange,
   onHitRegistrationChange,
   onExit,
 }: SettingsScreenProps) {
@@ -196,6 +200,16 @@ export function SettingsScreen({
           />
           <small>Scales the cursor during osu! gameplay.</small>
         </label>
+        <div className="settings-control">
+          <span>osu! raw pointer input</span>
+          <label className="modifier-checkbox">
+            <input type="checkbox" checked={osu_raw_input}
+              onChange={(event) => onOsuRawInputChange(event.target.checked)} />
+            <span aria-hidden="true" />
+            <strong>{osu_raw_input ? "Enabled" : "Disabled"}</strong>
+          </label>
+          <small>Uses high-frequency pointer updates for mouse and pen input when supported by the browser.</small>
+        </div>
         </section>
       </main>
     </div>

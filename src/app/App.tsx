@@ -39,6 +39,7 @@ const MUSIC_OFFSET_KEY = "rizu.music-offset";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
 const CURSOR_SCALE_KEY = "rizu.cursor-scale";
+const OSU_RAW_INPUT_KEY = "rizu.osu-raw-input";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const MUSIC_RATE_KEY = "rizu.music-rate";
 const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
@@ -88,6 +89,7 @@ export function App() {
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     return Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 2 ? stored_value : 1;
   });
+  const [osu_raw_input, setOsuRawInput] = useState(() => localStorage.getItem(OSU_RAW_INPUT_KEY) === "true");
   const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
   const [replay_base, setReplayBase] = useState(() => {
@@ -149,6 +151,11 @@ export function App() {
     const scale = Math.min(2, Math.max(0.25, Math.round(value * 20) / 20));
     localStorage.setItem(CURSOR_SCALE_KEY, String(scale));
     setCursorScale(scale);
+  };
+
+  const changeOsuRawInput = (enabled: boolean) => {
+    localStorage.setItem(OSU_RAW_INPUT_KEY, String(enabled));
+    setOsuRawInput(enabled);
   };
 
   const changeHitRegistration = (value: ManiaHitRegistration) => {
@@ -283,6 +290,7 @@ export function App() {
             music_offset={music_offset}
             scroll_speed={scroll_speed}
             cursor_scale={cursor_scale}
+            osu_raw_input={osu_raw_input}
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
@@ -356,6 +364,7 @@ export function App() {
               scroll_speed={scroll_speed}
               scroll_speed_type={scroll_speed_type}
               cursor_scale={cursor_scale}
+              osu_raw_input={osu_raw_input}
               hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
               onOsuHitSoundVolumeChange={changeOsuHitSoundVolume}
@@ -363,6 +372,7 @@ export function App() {
               onScrollSpeedChange={changeScrollSpeed}
               onScrollSpeedTypeChange={changeScrollSpeedType}
               onCursorScaleChange={changeCursorScale}
+              onOsuRawInputChange={changeOsuRawInput}
               onHitRegistrationChange={changeHitRegistration}
               onExit={() => setSettingsOpen(false)}
             />
