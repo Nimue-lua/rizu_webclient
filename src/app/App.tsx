@@ -8,6 +8,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
+import { WelcomeScreen } from "./WelcomeScreen";
 import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
@@ -31,7 +32,7 @@ import {
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
 
-type Screen = "song-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const OSU_HIT_SOUND_VOLUME_KEY = "rizu.osu-hit-sound-volume";
 const MUSIC_OFFSET_KEY = "rizu.music-offset";
@@ -50,7 +51,7 @@ function ScreenTransition({ children }: PropsWithChildren) {
 }
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>("song-select");
+  const [screen, setScreen] = useState<Screen>("welcome");
   const [settings_open, setSettingsOpen] = useState(false);
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<GameplayData | null>(null);
@@ -262,6 +263,12 @@ export function App() {
   };
 
   switch (screen) {
+    case "welcome":
+      return (
+        <ScreenTransition key="welcome">
+          <WelcomeScreen onPlay={() => setScreen("song-select")} />
+        </ScreenTransition>
+      );
     case "gameplay":
       if (!assets) {
         throw new Error("Gameplay assets are not loaded");

@@ -44,6 +44,45 @@ svg { width: 22px; height: 22px; }
   from { transform: scale(1.02); opacity: 0; }
 }
 
+.welcome-screen {
+  display: grid;
+  min-height: 100%;
+  overflow: auto;
+  padding: 32px;
+  background: var(--background);
+  place-items: center;
+}
+.welcome-card { width: min(720px, 100%); }
+.welcome-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 38px; }
+.welcome-brand img { width: 38px; height: 38px; }
+.welcome-brand div { display: grid; gap: 2px; }
+.welcome-brand span { font-size: 17px; font-weight: 700; letter-spacing: .12em; }
+.welcome-brand strong { color: var(--muted); font-size: 9px; letter-spacing: .2em; }
+.welcome-intro { margin-bottom: 48px; }
+.welcome-intro p { margin: 0; font-size: 17px; line-height: 1.55; }
+.welcome-play { display: flex; align-items: center; justify-content: space-between; width: min(310px, 100%); height: 76px; margin-top: 56px; padding: 0 25px 0 31px; background: linear-gradient(120deg, #93c751, var(--play) 62%, #527929); border-radius: 8px; box-shadow: 0 15px 38px #7db43524, inset 0 1px #dcffad7d; font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.welcome-play svg { width: 28px; height: 28px; }
+.welcome-play:focus-visible { outline: 3px solid var(--text); outline-offset: 5px; }
+.welcome-details { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.welcome-details > p { margin: 0 0 8px; }
+.welcome-details > p a { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
+.welcome-details > p svg { width: 12px; height: 12px; }
+.welcome-details a { color: var(--text); text-decoration-color: #d9a04f80; text-underline-offset: 3px; }
+.welcome-details a:hover { color: var(--accent); }
+.welcome-attribution { display: grid; gap: 8px; margin: 24px 0; }
+.welcome-attribution p { margin: 0; }
+.welcome-attribution a { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
+.welcome-attribution svg { width: 12px; height: 12px; }
+.welcome-note { color: var(--muted); }
+
+@media (max-width: 760px) {
+  .welcome-screen { display: block; padding: 28px 20px; }
+  .welcome-brand { margin-bottom: 32px; }
+  .welcome-intro { margin-bottom: 42px; }
+  .welcome-intro p { font-size: 16px; }
+  .welcome-play { height: 68px; margin-top: 38px; }
+}
+
 .loading-screen { padding: 2rem; text-align: center; }
 .loading-screen p, .song-library-error { color: #ff8d8d; }
 
