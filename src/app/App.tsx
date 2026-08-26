@@ -9,6 +9,7 @@ import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import { WelcomeScreen } from "./WelcomeScreen";
+import { UnlockingFpsScreen } from "./UnlockingFpsScreen";
 import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
@@ -32,7 +33,7 @@ import {
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
 
-type Screen = "welcome" | "song-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "unlocking-fps" | "song-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const OSU_HIT_SOUND_VOLUME_KEY = "rizu.osu-hit-sound-volume";
 const MUSIC_OFFSET_KEY = "rizu.music-offset";
@@ -273,7 +274,16 @@ export function App() {
     case "welcome":
       return (
         <ScreenTransition key="welcome">
-          <WelcomeScreen onPlay={() => setScreen("song-select")} />
+          <WelcomeScreen
+            onPlay={() => setScreen("song-select")}
+            onUnlockingFps={() => setScreen("unlocking-fps")}
+          />
+        </ScreenTransition>
+      );
+    case "unlocking-fps":
+      return (
+        <ScreenTransition key="unlocking-fps">
+          <UnlockingFpsScreen onBack={() => setScreen("welcome")} />
         </ScreenTransition>
       );
     case "gameplay":

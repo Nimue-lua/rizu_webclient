@@ -1,10 +1,11 @@
-import { ArrowUpRight, Play } from "lucide-react";
+import { ArrowUpRight, Gauge, Play } from "lucide-react";
 
 interface WelcomeScreenProps {
   onPlay: () => void;
+  onUnlockingFps: () => void;
 }
 
-export function WelcomeScreen({ onPlay }: WelcomeScreenProps) {
+export function WelcomeScreen({ onPlay, onUnlockingFps }: WelcomeScreenProps) {
   return (
     <main className="welcome-screen">
       <section className="welcome-card">
@@ -21,10 +22,16 @@ export function WelcomeScreen({ onPlay }: WelcomeScreenProps) {
             This is a toy project, but I will try to fix bugs you find or add features you want.
             I have no space left on the server, so I can&apos;t add more songs.
           </p>
-          <button className="welcome-play" type="button" onClick={onPlay} autoFocus>
-            <span>Play</span>
-            <Play aria-hidden="true" fill="currentColor" />
-          </button>
+          <div className="welcome-actions">
+            <button className="welcome-play" type="button" onClick={onPlay} autoFocus>
+              <span>Play</span>
+              <Play aria-hidden="true" fill="currentColor" />
+            </button>
+            <button className="welcome-fps" type="button" onClick={onUnlockingFps}>
+              <span>Unlocking FPS</span>
+              <Gauge aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <div className="welcome-details">
