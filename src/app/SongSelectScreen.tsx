@@ -1,30 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import {
-  ArrowUpDown,
-  Bell,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Download,
-  File,
-  Globe2,
-  Keyboard,
-  ListFilter,
-  Metronome,
-  Monitor,
-  Music2,
-  Paintbrush,
-  Play,
-  Puzzle,
-  Search,
-  Settings,
-  Terminal,
-  Trophy,
-  Undo2,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
 import type { Chartview } from "../library/views";
 import type { ChartSelectionEntry, ChartSelector, ChartSortMode } from "../select/ChartSelector";
@@ -33,48 +7,17 @@ import { GameplayModifiersModal } from "./GameplayModifiersModal";
 import { GamemodeFiltersModal } from "./GamemodeFiltersModal";
 import { noteSkinMode, type NoteSkinOption, type NoteSkinSelections } from "../gameplay/renderer/NoteSkinSelection";
 import { NoteSkinsModal } from "./NoteSkinsModal";
+import { ChartBrowser } from "./song-select/ChartBrowser";
+import { LibraryToolbar } from "./song-select/LibraryToolbar";
+import { SelectedSongPanel } from "./song-select/SelectedSongPanel";
+import { SongSelectFooter } from "./song-select/SongSelectFooter";
+import { SongSelectHeader } from "./song-select/SongSelectHeader";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
 const BACKGROUND_DEBOUNCE_MS = 200;
 const AUDIO_PREVIEW_DEBOUNCE_MS = 200;
 const SESSION_STARTED_AT = Date.now();
-
-type IconName = "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
-  "chevron-right" | "clock" | "download" | "file" | "filter" | "globe" | "keyboard" |
-  "metronome" | "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" |
-  "settings" | "terminal" | "trophy" | "undo" | "zap";
-
-const icons: Record<IconName, LucideIcon> = {
-  "arrow-up-down": ArrowUpDown,
-  bell: Bell,
-  "chevron-down": ChevronDown,
-  "chevron-left": ChevronLeft,
-  "chevron-right": ChevronRight,
-  clock: Clock3,
-  download: Download,
-  file: File,
-  filter: ListFilter,
-  globe: Globe2,
-  keyboard: Keyboard,
-  metronome: Metronome,
-  monitor: Monitor,
-  music: Music2,
-  paintbrush: Paintbrush,
-  play: Play,
-  puzzle: Puzzle,
-  search: Search,
-  settings: Settings,
-  terminal: Terminal,
-  trophy: Trophy,
-  undo: Undo2,
-  zap: Zap,
-};
-
-function Icon({ name }: { name: IconName }) {
-  const Component = icons[name];
-  return <Component aria-hidden="true" />;
-}
 
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
@@ -93,38 +36,11 @@ interface SongSelectScreenProps {
   onNoteSkinImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
 }
 
-const mode_names = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
-const sort_names: Record<ChartSortMode, string> = {
-  title: "Title",
-  artist: "Artist",
-  difficulty: "Difficulty",
-  duration: "Duration",
-};
-
-function chartMode(chart: Chartview): string {
-  const mode = mode_names[chart.mode] ?? "UNKNOWN";
-  return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K ${mode}` : mode;
-}
-
-function chartSummaryMode(chart: Chartview): string {
-  return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K` : mode_names[chart.mode] ?? "UNKNOWN";
-}
-
-function formatDuration(duration_seconds: number): string {
-  const seconds = Math.round(duration_seconds);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
 function formatSessionDuration(duration_seconds: number): string {
   const hours = Math.floor(duration_seconds / 3600);
   const minutes = Math.floor((duration_seconds % 3600) / 60);
   const seconds = duration_seconds % 60;
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
-}
-
-function difficultyColor(difficulty: number): string {
-  const hue = Math.max(0, 135 - difficulty * 18);
-  return `hsl(${hue} 92% 52%)`;
 }
 
 export function SongSelectScreen({
@@ -150,11 +66,9 @@ export function SongSelectScreen({
   const audio_ref = useRef<HTMLAudioElement>(null);
   const preview_unlocked_ref = useRef(false);
   const last_preview_change_ref = useRef<number | null>(null);
-  const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
   const [scroll_top, setScrollTop] = useState(0);
   const [viewport_height, setViewportHeight] = useState(0);
-  const [score_source, setScoreSource] = useState<"local" | "online">("online");
   const [now, setNow] = useState(() => new Date());
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
@@ -321,11 +235,6 @@ export function SongSelectScreen({
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(now).replace(",", "");
   const session_duration = formatSessionDuration(Math.floor((now.getTime() - SESSION_STARTED_AT) / 1_000));
-  const speed_progress = (music_rate - 0.25) / 3.75;
-  const speed_style = {
-    "--rate-angle": `${speed_progress * 270}deg`,
-    "--rate-rotation": `${-135 + speed_progress * 270}deg`,
-  } as CSSProperties;
   const hero_loaded = background_url === null || background_url === loaded_background_url;
   const unlockPreview = () => {
     if (preview_unlocked_ref.current) return;
@@ -342,75 +251,31 @@ export function SongSelectScreen({
       artist: song?.artist ?? "Unknown artist",
     });
   };
-  const moveRateDrag = (client_x: number) => {
-    const drag = rate_drag_ref.current;
-    if (!drag) return;
-    const value = drag.start_rate + (client_x - drag.start_x) / 360 * 3.75;
-    onMusicRateChange(Math.min(4, Math.max(0.25, Math.round(value / 0.05) * 0.05)));
-  };
-
   return (
     <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
       <audio ref={audio_ref} preload="auto" />
-      <header className="song-select-header">
-        <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT | {__GIT_HASH__}</span></div>
-        <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status">OFFLINE</span></div>
-        <nav className="header-actions" aria-label="Account and settings">
-          <div className="player-info"><span><strong>Guest</strong></span><i /></div>
-          <div className="header-icon-dock">
-            <button aria-label="Settings" onClick={onSettings}><Icon name="settings" /></button><button aria-label="Downloads"><Icon name="download" /></button>
-            <button aria-label="Command palette"><Icon name="terminal" /></button><button aria-label="Notifications"><Icon name="bell" /></button>
-          </div>
-        </nav>
-      </header>
-
-      <section className="library-toolbar" aria-label="Chart library controls">
-         <label className="collection-button"><span><small>COLLECTION</small><strong>{selection.selected_location_id === null ? "All songs" : selection.locations.find((location) => location.id === selection.selected_location_id)?.name ?? "All songs"}</strong></span><select aria-label="Collection" value={selection.selected_location_id ?? ""} onChange={(event) => selectLocation(event.target.value === "" ? null : Number(event.target.value))}><option value="">All songs</option>{selection.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select><Icon name="chevron-down" /></label>
-        <label className="toolbar-button sort-button"><Icon name="arrow-up-down" /><span><small>SORT</small><strong>{sort_names[selection.sort_mode]}</strong></span><select aria-label="Sort charts" value={selection.sort_mode} onChange={(event) => selectSortMode(event.target.value as ChartSortMode)}><option value="title">Title</option><option value="artist">Artist</option><option value="difficulty">Difficulty</option><option value="duration">Duration</option></select></label>
-        <button className="toolbar-button" aria-haspopup="dialog" aria-expanded={filters_open} onClick={() => setFiltersOpen(true)}><Icon name="filter" /><span><small>FILTERS</small><strong>{selection.selected_mode === null ? "None" : mode_names[selection.selected_mode]}</strong></span></button>
-        <label className="chart-search"><Icon name="search" /><input value={selection.query} onChange={(event) => { chart_selector.setQuery(event.target.value); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" /></label>
-      </section>
+      <SongSelectHeader date_text={date_text} session_duration={session_duration} onSettings={onSettings} />
+      <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
+        onQueryChange={(query) => { chart_selector.setQuery(query); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
+        onSortChange={selectSortMode} />
 
       <section className="song-select-content">
-        <div className="song-select-column left-column">
-          <article className={`song-hero${hero_loaded ? " loaded" : ""}`}>
-            {background_url && <img key={background_url} className="song-hero-background" src={background_url} alt="" onLoad={() => setLoadedBackgroundUrl(background_url)} onError={() => setLoadedBackgroundUrl(background_url)} />}
-            <div className="song-hero-chart"><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
-            <div className="song-hero-metadata"><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
-          </article>
-          <section className="score-list" aria-label="Scores">
-            <header><span>Not played yet</span><div className="score-source">
-              <button className={score_source === "local" ? "active" : ""} onClick={() => setScoreSource("local")} aria-label="Local scores" aria-pressed={score_source === "local"}><Icon name="monitor" /></button>
-              <button className={score_source === "online" ? "active" : ""} onClick={() => setScoreSource("online")} aria-label="Online scores" aria-pressed={score_source === "online"}><Icon name="globe" /></button>
-            </div></header>
-            <div className="no-records"><Icon name="trophy" /><span>No Records Set!</span></div>
-          </section>
-        </div>
-
-        <div className="song-select-column right-column">
-          <section className="chart-summary" aria-label="Selected chart information">
-            <div className="chart-difficulty" style={{ "--difficulty-color": difficultyColor(selected_chart?.difficulty ?? 0) } as CSSProperties}><span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em>NPS</em></span><span className="chart-mode">{selected_chart ? chartSummaryMode(selected_chart) : "NO CHART"}</span></div>
-            <div className="chart-metadata"><span><Icon name="clock" /><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span><span><Icon name="music" /><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span><span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><Icon name="metronome" /><b>{Math.round(selected_chart?.bpm_avg ?? 0)} BPM</b></span><span><strong>LN</strong><b className="accent">{Math.round((selected_chart?.long_note_ratio ?? 0) * 100)}%</b></span><span><Icon name="file" /><b>{selected_chart?.format.toUpperCase() ?? "-"}</b></span></div>
-          </section>
-          <section className={`chart-browser${chart_level_sort ? " chart-level-browser" : ""}`} aria-label="Chart browser">
-            {!chart_level_sort && <div className="difficulty-strip"><button aria-label="Previous difficulty" onClick={() => selectDifficulty(-1)}><Icon name="chevron-left" /></button><div ref={difficulty_strip_ref}>
-              {selected_song?.charts.map((chart) => <button ref={chart.id === selected_chart?.id ? selected_difficulty_ref : undefined} className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => chart_selector.selectChart(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}><strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span></button>)}
-            </div><button aria-label="Next difficulty" onClick={() => selectDifficulty(1)}><Icon name="chevron-right" /></button></div>}
-            {selection.error ? <p className="song-library-error">{selection.error}</p> : <div className="chart-list" ref={viewport_ref} role="listbox" aria-label="Songs" tabIndex={0} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)} onKeyDown={(event) => {
-              if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
-              if (event.key === "Enter" && selected_chart) playChart(selected_chart);
-            }}><div className="chart-list-space" style={{ height: selection_entries.length * ROW_HEIGHT }}>
-               {visible_entries.map((entry, offset) => { const chart = entry.chart ?? entry.song.charts.at(-1); const selected = chart_selector.isEntrySelected(entry); return <button aria-selected={selected} className={`chart-row${entry.chart ? " chart-entry-row" : ""}${selected ? " selected" : ""}`} key={entry.key} onClick={() => selectEntry(entry)} onDoubleClick={() => chart && playChart(chart, entry.song)} role="option" style={{ "--row-offset": `${(first_index + offset) * ROW_HEIGHT}px`, "--difficulty-color": difficultyColor(chart?.difficulty ?? 0) } as CSSProperties}><span className="chart-row-copy">{entry.chart ? <><strong>{entry.song.title} <span className="chart-row-artist"><span className="chart-row-separator">//</span> {entry.song.artist}</span></strong><em>{entry.chart.name}{selection.sort_mode === "duration" && ` // ${formatDuration(entry.chart.duration_seconds)}`}</em></> : <><strong>{entry.song.title}</strong><small>{entry.song.artist}</small></>}</span><i className={(first_index + offset) % 3 === 0 ? "ranked" : ""} /></button>; })}
-            </div>{selection_entries.length === 0 && <p className="empty-library">{selection.query ? `No songs match “${selection.query}”` : "No songs in this collection"}</p>}</div>}
-          </section>
-        </div>
+        <SelectedSongPanel background_url={background_url} background_loaded={hero_loaded} selected_chart={selected_chart}
+          selected_song={selected_song} onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} />
+        <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
+          first_index={first_index} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
+          selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}
+          visible_entries={visible_entries} onChartSelect={(chart_id) => chart_selector.selectChart(chart_id)}
+          onEntryPlay={(entry) => { const chart = entry.chart ?? entry.song.charts.at(-1); if (chart) playChart(chart, entry.song); }}
+          onEntrySelect={selectEntry} onKeyDown={(event) => {
+            if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
+            if (event.key === "Enter" && selected_chart) playChart(selected_chart);
+          }} onMoveDifficulty={selectDifficulty} onScroll={setScrollTop} isEntrySelected={(entry) => chart_selector.isEntrySelected(entry)} />
       </section>
 
-      <footer className="song-select-footer">
-        <button className="back-control" type="button"><Icon name="undo" /><span>BACK</span></button>
-        <nav className="loadout-controls" aria-label="Loadout"><button className={`mods${constant_scroll || tap_only ? " active" : ""}`} aria-haspopup="dialog" aria-expanded={modifiers_open} onClick={() => setModifiersOpen(true)}><Icon name="puzzle" /><span>MODS</span><b>{Number(constant_scroll) + Number(tap_only)}</b></button><button className="mutators"><Icon name="zap" /><span>MUTATORS</span><b>0</b></button><button className="inputs" disabled={!selected_chart} onClick={() => setInputBindingsOpen(true)}><Icon name="keyboard" /><span>INPUTS</span></button><button className="skins" aria-haspopup="dialog" aria-expanded={skins_open} onClick={() => setSkinsOpen(true)}><Icon name="paintbrush" /><span>SKINS</span></button></nav>
-        <div className="play-controls"><div className="play-modifiers"><strong>MUSIC SPEED</strong><label className="rate-control"><output htmlFor="music-rate">{music_rate.toFixed(2)}x</output><span className="rate-knob" style={speed_style}><span /><input id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); rate_drag_ref.current = { pointer_id: event.pointerId, start_x: event.clientX, start_rate: music_rate }; }} onPointerMove={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) moveRateDrag(event.clientX); }} onPointerUp={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} onPointerCancel={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} /></span></label></div><button className="play-control" disabled={!selected_chart} onClick={() => selected_chart && playChart(selected_chart)}><span>PLAY</span><Icon name="play" /></button></div>
-      </footer>
+      <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
+        onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
+        onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)} />
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
