@@ -42,6 +42,14 @@ test("rejects invalid and unsupported local skin archives", async () => {
   })), /no supported osu or mania/);
 });
 
+test("recognizes spinner-only standard skins", async () => {
+  const skin = await inspectLocalNoteSkin(archiveFile("spinner.osk", {
+    "skin.ini": strToU8("[General]\nName: Spinner"),
+    "spinner-circle@2x.png": new Uint8Array([1]),
+  }));
+  assert.equal(skin.supportsOsu, true);
+});
+
 test("keeps archives over 100 MB session-only", () => {
   assert.equal(shouldPersistLocalNoteSkin(100 * 1024 * 1024), true);
   assert.equal(shouldPersistLocalNoteSkin(200 * 1024 * 1024), false);

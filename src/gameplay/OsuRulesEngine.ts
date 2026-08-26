@@ -37,7 +37,12 @@ interface ActiveSpinner {
   required_rotations: number;
   rotations: number;
   last_angle: number | null;
+  last_sample_time: number | null;
+  last_rpm_update_time: number;
   accumulated_angle: number;
+  display_angle: number;
+  rpm: number;
+  judged: boolean;
 }
 
 const STABLE_HITTABLE_RANGE = 0.4;
@@ -46,6 +51,10 @@ const SLIDER_TAIL_LENIENCE = 0.036;
 const BOUNDARY_EPSILON = 1e-9;
 const TRANSIENT_LIFETIME = 1.1;
 const SPINNER_CENTER = { x: 256, y: 192 };
+const SPINNER_RPM_DECAY_PER_FRAME = 0.9;
+const SPINNER_MAX_RPM = 0.05 * 1000 / (Math.PI * 2) * 60;
+const SPINNER_FADE_IN = 0.4;
+const SPINNER_FADE_OUT = 0.24;
 
 export class OsuRulesEngine {
   readonly object_states: Uint8Array;
@@ -107,7 +116,22 @@ export class OsuRulesEngine {
   get spinner_state(): OsuSpinnerPresentationState | null {
     const active = this.active_spinner;
     if (!active) return null;
-    return { object_index: active.index, progress: Math.min(1, active.rotations / Math.max(1, active.required_rotations)), active: true };
+    const duration = active.spinner.end_time - active.spinner.absolute_time;
+    const fade_in_progress = Math.min(1, Math.max(0,
+      (this.current_time - (active.spinner.absolute_time - SPINNER_FADE_IN)) / SPINNER_FADE_IN));
+    const fade_out_progress = Math.min(1, Math.max(0,
+      (this.current_time - active.spinner.end_time) / SPINNER_FADE_OUT));
+    return {
+      object_index: active.index,
+      progress: Math.min(1, active.rotations / Math.max(1, active.required_rotations)),
+      duration_progress: duration <= 0 ? 1
+        : Math.min(1, Math.max(0, (this.current_time - active.spinner.absolute_time) / duration)),
+      rotation_radians: active.display_angle,
+      rpm: active.rpm,
+      opacity: fade_in_progress * (1 - fade_out_progress),
+      fade_in_progress,
+      active: true,
+    };
   }
 
   private current_time = Number.NEGATIVE_INFINITY;
@@ -133,7 +157,7 @@ export class OsuRulesEngine {
       const index = this.next_timeout_index;
       const object = this.chart.hit_objects[index]!;
       if (object.kind === "spinner") {
-        if (song_time < object.absolute_time) break;
+        if (song_time < object.absolute_time - SPINNER_FADE_IN) break;
         this.next_timeout_index += 1;
         if (this.object_states[index] === OsuCircleState.Pending) this.startSpinner(index, object);
         continue;
@@ -153,7 +177,10 @@ export class OsuRulesEngine {
 
   private updateActiveTracking(song_time: number): void {
     for (const active of this.active_sliders) this.updateSliderTracking(active, song_time);
-    if (this.active_spinner && !this.action_pressed) this.active_spinner.last_angle = null;
+    if (this.active_spinner && !this.action_pressed) {
+      this.active_spinner.last_angle = null;
+      this.active_spinner.last_sample_time = null;
+    }
   }
 
   click(x: number, y: number, song_time: number): OsuClickOutcome {
@@ -278,21 +305,35 @@ export class OsuRulesEngine {
     const overall_difficulty = this.chart.overall_difficulty ?? 5;
     const ratio = overall_difficulty > 5 ? 5 + (overall_difficulty - 5) * 0.5 : 3 + overall_difficulty * 0.4;
     this.active_spinner = { index, spinner, required_rotations: Math.floor((spinner.end_time - spinner.absolute_time) * ratio),
-      rotations: 0, last_angle: null, accumulated_angle: 0 };
+      rotations: 0, last_angle: null, last_sample_time: null, last_rpm_update_time: spinner.absolute_time,
+      accumulated_angle: 0, display_angle: 0, rpm: 0, judged: false };
   }
 
   private updateSpinner(song_time: number): void {
     const active = this.active_spinner;
     if (!active) return;
-    if (song_time < active.spinner.end_time && this.action_pressed) {
+    if (song_time > active.last_rpm_update_time) {
+      active.rpm *= Math.pow(SPINNER_RPM_DECAY_PER_FRAME, (song_time - active.last_rpm_update_time) * 60);
+      active.last_rpm_update_time = song_time;
+    }
+    if (song_time >= active.spinner.absolute_time && song_time < active.spinner.end_time && this.action_pressed) {
       const angle = Math.atan2(this.cursor.y - SPINNER_CENTER.y, this.cursor.x - SPINNER_CENTER.x);
       if (active.last_angle !== null) {
         let difference = angle - active.last_angle;
         if (difference > Math.PI) difference -= Math.PI * 2;
         else if (difference < -Math.PI) difference += Math.PI * 2;
-        if (Math.abs(difference) < Math.PI) active.accumulated_angle += Math.abs(difference);
+        if (Math.abs(difference) < Math.PI) {
+          active.accumulated_angle += Math.abs(difference);
+          active.display_angle += difference;
+          if (active.last_sample_time !== null && song_time > active.last_sample_time) {
+            const instantaneous_rpm = Math.min(SPINNER_MAX_RPM,
+              Math.abs(difference) / (song_time - active.last_sample_time) / (Math.PI * 2) * 60);
+            active.rpm = active.rpm * SPINNER_RPM_DECAY_PER_FRAME + instantaneous_rpm * (1 - SPINNER_RPM_DECAY_PER_FRAME);
+          }
+        }
       }
       active.last_angle = angle;
+      active.last_sample_time = song_time;
       const rotations = Math.floor(active.accumulated_angle / Math.PI);
       while (active.rotations < rotations) {
         active.rotations += 1;
@@ -302,14 +343,18 @@ export class OsuRulesEngine {
           this.emit({ kind: "spinner-spin", object_index: active.index, time: song_time, bonus });
         }
       }
-    } else if (!this.action_pressed) {
+    } else if (song_time < active.spinner.absolute_time || !this.action_pressed) {
       active.last_angle = null;
+      active.last_sample_time = null;
     }
     if (song_time < active.spinner.end_time) return;
-    this.object_states[active.index] = active.rotations >= active.required_rotations ? OsuCircleState.Hit : OsuCircleState.Missed;
-    this.emit({ kind: "spinner-end", object_index: active.index, time: active.spinner.end_time,
-      rotations: active.rotations, required_rotations: active.required_rotations });
-    this.active_spinner = null;
+    if (!active.judged) {
+      active.judged = true;
+      this.object_states[active.index] = active.rotations >= active.required_rotations ? OsuCircleState.Hit : OsuCircleState.Missed;
+      this.emit({ kind: "spinner-end", object_index: active.index, time: active.spinner.end_time,
+        rotations: active.rotations, required_rotations: active.required_rotations });
+    }
+    if (song_time >= active.spinner.end_time + SPINNER_FADE_OUT) this.active_spinner = null;
   }
 
   private findCandidate(x: number, y: number, song_time: number): number | undefined {

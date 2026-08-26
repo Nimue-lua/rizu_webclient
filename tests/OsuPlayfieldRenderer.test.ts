@@ -517,3 +517,67 @@ test("uses beatmap combo colors and centers multi-digit object numbers", () => {
   const number_width = quads[1]![2] + quads[2]![2] + 2 * (64 / 128 * 0.8);
   assert.ok(Math.abs(quads[1]![0] - (64 + 256 - number_width / 2)) < 1e-9);
 });
+
+test("draws spinner layers, rotates its top, and prints RPM with score glyphs", () => {
+  const background = { sourceSize: { w: 640, h: 480 } } as OsuStandardSkin["hitCircle"];
+  const circle = { sourceSize: { w: 200, h: 200 } } as OsuStandardSkin["hitCircle"];
+  const approach = { sourceSize: { w: 200, h: 200 } } as OsuStandardSkin["hitCircle"];
+  const rpm = { sourceSize: { w: 174, h: 35 } } as OsuStandardSkin["hitCircle"];
+  const digit = { sourceSize: { w: 20, h: 40 } } as OsuStandardSkin["hitCircle"];
+  const skin = { sprites: { "score-1": digit, "score-2": digit, "score-3": digit },
+    spinnerBackground: background, spinnerCircle: circle, spinnerApproachCircle: approach, spinnerRpm: rpm,
+    scoreGlyphs: { "1": "score-1", "2": "score-2", "3": "score-3" }, scoreOverlap: 0,
+  } as unknown as OsuStandardSkin;
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 0, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: [] } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(), 0, [], 1,
+    (...quad) => quads.push(quad), undefined, undefined, undefined,
+    { object_index: 0, progress: 0.5, duration_progress: 0.5, rotation_radians: 1.25, rpm: 123,
+      opacity: 0.5, fade_in_progress: 0.5, active: true });
+
+  assert.deepEqual(quads.slice(0, 4).map((quad) => quad[5]), [background, circle, approach, rpm]);
+  assert.equal(quads[1]![9], 1.25);
+  assert.equal(quads[2]![9], 0);
+  assert.deepEqual(quads.slice(4).map((quad) => quad[5]), [digit, digit, digit]);
+  assert.ok(quads.every((quad) => quad[4][3] === 0.5));
+  assert.equal(quads[3]![1], 409.5);
+});
+
+test("fits layered spinner artwork inside the osu playfield", () => {
+  const bottom = { sourceSize: { w: 667, h: 667 } } as OsuStandardSkin["hitCircle"];
+  const top = { sourceSize: { w: 667, h: 667 } } as OsuStandardSkin["hitCircle"];
+  const skin = { sprites: {}, spinnerBottom: bottom, spinnerTop: top,
+    scoreGlyphs: {}, scoreOverlap: 0 } as unknown as OsuStandardSkin;
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 0, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: [] } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(), 0, [], 1,
+    (...quad) => quads.push(quad), undefined, undefined, undefined,
+    { object_index: 0, progress: 0, duration_progress: 0, rotation_radians: 0, rpm: 0,
+      opacity: 1, fade_in_progress: 1, active: true });
+
+  assert.ok(Math.abs(quads[0]![2] - 384) < 1e-9);
+  assert.ok(Math.abs(quads[0]![3] - 384) < 1e-9);
+  assert.ok(Math.abs(quads[0]![1] - 48) < 1e-9);
+  assert.ok(Math.abs(quads[1]![2] - 384) < 1e-9);
+});
+
+test("draws spinner RPM digits without the optional RPM background", () => {
+  const bottom = { sourceSize: { w: 400, h: 400 } } as OsuStandardSkin["hitCircle"];
+  const digit = { sourceSize: { w: 20, h: 40 } } as OsuStandardSkin["hitCircle"];
+  const skin = { sprites: { "score-1": digit, "score-2": digit }, spinnerBottom: bottom,
+    scoreGlyphs: { "1": "score-1", "2": "score-2" }, scoreOverlap: 0 } as unknown as OsuStandardSkin;
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 0, drain_length_seconds: 1, end_time: 1, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: [] } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(), 0, [], 1,
+    (...quad) => quads.push(quad), undefined, undefined, undefined,
+    { object_index: 0, progress: 0, duration_progress: 0.5, rotation_radians: 0, rpm: 12,
+      opacity: 1, fade_in_progress: 1, active: true });
+
+  assert.deepEqual(quads.map((quad) => quad[5]), [bottom, digit, digit]);
+});

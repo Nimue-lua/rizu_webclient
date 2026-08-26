@@ -268,12 +268,37 @@ test("starts and completes spinner rules from timestamped cursor samples", () =>
     hit_sound: 0, hit_sample: sample, new_combo: false, combo_skip: 0, combo_number: null,
     combo_color_index: 0 };
   const engine = createObjectEngine([spinner]);
+  engine.update(0.6);
+  assert.equal(engine.spinner_state?.opacity, 0);
+  engine.update(0.8);
+  assert.ok(Math.abs(engine.spinner_state!.opacity - 0.5) < 1e-9);
   engine.setInput(356, 192, true, 1);
   for (let index = 1; index <= 32; index += 1) {
     const angle = index * Math.PI / 4;
     engine.setInput(256 + Math.cos(angle) * 100, 192 + Math.sin(angle) * 100, true, 1 + index / 40);
   }
+  assert.ok(engine.spinner_state!.rotation_radians > Math.PI * 7);
+  assert.ok(engine.spinner_state!.rpm > 0);
+  assert.ok(engine.spinner_state!.duration_progress > 0.7);
   engine.update(2);
   assert.equal(engine.score.judges?.["300"], 1);
+  assert.equal(engine.spinner_state?.opacity, 1);
+  engine.update(2.12);
+  assert.ok(Math.abs(engine.spinner_state!.opacity - 0.5) < 1e-9);
+  assert.equal(engine.score.judges?.["300"], 1);
+  engine.update(2.24);
   assert.equal(engine.spinner_state, null);
+});
+
+test("caps displayed spinner RPM without changing angular scoring", () => {
+  const spinner = { kind: "spinner" as const, x: 256, y: 192, absolute_time: 1, end_time: 2,
+    hit_sound: 0, hit_sample: sample, new_combo: false, combo_skip: 0, combo_number: null,
+    combo_color_index: 0 };
+  const engine = createObjectEngine([spinner]);
+  engine.setInput(356, 192, true, 1);
+  engine.setInput(256, 292, true, 1 + Number.EPSILON);
+  engine.setInput(156, 192, true, 1 + Number.EPSILON * 2);
+
+  assert.ok(engine.spinner_state!.rpm <= 0.05 * 1000 / (Math.PI * 2) * 60);
+  assert.ok(engine.spinner_state!.rotation_radians > 0);
 });

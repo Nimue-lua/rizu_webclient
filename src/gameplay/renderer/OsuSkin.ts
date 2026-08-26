@@ -28,6 +28,14 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly sliderEndCircleOverlay: Sprite | null;
   readonly reverseArrow: Sprite;
   readonly sliderTick: Sprite;
+  readonly spinnerBackground?: Sprite;
+  readonly spinnerCircle?: Sprite;
+  readonly spinnerMetre?: Sprite;
+  readonly spinnerApproachCircle?: Sprite;
+  readonly spinnerRpm?: Sprite;
+  readonly spinnerTop?: Sprite;
+  readonly spinnerBottom?: Sprite;
+  readonly spinnerMiddle?: Sprite;
   readonly judgments: Readonly<Record<string, readonly string[]>>;
   readonly hpBackground: Sprite;
   readonly hpFill: Sprite;
@@ -287,10 +295,13 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
   const slider_ball_names = resolveSliderBallFrames(available, defaults);
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
   const slider_end_names = resolveSliderEndSpriteNames(new Set(available.keys()), new Set(defaults.keys()));
+  const spinner_names = ["spinner-background", "spinner-circle", "spinner-metre", "spinner-approachcircle",
+    "spinner-rpm", "spinner-top", "spinner-bottom", "spinner-middle"]
+    .filter((name) => available.has(name) || defaults.has(name));
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", "sliderfollowcircle",
     "sliderscorepoint", "scorebar-bg", "scorebar-colour", cursor_name, slider_end_names.circle,
     ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
-    ...slider_ball_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
+    ...slider_ball_names, ...spinner_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
     ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
@@ -340,6 +351,14 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     sliderEndCircleOverlay: slider_end_names.overlay ? sprites[slider_end_names.overlay]! : null,
     reverseArrow: sprites.reversearrow!,
     sliderTick: sprites.sliderscorepoint!,
+    spinnerBackground: sprites["spinner-background"],
+    spinnerCircle: sprites["spinner-circle"],
+    spinnerMetre: sprites["spinner-metre"],
+    spinnerApproachCircle: sprites["spinner-approachcircle"],
+    spinnerRpm: sprites["spinner-rpm"],
+    spinnerTop: sprites["spinner-top"],
+    spinnerBottom: sprites["spinner-bottom"],
+    spinnerMiddle: sprites["spinner-middle"],
     judgments,
     hpBackground: sprites["scorebar-bg"]!,
     hpFill: sprites["scorebar-colour"]!,

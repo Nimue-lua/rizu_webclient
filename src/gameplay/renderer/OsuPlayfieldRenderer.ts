@@ -7,6 +7,7 @@ import type { OsuStandardSkin } from "./OsuSkin";
 import type { SpriteQuadWriter } from "./Sprite";
 import type { OsuSliderPath } from "../OsuSliderPath";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
+import { drawBitmapText } from "./BitmapTextRenderer";
 
 const CIRCLE_FADE_IN = 0.4;
 const APPROACH_FADE_IN = 0.8;
@@ -240,10 +241,40 @@ export class OsuPlayfieldRenderer {
 
   private drawSpinner(viewport: OsuViewport, state: OsuSpinnerPresentationState, write: SpriteQuadWriter): void {
     const center = viewport.playfieldToScreen({ x: 256, y: 192 });
-    const diameter = 180 * viewport.scale;
-    const alpha = 0.25 + state.progress * 0.5;
-    write(center.x - diameter / 2, center.y - diameter / 2, diameter, diameter,
-      [1, 1, 1, alpha], this.skin.approachCircle);
+    const addCentered = (sprite: OsuStandardSkin["spinnerCircle"], rotation = 0, scale = 1) => {
+      if (!sprite) return;
+      const width = sprite.sourceSize.w * viewport.scale * scale;
+      const height = sprite.sourceSize.h * viewport.scale * scale;
+      write(center.x - width / 2, center.y - height / 2, width, height, [1, 1, 1, state.opacity], sprite,
+        false, undefined, false, rotation);
+    };
+    const legacy = this.skin.spinnerCircle !== undefined;
+    if (legacy) {
+      addCentered(this.skin.spinnerBackground);
+      addCentered(this.skin.spinnerCircle, state.rotation_radians);
+      addCentered(this.skin.spinnerMetre);
+    } else {
+      const layers = [this.skin.spinnerBottom, this.skin.spinnerMiddle, this.skin.spinnerTop].filter(Boolean);
+      const layered_scale = layers.length === 0 ? 1 : Math.min(1,
+        512 / Math.max(...layers.map((sprite) => sprite!.sourceSize.w)),
+        384 / Math.max(...layers.map((sprite) => sprite!.sourceSize.h)));
+      addCentered(this.skin.spinnerBottom, 0, layered_scale);
+      addCentered(this.skin.spinnerMiddle, 0, layered_scale);
+      addCentered(this.skin.spinnerTop, state.rotation_radians, layered_scale);
+    }
+    addCentered(this.skin.spinnerApproachCircle, 0, 1.86 - 1.76 * state.duration_progress);
+
+    const rpm_background = this.skin.spinnerRpm;
+    const eased_fade_in = 1 - (1 - state.fade_in_progress) * (1 - state.fade_in_progress);
+    const y = viewport.stage_top + (447 - 50 * eased_fade_in) * viewport.scale;
+    if (rpm_background) {
+      const width = rpm_background.sourceSize.w * viewport.scale;
+      const height = rpm_background.sourceSize.h * viewport.scale;
+      const x = center.x - width / 2;
+      write(x, y, width, height, [1, 1, 1, state.opacity], rpm_background);
+    }
+    drawBitmapText(this.skin.sprites, String(Math.round(state.rpm)), this.skin.scoreGlyphs, this.skin.scoreOverlap,
+      center.x + 80 * viewport.scale, y + 3 * viewport.scale, 0.9 * viewport.scale, "right", write, state.opacity);
   }
 
   private drawCircle(viewport: OsuViewport, position: { x: number; y: number }, diameter: number, alpha: number,
