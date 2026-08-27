@@ -98,7 +98,7 @@ interface SelectedSongPanelProps {
 }
 
 export function SelectedSongPanel({ nickname, background_url, background_loaded, selected_chart, selected_song, stored_plays, onBackgroundLoaded, onReplay }: SelectedSongPanelProps) {
-  const [score_source, setScoreSource] = useState<"local" | "online">("local");
+  const [score_source, setScoreSource] = useState<"local" | "online">("online");
   const [online_scores, setOnlineScores] = useState<readonly OnlineScore[]>([]);
   const [online_scores_state, setOnlineScoresState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const scores = stored_plays.map(scoreRow).filter((score): score is ScoreRow => score !== null)

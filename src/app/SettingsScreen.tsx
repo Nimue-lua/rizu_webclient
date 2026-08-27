@@ -129,7 +129,7 @@ export function SettingsScreen({
           <small>Used for scores submitted to the online leaderboard.</small>
         </label>
 
-        <header className="settings-heading" id="audio-volume">
+        <header className="settings-heading settings-heading-spaced" id="audio-volume">
           <Volume2 aria-hidden="true" />
           <h2>Audio Volume</h2>
         </header>
