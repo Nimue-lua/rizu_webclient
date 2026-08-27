@@ -12,34 +12,12 @@ import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import {
   scrollSpeedToCanonical,
   scrollSpeedToDisplay,
-  type ScrollSpeedType,
 } from "../gameplay/mania/ScrollSpeed";
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
+import { appSettings, settings, useSetting } from "../config/Settings";
 
 interface SettingsScreenProps {
-  nickname: string;
-  master_volume: number;
-  osu_hit_sound_volume: number;
-  music_offset: number;
-  scroll_speed: number;
-  scroll_speed_type: ScrollSpeedType;
-  cursor_scale: number;
-  osu_cursor_renderer: OsuCursorRendererMode;
-  osu_raw_input: boolean;
-  osu_slider_renderer: OsuSliderRendererMode;
-  hit_registration: ManiaHitRegistration;
-  onNicknameChange: (nickname: string) => void;
-  onMasterVolumeChange: (master_volume: number) => void;
-  onOsuHitSoundVolumeChange: (volume: number) => void;
-  onMusicOffsetChange: (music_offset: number) => void;
-  onScrollSpeedChange: (scroll_speed: number) => void;
-  onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
-  onCursorScaleChange: (cursor_scale: number) => void;
-  onOsuCursorRendererChange: (renderer: OsuCursorRendererMode) => void;
-  onOsuRawInputChange: (enabled: boolean) => void;
-  onOsuSliderRendererChange: (renderer: OsuSliderRendererMode) => void;
-  onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
   onDeleteScores: () => Promise<void>;
   onExit: () => void;
 }
@@ -60,31 +38,20 @@ function sliderStyle(value: number, minimum: number, maximum: number): CSSProper
 }
 
 export function SettingsScreen({
-  nickname,
-  master_volume,
-  osu_hit_sound_volume,
-  music_offset,
-  scroll_speed,
-  scroll_speed_type,
-  cursor_scale,
-  osu_cursor_renderer,
-  osu_raw_input,
-  osu_slider_renderer,
-  hit_registration,
-  onNicknameChange,
-  onMasterVolumeChange,
-  onOsuHitSoundVolumeChange,
-  onMusicOffsetChange,
-  onScrollSpeedChange,
-  onScrollSpeedTypeChange,
-  onCursorScaleChange,
-  onOsuCursorRendererChange,
-  onOsuRawInputChange,
-  onOsuSliderRendererChange,
-  onHitRegistrationChange,
   onDeleteScores,
   onExit,
 }: SettingsScreenProps) {
+  const nickname = useSetting(settings.nickname);
+  const master_volume = useSetting(settings.master_volume);
+  const osu_hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
+  const music_offset = useSetting(settings.music_offset);
+  const scroll_speed = useSetting(settings.scroll_speed);
+  const scroll_speed_type = useSetting(settings.scroll_speed_type);
+  const cursor_scale = useSetting(settings.cursor_scale);
+  const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
+  const osu_raw_input = useSetting(settings.osu_raw_input);
+  const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
+  const hit_registration = useSetting(settings.hit_registration);
   const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
   const panel_ref = useRef<HTMLElement>(null);
 
@@ -166,13 +133,13 @@ export function SettingsScreen({
                 <label htmlFor="master-volume">Master volume&nbsp;&nbsp;<output>{master_volume_percent}%</output></label>
                 <input id="master-volume" type="range" min="0" max="100" step="1"
                   value={master_volume_percent} style={sliderStyle(master_volume_percent, 0, 100)}
-                  onChange={(event) => onMasterVolumeChange(Number(event.target.value) / 100)} />
+                  onChange={(event) => appSettings.set(settings.master_volume, Number(event.target.value) / 100)} />
               </div>
               <div className="settings-control settings-slider-control">
                 <label htmlFor="osu-hit-sound-volume">osu! hit sound volume&nbsp;&nbsp;<output>{osu_hit_sound_volume_percent}%</output></label>
                 <input id="osu-hit-sound-volume" type="range" min="0" max="100" step="1"
                   value={osu_hit_sound_volume_percent} style={sliderStyle(osu_hit_sound_volume_percent, 0, 100)}
-                  onChange={(event) => onOsuHitSoundVolumeChange(Number(event.target.value) / 100)} />
+                  onChange={(event) => appSettings.set(settings.osu_hit_sound_volume, Number(event.target.value) / 100)} />
               </div>
           </section>
 
@@ -185,9 +152,9 @@ export function SettingsScreen({
                 <span>Scroll speed type</span>
                 <div role="group" aria-label="Scroll speed type">
                   <button type="button" className={scroll_speed_type === "default" ? "selected" : ""}
-                    onClick={() => onScrollSpeedTypeChange("default")}>Rizu</button>
+                    onClick={() => appSettings.set(settings.scroll_speed_type, "default")}>Rizu</button>
                   <button type="button" className={scroll_speed_type === "osu" ? "selected" : ""}
-                    onClick={() => onScrollSpeedTypeChange("osu")}>osu!</button>
+                    onClick={() => appSettings.set(settings.scroll_speed_type, "osu")}>osu!</button>
                 </div>
               </div>
               <div className="settings-control settings-slider-control">
@@ -197,18 +164,19 @@ export function SettingsScreen({
                 <input id="settings-scroll-speed" type="range" min={scroll_speed_range.minimum}
                   max={scroll_speed_range.maximum} step={scroll_speed_range.step} value={displayed_scroll_speed}
                   style={sliderStyle(displayed_scroll_speed, scroll_speed_range.minimum, scroll_speed_range.maximum)}
-                  onChange={(event) => onScrollSpeedChange(scrollSpeedToCanonical(scroll_speed_type, Number(event.target.value)))} />
+                  onChange={(event) => appSettings.set(settings.scroll_speed,
+                    scrollSpeedToCanonical(scroll_speed_type, Number(event.target.value)))} />
               </div>
               <label className="settings-checkbox-control">
                 <input type="checkbox" checked={osu_raw_input}
-                  onChange={(event) => onOsuRawInputChange(event.target.checked)} />
+                  onChange={(event) => appSettings.set(settings.osu_raw_input, event.target.checked)} />
                 <span aria-hidden="true" />
                 <strong>osu! raw pointer input</strong>
               </label>
               <label className="settings-control settings-select-control" htmlFor="settings-hit-registration">
                 <span>Hit registration</span>
                 <select id="settings-hit-registration" value={hit_registration}
-                  onChange={(event) => onHitRegistrationChange(event.target.value as ManiaHitRegistration)}>
+                  onChange={(event) => appSettings.set(settings.hit_registration, event.target.value as ManiaHitRegistration)}>
                   <option value="earliest">Earliest note</option>
                   <option value="nearest">Nearest note</option>
                 </select>
@@ -224,7 +192,7 @@ export function SettingsScreen({
                 <label htmlFor="music-offset">Music offset&nbsp;&nbsp;<output>{music_offset} ms</output></label>
                 <input id="music-offset" type="range" min="-200" max="200" step="1" value={music_offset}
                   style={sliderStyle(music_offset, -200, 200)}
-                  onChange={(event) => onMusicOffsetChange(Number(event.target.value))} />
+                  onChange={(event) => appSettings.set(settings.music_offset, Number(event.target.value))} />
               </div>
           </section>
 
@@ -237,12 +205,12 @@ export function SettingsScreen({
                 <label htmlFor="settings-cursor-scale">osu! cursor scale&nbsp;&nbsp;<output>{Math.round(cursor_scale * 100)}%</output></label>
                 <input id="settings-cursor-scale" type="range" min="25" max="200" step="5"
                   value={Math.round(cursor_scale * 100)} style={sliderStyle(cursor_scale * 100, 25, 200)}
-                  onChange={(event) => onCursorScaleChange(Number(event.target.value) / 100)} />
+                  onChange={(event) => appSettings.set(settings.cursor_scale, Number(event.target.value) / 100)} />
               </div>
               <label className="settings-control settings-select-control" htmlFor="settings-osu-slider-renderer">
                 <span>osu! slider renderer</span>
                 <select id="settings-osu-slider-renderer" value={osu_slider_renderer}
-                  onChange={(event) => onOsuSliderRendererChange(event.target.value as OsuSliderRendererMode)}>
+                  onChange={(event) => appSettings.set(settings.osu_slider_renderer, event.target.value as OsuSliderRendererMode)}>
                   <option value="direct">Normal</option>
                   <option value="stable">Stable experimental</option>
                 </select>
@@ -250,7 +218,7 @@ export function SettingsScreen({
               <label className="settings-control settings-select-control" htmlFor="settings-osu-cursor-renderer">
                 <span>osu! cursor renderer</span>
                 <select id="settings-osu-cursor-renderer" value={osu_cursor_renderer}
-                  onChange={(event) => onOsuCursorRendererChange(event.target.value as OsuCursorRendererMode)}>
+                  onChange={(event) => appSettings.set(settings.osu_cursor_renderer, event.target.value as OsuCursorRendererMode)}>
                   <option value="os">OS cursor (low latency)</option>
                   <option value="webgl">WebGL cursor</option>
                 </select>
@@ -265,7 +233,7 @@ export function SettingsScreen({
               <label className="settings-control settings-text-control" htmlFor="settings-nickname">
                 <span>Nickname</span>
                 <input id="settings-nickname" type="text" value={nickname} placeholder="Anonymous"
-                  onChange={(event) => onNicknameChange(event.target.value)} />
+                  onChange={(event) => appSettings.set(settings.nickname, event.target.value)} />
               </label>
           </section>
 

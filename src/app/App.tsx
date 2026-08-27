@@ -12,9 +12,7 @@ import { WelcomeScreen } from "./WelcomeScreen";
 import { UnlockingFpsScreen } from "./UnlockingFpsScreen";
 import { OszSelectScreen } from "./OszSelectScreen";
 import { readOszArchive, type OszArchive } from "../library/OszArchive";
-import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
-import type { ScrollSpeedType } from "../gameplay/mania/ScrollSpeed";
 import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import {
   loadNoteSkinSelections,
@@ -34,27 +32,12 @@ import {
   saveLocalNoteSkin,
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
-import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
-import { osuCursorRendererMode, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { submitPlay } from "../replay/ReplayServer";
+import { appSettings, settings, useSetting } from "../config/Settings";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
-const MASTER_VOLUME_KEY = "rizu.master-volume";
-const OSU_HIT_SOUND_VOLUME_KEY = "rizu.osu-hit-sound-volume";
-const MUSIC_OFFSET_KEY = "rizu.music-offset";
-const SCROLL_SPEED_KEY = "rizu.scroll-speed";
-const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
-const CURSOR_SCALE_KEY = "rizu.cursor-scale";
-const OSU_CURSOR_RENDERER_KEY = "rizu.osu-cursor-renderer";
-const OSU_RAW_INPUT_KEY = "rizu.osu-raw-input";
-const OSU_SLIDER_RENDERER_KEY = "rizu.osu-slider-renderer";
-const HIT_REGISTRATION_KEY = "rizu.hit-registration";
-const MUSIC_RATE_KEY = "rizu.music-rate";
-const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
-const TAP_ONLY_KEY = "rizu.no-long-notes";
-const NICKNAME_KEY = "rizu.nickname";
 const gameplay_loader = new HttpGameplayLoader();
 const chart_selector = new ChartSelector(new SqliteLibrary());
 
@@ -81,50 +64,23 @@ export function App() {
   const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const local_skin_urls = useRef(new Map<string, string>());
-  const [nickname, setNickname] = useState(() => localStorage.getItem(NICKNAME_KEY) ?? "Anonymous");
-  const [master_volume, setMasterVolume] = useState(() => {
-    const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
-    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    return Number.isFinite(stored_value) && stored_value >= 0 && stored_value <= 1 ? stored_value : 0.2;
-  });
-  const [osu_hit_sound_volume, setOsuHitSoundVolume] = useState(() => {
-    const stored_setting = localStorage.getItem(OSU_HIT_SOUND_VOLUME_KEY);
-    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    return Number.isFinite(stored_value) && stored_value >= 0 && stored_value <= 1 ? stored_value : 1;
-  });
-  const [music_offset, setMusicOffset] = useState(() => {
-    const stored_setting = localStorage.getItem(MUSIC_OFFSET_KEY);
-    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    return Number.isFinite(stored_value) && stored_value >= -200 && stored_value <= 200 ? stored_value : 0;
-  });
-  const [scroll_speed, setScrollSpeed] = useState(() => {
-    const stored_setting = localStorage.getItem(SCROLL_SPEED_KEY);
-    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    return Number.isFinite(stored_value) && stored_value >= 0.05 && stored_value <= 3 ? stored_value : 1;
-  });
-  const [scroll_speed_type, setScrollSpeedType] = useState<ScrollSpeedType>(() =>
-    localStorage.getItem(SCROLL_SPEED_TYPE_KEY) === "osu" ? "osu" : "default");
-  const [cursor_scale, setCursorScale] = useState(() => {
-    const stored_setting = localStorage.getItem(CURSOR_SCALE_KEY);
-    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    return Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 2 ? stored_value : 1;
-  });
-  const [osu_cursor_renderer, setOsuCursorRenderer] = useState<OsuCursorRendererMode>(() =>
-    osuCursorRendererMode(localStorage.getItem(OSU_CURSOR_RENDERER_KEY)));
-  const [osu_raw_input, setOsuRawInput] = useState(() => localStorage.getItem(OSU_RAW_INPUT_KEY) !== "false");
-  const [osu_slider_renderer, setOsuSliderRenderer] = useState<OsuSliderRendererMode>(() =>
-    osuSliderRendererMode(localStorage.getItem(OSU_SLIDER_RENDERER_KEY)));
-  const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
-    localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
-  const [replay_base, setReplayBase] = useState(() => {
-    const replay_base = new ManiaReplayBase();
-    const stored_setting = localStorage.getItem(MUSIC_RATE_KEY);
-    const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
-    if (Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 4) replay_base.rate = stored_value;
-    replay_base.const = localStorage.getItem(CONSTANT_SCROLL_KEY) === "true";
-    replay_base.tap_only = localStorage.getItem(TAP_ONLY_KEY) === "true";
-    return replay_base;
-  });
+  const nickname = useSetting(settings.nickname);
+  const master_volume = useSetting(settings.master_volume);
+  const osu_hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
+  const music_offset = useSetting(settings.music_offset);
+  const scroll_speed = useSetting(settings.scroll_speed);
+  const cursor_scale = useSetting(settings.cursor_scale);
+  const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
+  const osu_raw_input = useSetting(settings.osu_raw_input);
+  const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
+  const hit_registration = useSetting(settings.hit_registration);
+  const music_rate = useSetting(settings.music_rate);
+  const constant_scroll = useSetting(settings.constant_scroll);
+  const tap_only = useSetting(settings.tap_only);
+  const replay_base = new ManiaReplayBase();
+  replay_base.rate = music_rate;
+  replay_base.const = constant_scroll;
+  replay_base.tap_only = tap_only;
 
   useEffect(() => {
     let cancelled = false;
@@ -189,92 +145,17 @@ export function App() {
     };
   }, [screen]);
 
-  const changeMasterVolume = (value: number) => {
-    localStorage.setItem(MASTER_VOLUME_KEY, String(value));
-    setMasterVolume(value);
-  };
-
-  const changeNickname = (value: string) => {
-    localStorage.setItem(NICKNAME_KEY, value);
-    setNickname(value);
-  };
-
-  const changeOsuHitSoundVolume = (value: number) => {
-    localStorage.setItem(OSU_HIT_SOUND_VOLUME_KEY, String(value));
-    setOsuHitSoundVolume(value);
-  };
-
-  const changeMusicOffset = (value: number) => {
-    const offset = Math.min(200, Math.max(-200, Math.round(value)));
-    localStorage.setItem(MUSIC_OFFSET_KEY, String(offset));
-    setMusicOffset(offset);
-  };
-
-  const changeScrollSpeed = (value: number) => {
-    localStorage.setItem(SCROLL_SPEED_KEY, String(value));
-    setScrollSpeed(value);
-  };
-
-  const changeScrollSpeedType = (value: ScrollSpeedType) => {
-    localStorage.setItem(SCROLL_SPEED_TYPE_KEY, value);
-    setScrollSpeedType(value);
-  };
-
-  const changeCursorScale = (value: number) => {
-    const scale = Math.min(2, Math.max(0.25, Math.round(value * 20) / 20));
-    localStorage.setItem(CURSOR_SCALE_KEY, String(scale));
-    setCursorScale(scale);
-  };
-
-  const changeOsuRawInput = (enabled: boolean) => {
-    localStorage.setItem(OSU_RAW_INPUT_KEY, String(enabled));
-    setOsuRawInput(enabled);
-  };
-
-  const changeOsuCursorRenderer = (renderer: OsuCursorRendererMode) => {
-    localStorage.setItem(OSU_CURSOR_RENDERER_KEY, renderer);
-    setOsuCursorRenderer(renderer);
-  };
-
-  const changeOsuSliderRenderer = (renderer: OsuSliderRendererMode) => {
-    localStorage.setItem(OSU_SLIDER_RENDERER_KEY, renderer);
-    setOsuSliderRenderer(renderer);
-  };
-
-  const changeHitRegistration = (value: ManiaHitRegistration) => {
-    localStorage.setItem(HIT_REGISTRATION_KEY, value);
-    setHitRegistration(value);
-  };
-
   const changeMusicRate = (value: number) => {
     const rate = Math.round(value * 1000) / 1000;
-    localStorage.setItem(MUSIC_RATE_KEY, String(rate));
-    setReplayBase((current) => {
-      const next = new ManiaReplayBase();
-      next.importReplayBase(current.exportReplayBase());
-      next.rate = rate;
-      return next;
-    });
+    appSettings.set(settings.music_rate, rate);
   };
 
   const changeConstantScroll = (value: boolean) => {
-    localStorage.setItem(CONSTANT_SCROLL_KEY, String(value));
-    setReplayBase((current) => {
-      const next = new ManiaReplayBase();
-      next.importReplayBase(current.exportReplayBase());
-      next.const = value;
-      return next;
-    });
+    appSettings.set(settings.constant_scroll, value);
   };
 
   const changeTapOnly = (value: boolean) => {
-    localStorage.setItem(TAP_ONLY_KEY, String(value));
-    setReplayBase((current) => {
-      const next = new ManiaReplayBase();
-      next.importReplayBase(current.exportReplayBase());
-      next.tap_only = value;
-      return next;
-    });
+    appSettings.set(settings.tap_only, value);
   };
 
   const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null) => {
@@ -480,28 +361,6 @@ export function App() {
           />
           {settings_open && (
             <SettingsScreen
-              nickname={nickname}
-              master_volume={master_volume}
-              osu_hit_sound_volume={osu_hit_sound_volume}
-              music_offset={music_offset}
-              scroll_speed={scroll_speed}
-              scroll_speed_type={scroll_speed_type}
-              cursor_scale={cursor_scale}
-              osu_cursor_renderer={osu_cursor_renderer}
-              osu_raw_input={osu_raw_input}
-              osu_slider_renderer={osu_slider_renderer}
-              hit_registration={hit_registration}
-              onNicknameChange={changeNickname}
-              onMasterVolumeChange={changeMasterVolume}
-              onOsuHitSoundVolumeChange={changeOsuHitSoundVolume}
-              onMusicOffsetChange={changeMusicOffset}
-              onScrollSpeedChange={changeScrollSpeed}
-              onScrollSpeedTypeChange={changeScrollSpeedType}
-              onCursorScaleChange={changeCursorScale}
-              onOsuCursorRendererChange={changeOsuCursorRenderer}
-              onOsuRawInputChange={changeOsuRawInput}
-              onOsuSliderRendererChange={changeOsuSliderRenderer}
-              onHitRegistrationChange={changeHitRegistration}
               onDeleteScores={async () => {
                 await deleteScoreDatabase();
                 setScoreStorageRevision((revision) => revision + 1);
