@@ -1,5 +1,15 @@
 import type { StoredPlay } from "./ReplayStore";
 
+export interface OnlineScore {
+  readonly id: number;
+  readonly nickname: string;
+  readonly score: number | null;
+  readonly accuracy: number | null;
+  readonly grade: string | null;
+  readonly played_at: string;
+  readonly replay_base: unknown;
+}
+
 function replayBase64(data: Uint8Array): string {
   let binary = "";
   const chunk_size = 0x8000;
@@ -31,4 +41,11 @@ export async function submitPlay(play: StoredPlay, nickname: string, request: ty
     }),
   });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+}
+
+export async function listOnlineScores(chart_id: string, signal?: AbortSignal, request: typeof fetch = fetch): Promise<OnlineScore[]> {
+  const response = await request(`/api/leaderboard?chart_id=${encodeURIComponent(chart_id)}&limit=5`, { signal });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  const result = await response.json() as { scores?: unknown };
+  return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { submitPlay } from "../src/replay/ReplayServer";
+import { listOnlineScores, submitPlay } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -54,4 +54,15 @@ test("uses Anonymous for a blank nickname and rejects server errors", async () =
     /returned 500/,
   );
   assert.equal(nickname, "Anonymous");
+});
+
+test("loads a chart leaderboard", async () => {
+  let requested_url = "";
+  const scores = await listOnlineScores("chart:42", undefined, async (input) => {
+    requested_url = String(input);
+    return Response.json({ scores: [{ id: 1, nickname: "Nimue", accuracy: 0.99 }] });
+  });
+
+  assert.equal(requested_url, "/api/leaderboard?chart_id=chart%3A42&limit=5");
+  assert.equal(scores[0]?.nickname, "Nimue");
 });

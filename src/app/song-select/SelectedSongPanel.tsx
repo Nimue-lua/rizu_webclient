@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChartfileSetView, Chartview } from "../../library/views";
+import { listOnlineScores, type OnlineScore } from "../../replay/ReplayServer";
 import type { StoredPlay } from "../../replay/ReplayStore";
 import { SongSelectIcon } from "./SongSelectUi";
 
@@ -14,6 +15,14 @@ const GRADE_COLORS: Readonly<Record<string, string>> = {
 
 interface ScoreRow {
   readonly play: StoredPlay;
+  readonly grade: string;
+  readonly color: string;
+  readonly accuracy: number;
+  readonly mods: string;
+}
+
+interface OnlineScoreRow {
+  readonly score: OnlineScore;
   readonly grade: string;
   readonly color: string;
   readonly accuracy: number;
@@ -40,6 +49,23 @@ function scoreRow(play: StoredPlay): ScoreRow | null {
   } catch {
     return null;
   }
+}
+
+function replayMods(replay_base: ReplayBaseSummary): string {
+  const mods: string[] = [];
+  if (typeof replay_base.rate === "number" && replay_base.rate !== 1) mods.push(`${replay_base.rate.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}x`);
+  if (replay_base.mode === "mania" && replay_base.const === true) mods.push("Const");
+  if (replay_base.mode === "mania" && replay_base.tap_only === true) mods.push("No Long Note");
+  return mods.join(" ") || "No mods";
+}
+
+function onlineScoreRow(score: OnlineScore): OnlineScoreRow | null {
+  if (typeof score.accuracy !== "number") return null;
+  const grade = score.grade && GRADE_COLORS[score.grade.toUpperCase()] ? score.grade.toUpperCase() : "D";
+  const replay_base = typeof score.replay_base === "object" && score.replay_base !== null
+    ? score.replay_base as ReplayBaseSummary
+    : {};
+  return { score, grade, color: GRADE_COLORS[grade] ?? GRADE_COLORS.D, accuracy: score.accuracy, mods: replayMods(replay_base) };
 }
 
 function formatPlayDate(played_at: string): string {
@@ -73,9 +99,28 @@ interface SelectedSongPanelProps {
 
 export function SelectedSongPanel({ nickname, background_url, background_loaded, selected_chart, selected_song, stored_plays, onBackgroundLoaded, onReplay }: SelectedSongPanelProps) {
   const [score_source, setScoreSource] = useState<"local" | "online">("local");
+  const [online_scores, setOnlineScores] = useState<readonly OnlineScore[]>([]);
+  const [online_scores_state, setOnlineScoresState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const scores = stored_plays.map(scoreRow).filter((score): score is ScoreRow => score !== null)
     .sort((left, right) => right.accuracy - left.accuracy || right.play.played_at.localeCompare(left.play.played_at)).slice(0, 5);
+  const online_rows = online_scores.map(onlineScoreRow).filter((score): score is OnlineScoreRow => score !== null);
   const personal_best = scores[0];
+
+  useEffect(() => {
+    if (score_source !== "online" || !selected_chart) return;
+    const abort_controller = new AbortController();
+    setOnlineScores([]);
+    setOnlineScoresState("loading");
+    void listOnlineScores(selected_chart.id, abort_controller.signal).then((loaded_scores) => {
+      setOnlineScores(loaded_scores);
+      setOnlineScoresState("loaded");
+    }).catch((error: unknown) => {
+      if (abort_controller.signal.aborted) return;
+      console.error("Could not load online scores", error);
+      setOnlineScoresState("error");
+    });
+    return () => abort_controller.abort();
+  }, [score_source, selected_chart?.id]);
 
   return (
     <div className="song-select-column left-column">
@@ -103,7 +148,21 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
               </span>
             </button>;
           })}
-        </div> : <div className="no-records"><SongSelectIcon name="trophy" /><span>{score_source === "online" ? "Online scores unavailable" : "No Records Set!"}</span></div>}
+        </div> : score_source === "online" && online_rows.length > 0 ? <div className="score-rows">
+          {Array.from({ length: 5 }, (_, index) => {
+            const row = online_rows[index];
+            if (!row) return <div className="score-row" key={`online-empty-${index}`} aria-hidden="true" />;
+            return <div className="score-row filled" key={row.score.id}
+              style={{ "--grade-color": row.color } as React.CSSProperties}>
+              <div className="score-avatar" aria-label="Avatar placeholder" />
+              <span className="score-player">#{index + 1} {row.score.nickname || "Anonymous"}</span>
+              <span className="score-details">
+                <strong>{(row.accuracy * 100).toFixed(2)}%</strong>
+                <span><b>{row.mods}</b><time dateTime={row.score.played_at}>{formatPlayDate(row.score.played_at)}</time></span>
+              </span>
+            </div>;
+          })}
+        </div> : <div className="no-records"><SongSelectIcon name="trophy" /><span>{score_source === "local" ? "No Records Set!" : online_scores_state === "loading" ? "Loading online scores..." : online_scores_state === "error" ? "Could not load online scores" : "No online scores yet"}</span></div>}
       </section>
     </div>
   );
