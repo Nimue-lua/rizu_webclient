@@ -149,7 +149,7 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
     const repeat_count = Number(object.fields[6]);
     const pixel_length = Number(object.fields[7]);
     if (!Number.isInteger(repeat_count) || repeat_count < 1 || repeat_count > 9000 ||
-      !Number.isFinite(pixel_length) || pixel_length < 0) throw new Error(`Invalid slider: ${line}`);
+      !Number.isFinite(pixel_length)) throw new Error(`Invalid slider: ${line}`);
     const timing = activeSliderTiming(timing_points, object.start_time);
     const exact_duration_ms = timing.beat_length > 0
       ? pixel_length * repeat_count * timing.beat_length / (slider_multiplier * 100 * timing.velocity)
@@ -181,7 +181,7 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
   }
   if ((object.type & 8) !== 0) {
     const end_time = Number(object.fields[5]) / 1000;
-    if (!Number.isFinite(end_time) || end_time < object.start_time) throw new Error(`Invalid spinner: ${line}`);
+    if (!Number.isFinite(end_time)) throw new Error(`Invalid spinner: ${line}`);
     return { kind: "spinner", ...common, end_time, hit_sample: parseHitSample(object.fields[6], line) };
   }
   throw new Error(`Unsupported osu hit object: ${line}`);
@@ -341,7 +341,7 @@ export function parseOsuChart(source: string): Chart {
         if (beat_length !== 0 || uninherited) throw new Error(`Invalid timing point: ${line}`);
       }
       if (timing_sample_set !== null && (!Number.isInteger(timing_sample_set) || timing_sample_set < 1 || timing_sample_set > 3) ||
-        !Number.isInteger(sample_index) || sample_index < 0 || !Number.isFinite(volume) || volume < 0) {
+        !Number.isInteger(sample_index) || sample_index < 0 || !Number.isFinite(volume)) {
         throw new Error(`Invalid timing point: ${line}`);
       }
       timing_points.push({ offset, beat_length, uninherited, sample_set: timing_sample_set,

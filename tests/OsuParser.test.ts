@@ -238,12 +238,51 @@ CircleSize:4
   }
 });
 
+test("retains stable-compatible sliders with negative pixel length", () => {
+  const chart = parseOsuChart(`osu file format v14
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+SliderMultiplier:2.5
+[TimingPoints]
+552,-9.88131291682493E-324,-4,2,0,5,1,0
+[HitObjects]
+250,220,-2040,86,0,C,1,-1
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  const slider = chart.hit_objects[0];
+  assert.equal(slider?.kind, "slider");
+  if (slider?.kind === "slider") {
+    assert.equal(slider.pixel_length, -1);
+    assert.equal(slider.total_duration, 0);
+  }
+});
+
+test("retains stable-compatible spinners ending before they start", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+[HitObjects]
+256,192,3352,8,0,2952,0:0:0:0:
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode === "osu") {
+    const spinner = chart.hit_objects[0];
+    assert.equal(spinner?.kind, "spinner");
+    if (spinner?.kind === "spinner") assert.equal(spinner.end_time, 2.952);
+  }
+});
+
 test("rejects malformed standard sliders and spinners", () => {
   const prefix = `[General]\nMode:0\n[Difficulty]\nCircleSize:4\n[HitObjects]\n`;
   assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,Q|100:100,1,100`), /Invalid slider path/);
   assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,L|bad:100,1,100`), /Invalid slider path/);
   assert.throws(() => parseOsuChart(`${prefix}64,64,1000,2,0,L|100:100,0,100`), /Invalid slider/);
-  assert.throws(() => parseOsuChart(`${prefix}64,64,1000,8,0,999`), /Invalid spinner/);
+  assert.throws(() => parseOsuChart(`${prefix}64,64,1000,8,0,nope`), /Invalid spinner/);
 });
 
 test("uses overall difficulty as approach rate for old osu charts", () => {
@@ -367,6 +406,22 @@ SliderMultiplier:1.4
   const sliders = chart.hit_objects.filter((object) => object.kind === "slider");
   assert.equal(sliders[0]?.end_time, 0.328);
   assert.equal(sliders[1]?.end_time, 0.607);
+});
+
+test("retains stable-compatible negative timing point volumes", () => {
+  const chart = parseOsuChart(`
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+[TimingPoints]
+0,500,4,2,0,60,1,0
+100,-100,4,3,0,-100,0,0
+[HitObjects]
+64,64,200,1,0,0:0:0:0:
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode === "osu") assert.equal(chart.timing_points[1]?.volume, -100);
 });
 
 test("still rejects NaN uninherited timing points", () => {
