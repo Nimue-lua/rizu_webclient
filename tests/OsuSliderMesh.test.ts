@@ -44,6 +44,21 @@ test("uses round join geometry at a multipart Bezier cusp", () => {
   assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 3));
 });
 
+test("caps an exact retracing Bezier turnaround", () => {
+  const slider: OsuSlider = {
+    ...straightSlider(), x: 275, y: 93, curve_type: "bezier", pixel_length: 50,
+    control_points: [{ x: 288, y: 72 }, { x: 288, y: 72 }, { x: 275, y: 93 }],
+  };
+  const path = OsuSliderPath.create(slider, 14);
+  const mesh = createOsuSliderMesh(path, 20);
+  const vertices = [...mesh.vertices];
+  const turnaround_centers = vertices.filter((_value, index) => index % 3 === 2 && vertices[index] === 0 &&
+    Math.hypot(vertices[index - 2]! - 288, vertices[index - 1]! - 72) < 1e-6);
+  assert.ok(turnaround_centers.length > 0);
+  assert.ok([...mesh.vertices].every(Number.isFinite));
+  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 3));
+});
+
 test("uses outer wedges instead of full circles along smooth curves", () => {
   const slider: OsuSlider = {
     ...straightSlider(), x: 224, y: 232, curve_type: "perfect", pixel_length: 90,

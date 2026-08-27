@@ -87,7 +87,12 @@ function addRoundJoin(previous: Point, point: Point, next: Point, radius: number
   const after_x = (next.x - point.x) / after_length;
   const after_y = (next.y - point.y) / after_length;
   const cross = before_x * after_y - before_y * after_x;
-  if (Math.abs(cross) < 1e-6) return;
+  if (Math.abs(cross) < 1e-6) {
+    if (before_x * after_x + before_y * after_y < 0) {
+      addTurnaroundCap(point, before_x, before_y, radius, vertex, indices);
+    }
+    return;
+  }
 
   const side = cross > 0 ? -1 : 1;
   let start_angle = Math.atan2(before_x * side, -before_y * side);
@@ -107,6 +112,20 @@ function addRoundJoin(previous: Point, point: Point, next: Point, radius: number
     const edge = vertex(point.x + Math.cos(angle) * radius, point.y + Math.sin(angle) * radius, 1);
     if (cross > 0) indices.push(center, previous_edge, edge);
     else indices.push(center, edge, previous_edge);
+    previous_edge = edge;
+  }
+}
+
+function addTurnaroundCap(point: Point, direction_x: number, direction_y: number, radius: number,
+  vertex: (x: number, y: number, edge_distance: number) => number, indices: number[]): void {
+  const center = vertex(point.x, point.y, 0);
+  const direction_angle = Math.atan2(direction_y, direction_x);
+  let previous_edge = vertex(point.x + Math.cos(direction_angle - Math.PI / 2) * radius,
+    point.y + Math.sin(direction_angle - Math.PI / 2) * radius, 1);
+  for (let segment = 1; segment <= CIRCLE_SEGMENTS / 2; segment += 1) {
+    const angle = direction_angle - Math.PI / 2 + Math.PI * segment / (CIRCLE_SEGMENTS / 2);
+    const edge = vertex(point.x + Math.cos(angle) * radius, point.y + Math.sin(angle) * radius, 1);
+    indices.push(center, previous_edge, edge);
     previous_edge = edge;
   }
 }
