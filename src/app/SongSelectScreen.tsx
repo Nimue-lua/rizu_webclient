@@ -12,6 +12,8 @@ import { LibraryToolbar } from "./song-select/LibraryToolbar";
 import { SelectedSongPanel } from "./song-select/SelectedSongPanel";
 import { SongSelectFooter } from "./song-select/SongSelectFooter";
 import { SongSelectHeader } from "./song-select/SongSelectHeader";
+import { completedGameplayFromStoredPlay, listPlaysByChart, type StoredPlay } from "../replay/ReplayStore";
+import type { CompletedGameplay } from "../replay/RecordedReplay";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
@@ -22,6 +24,7 @@ const SESSION_STARTED_AT = Date.now();
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
+  onReplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }, playback: CompletedGameplay) => void;
   onSettings: () => void;
   master_volume: number;
   music_rate: number;
@@ -46,6 +49,7 @@ function formatSessionDuration(duration_seconds: number): string {
 export function SongSelectScreen({
   chart_selector,
   onPlay,
+  onReplay,
   onSettings,
   master_volume,
   music_rate,
@@ -76,6 +80,7 @@ export function SongSelectScreen({
   const [modifiers_open, setModifiersOpen] = useState(false);
   const [filters_open, setFiltersOpen] = useState(false);
   const [skins_open, setSkinsOpen] = useState(false);
+  const [stored_plays, setStoredPlays] = useState<readonly StoredPlay[]>([]);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -114,6 +119,18 @@ export function SongSelectScreen({
   const selected_song = chart_selector.getSelectedSong();
   const selected_chart = chart_selector.getSelectedChart();
   const chart_level_sort = selection.sort_mode === "difficulty" || selection.sort_mode === "duration";
+
+  useEffect(() => {
+    let active = true;
+    setStoredPlays([]);
+    if (!selected_chart) return () => { active = false; };
+    void listPlaysByChart(selected_chart.id).then((plays) => {
+      if (active) setStoredPlays(plays);
+    }).catch((error: unknown) => {
+      console.error("Could not load chart scores", error);
+    });
+    return () => { active = false; };
+  }, [selected_chart?.id]);
 
   useEffect(() => {
     if (restored_song_scroll_ref.current) return;
@@ -251,6 +268,19 @@ export function SongSelectScreen({
       artist: song?.artist ?? "Unknown artist",
     });
   };
+  const playReplay = (play: StoredPlay) => {
+    if (!selected_chart || play.chart_id !== selected_chart.id) return;
+    try {
+      const playback = completedGameplayFromStoredPlay(play);
+      audio_ref.current?.pause();
+      onReplay(selected_chart, loadInputBindings(inputLayout(selected_chart)), {
+        title: selected_song?.title ?? "Unknown title",
+        artist: selected_song?.artist ?? "Unknown artist",
+      }, playback);
+    } catch (error) {
+      console.error("Could not play stored replay", error);
+    }
+  };
   return (
     <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
       <audio ref={audio_ref} preload="auto" />
@@ -261,7 +291,7 @@ export function SongSelectScreen({
 
       <section className="song-select-content">
         <SelectedSongPanel background_url={background_url} background_loaded={hero_loaded} selected_chart={selected_chart}
-          selected_song={selected_song} onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} />
+          selected_song={selected_song} stored_plays={stored_plays} onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
         <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
           first_index={first_index} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
           selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}

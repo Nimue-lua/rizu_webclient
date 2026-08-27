@@ -268,7 +268,7 @@ export function App() {
     });
   };
 
-  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => {
+  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null) => {
     const skin_mode = noteSkinMode(chart.mode);
     const note_skin = skin_mode === null ? undefined : selectedNoteSkin(skin_mode, chart.mode === 3 ? chart.keys : null,
       note_skin_selections, available_note_skins);
@@ -288,9 +288,9 @@ export function App() {
     });
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
-    setScore(null);
-    setCompletedGameplay(null);
-    setPlayback(null);
+    setScore(requested_playback?.score ?? null);
+    setCompletedGameplay(requested_playback);
+    setPlayback(requested_playback);
     setLoadingReturnScreen(screen === "osz-select" ? "osz-select" : "song-select");
     setScreen("loading");
   };
@@ -455,6 +455,7 @@ export function App() {
             note_skin_selections={note_skin_selections}
             available_note_skins={available_note_skins}
             onPlay={beginLoading}
+            onReplay={(chart, bindings, song, requested_playback) => beginLoading(chart, bindings, song, requested_playback)}
             onSettings={() => setSettingsOpen(true)}
             onMusicRateChange={changeMusicRate}
             onConstantScrollChange={changeConstantScroll}
