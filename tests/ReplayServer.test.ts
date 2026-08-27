@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listOnlineScores, submitPlay } from "../src/replay/ReplayServer";
+import { listGlobalRankings, listOnlineScores, submitPlay } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -65,4 +65,13 @@ test("loads a chart leaderboard", async () => {
 
   assert.equal(requested_url, "/api/leaderboard?chart_id=chart%3A42&limit=5");
   assert.equal(scores[0]?.nickname, "Nimue");
+});
+
+test("loads global PP rankings", async () => {
+  const players = await listGlobalRankings(undefined, async (input) => {
+    assert.equal(String(input), "/api/rankings");
+    return Response.json({ players: [{ rank: 1, nickname: "Nimue", pp: 123.45, play_count: 2 }] });
+  });
+
+  assert.equal(players[0]?.pp, 123.45);
 });

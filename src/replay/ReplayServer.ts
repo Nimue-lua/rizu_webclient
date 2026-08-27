@@ -8,6 +8,15 @@ export interface OnlineScore {
   readonly grade: string | null;
   readonly played_at: string;
   readonly replay_base: unknown;
+  readonly difficulty: number;
+  readonly pp: number;
+}
+
+export interface GlobalRanking {
+  readonly rank: number;
+  readonly nickname: string;
+  readonly pp: number;
+  readonly play_count: number;
 }
 
 function replayBase64(data: Uint8Array): string {
@@ -48,4 +57,11 @@ export async function listOnlineScores(chart_id: string, signal?: AbortSignal, r
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { scores?: unknown };
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
+}
+
+export async function listGlobalRankings(signal?: AbortSignal, request: typeof fetch = fetch): Promise<GlobalRanking[]> {
+  const response = await request("/api/rankings", { signal });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  const result = await response.json() as { players?: unknown };
+  return Array.isArray(result.players) ? result.players as GlobalRanking[] : [];
 }

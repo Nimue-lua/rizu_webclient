@@ -10,6 +10,16 @@ from urllib.parse import parse_qs, urlparse
 
 
 MAX_BODY_SIZE = 5 * 1024 * 1024
+MAX_RANKING_PLAYS = 50
+
+
+def play_pp(difficulty, accuracy):
+    try:
+        difficulty = max(0.0, float(difficulty))
+        accuracy = min(1.0, max(0.0, float(accuracy)))
+    except (TypeError, ValueError):
+        return 0.0
+    return difficulty * difficulty * 8 * accuracy**6
 
 
 def open_database(path):
@@ -39,7 +49,7 @@ def initialize_database(path):
         )
 
 
-def make_handler(database_path):
+def make_handler(database_path, catalog_path=None):
     class ReplayHandler(BaseHTTPRequestHandler):
         server_version = "RizuReplayServer/1"
 
@@ -122,6 +132,9 @@ def make_handler(database_path):
             if parsed.path == "/leaderboard":
                 self.get_leaderboard(parse_qs(parsed.query))
                 return
+            if parsed.path == "/rankings":
+                self.get_rankings()
+                return
             if parsed.path.startswith("/scores/") and parsed.path.endswith("/replay"):
                 self.get_replay(parsed.path)
                 return
@@ -134,21 +147,22 @@ def make_handler(database_path):
                 return
             mode = query.get("mode", [None])[0]
             try:
-                limit = min(max(int(query.get("limit", ["100"])[0]), 1), 100)
+                limit = min(max(int(query.get("limit", ["50"])[0]), 1), 50)
             except ValueError:
-                limit = 100
+                limit = 50
 
             sql = "SELECT id, metadata_json, submitted_at FROM scores WHERE chart_id = ?"
             parameters = [chart_id]
             if mode is not None:
                 sql += " AND mode = ?"
                 parameters.append(mode)
-            sql += " ORDER BY score DESC, id ASC LIMIT ?"
+            sql += " ORDER BY CAST(json_extract(metadata_json, '$.accuracy') AS REAL) DESC, id ASC LIMIT ?"
             parameters.append(limit)
             with open_database(database_path) as database:
                 rows = database.execute(sql, parameters).fetchall()
 
             scores = []
+            difficulty = self.get_chart_difficulty(chart_id)
             for row in rows:
                 score = json.loads(row["metadata_json"])
                 score.update(
@@ -156,10 +170,53 @@ def make_handler(database_path):
                         "id": row["id"],
                         "submitted_at": row["submitted_at"],
                         "replay_url": f"/api/scores/{row['id']}/replay",
+                        "difficulty": difficulty,
+                        "pp": round(play_pp(difficulty, score.get("accuracy")), 2),
                     }
                 )
                 scores.append(score)
             self.send_json(200, {"scores": scores})
+
+        def get_chart_difficulty(self, chart_id):
+            if catalog_path is None:
+                return 0.0
+            try:
+                with open_database(catalog_path) as catalog:
+                    row = catalog.execute("SELECT difficulty FROM charts WHERE id = ?", (chart_id,)).fetchone()
+                return 0.0 if row is None else row["difficulty"]
+            except sqlite3.Error:
+                return 0.0
+
+        def get_rankings(self):
+            difficulties = {}
+            if catalog_path is not None:
+                try:
+                    with open_database(catalog_path) as catalog:
+                        difficulties = dict(catalog.execute("SELECT id, difficulty FROM charts"))
+                except sqlite3.Error:
+                    pass
+            with open_database(database_path) as database:
+                rows = database.execute("SELECT chart_id, nickname, metadata_json FROM scores").fetchall()
+
+            best_plays = {}
+            for row in rows:
+                metadata = json.loads(row["metadata_json"])
+                pp = play_pp(difficulties.get(row["chart_id"], 0), metadata.get("accuracy"))
+                key = (row["nickname"], row["chart_id"])
+                best_plays[key] = max(best_plays.get(key, 0), pp)
+
+            players = {}
+            for (nickname, _chart_id), pp in best_plays.items():
+                players.setdefault(nickname, []).append(pp)
+            rankings = []
+            for nickname, plays in players.items():
+                plays.sort(reverse=True)
+                weighted_pp = sum(pp * 0.95**index for index, pp in enumerate(plays[:MAX_RANKING_PLAYS]))
+                rankings.append({"nickname": nickname, "pp": round(weighted_pp, 2), "play_count": len(plays)})
+            rankings.sort(key=lambda player: (-player["pp"], player["nickname"].casefold()))
+            for index, player in enumerate(rankings[:50]):
+                player["rank"] = index + 1
+            self.send_json(200, {"players": rankings[:50]})
 
         def get_replay(self, path):
             try:
@@ -190,12 +247,13 @@ def make_handler(database_path):
 def main():
     parser = argparse.ArgumentParser(description="Store Rizu scores and replays")
     parser.add_argument("--database", default="scores.sqlite3")
+    parser.add_argument("--catalog")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     arguments = parser.parse_args()
 
     initialize_database(arguments.database)
-    server = ThreadingHTTPServer((arguments.host, arguments.port), make_handler(arguments.database))
+    server = ThreadingHTTPServer((arguments.host, arguments.port), make_handler(arguments.database, arguments.catalog))
     print(f"Listening on http://{arguments.host}:{arguments.port}")
     try:
         server.serve_forever()

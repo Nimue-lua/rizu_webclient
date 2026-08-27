@@ -158,7 +158,7 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
               <span className="score-player">#{index + 1} {row.score.nickname || "Anonymous"}</span>
               <span className="score-details">
                 <strong>{(row.accuracy * 100).toFixed(2)}%</strong>
-                <span><b>{row.mods}</b><time dateTime={row.score.played_at}>{formatPlayDate(row.score.played_at)}</time></span>
+                <span><b>{row.score.pp.toFixed(2)}pp</b><time dateTime={row.score.played_at}>{formatPlayDate(row.score.played_at)}</time></span>
               </span>
             </div>;
           })}

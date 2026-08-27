@@ -14,6 +14,7 @@ import { SongSelectFooter } from "./song-select/SongSelectFooter";
 import { SongSelectHeader } from "./song-select/SongSelectHeader";
 import { completedGameplayFromStoredPlay, listPlaysByChart, type StoredPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
+import { GlobalLeaderboardModal } from "./GlobalLeaderboardModal";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
@@ -84,6 +85,7 @@ export function SongSelectScreen({
   const [modifiers_open, setModifiersOpen] = useState(false);
   const [filters_open, setFiltersOpen] = useState(false);
   const [skins_open, setSkinsOpen] = useState(false);
+  const [global_leaderboard_open, setGlobalLeaderboardOpen] = useState(false);
   const [stored_plays, setStoredPlays] = useState<readonly StoredPlay[]>([]);
 
   useEffect(() => {
@@ -288,7 +290,8 @@ export function SongSelectScreen({
   return (
     <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
       <audio ref={audio_ref} preload="auto" />
-      <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration} onSettings={onSettings} />
+      <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
+        onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings} />
       <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
         onQueryChange={(query) => { chart_selector.setQuery(query); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
         onSortChange={selectSortMode} />
@@ -315,6 +318,7 @@ export function SongSelectScreen({
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
       {skins_open && <NoteSkinsModal selections={note_skin_selections} options={available_note_skins} selected_mode={selected_chart ? noteSkinMode(selected_chart.mode) : null} selected_column_count={selected_chart?.mode === 3 ? selected_chart.keys : null} onSelectionChange={onNoteSkinSelectionChange} onImport={onNoteSkinImport} onExit={() => setSkinsOpen(false)} />}
+      {global_leaderboard_open && <GlobalLeaderboardModal onExit={() => setGlobalLeaderboardOpen(false)} />}
     </main>
   );
 }
