@@ -133,8 +133,16 @@ svg { width: 22px; height: 22px; }
 .osz-heading { padding: clamp(28px, 5vh, 62px) clamp(22px, 8vw, 140px) 24px; }
 .osz-heading h1 { max-width: 900px; margin: 0 0 3px; font-family: "Zen Maru Gothic", sans-serif; font-size: clamp(34px, 5vw, 72px); line-height: 1.05; }
 .osz-heading p { margin: 8px 0 20px; color: var(--accent); font-size: clamp(18px, 2vw, 28px); font-weight: 600; }
+.osz-heading p.osz-import-error { color: var(--danger); }
+.osz-heading p.osz-import-status { color: var(--muted); }
 .osz-heading small { color: var(--muted); }
 .osz-picker { display: grid; align-content: start; gap: 7px; width: min(1120px, calc(100% - 44px)); margin: 0 auto; padding: 8px 5px 32px; overflow-y: auto; scrollbar-color: var(--outline) transparent; }
+.osz-inline-error { padding: 14px 18px; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 7px; font-weight: 600; }
+.osz-import-message { display: grid; justify-items: center; gap: 12px; margin: auto; padding: 42px; color: var(--muted); text-align: center; }
+.osz-import-message svg { width: 42px; height: 42px; color: var(--accent); }
+.osz-import-message strong { color: var(--text); font-size: 20px; }
+.osz-import-message.error svg, .osz-import-message.error strong { color: var(--danger); }
+.osz-import-message span { max-width: 460px; line-height: 1.5; }
 .osz-picker > button { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 74px; padding: 10px 20px; color: var(--text); background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid transparent; border-radius: 7px; text-align: left; backdrop-filter: blur(8px); }
 .osz-picker > button.selected { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent), var(--surface) 55%); border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: inset 4px 0 var(--accent); }
 .osz-picker i { display: grid; width: 42px; height: 42px; color: var(--accent); background: var(--background); border-radius: 50%; place-items: center; }

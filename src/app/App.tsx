@@ -132,12 +132,14 @@ export function App() {
   useEffect(() => () => osz_archive_ref.current?.dispose(), []);
 
   const importOsz = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".osz")) {
-      setOszImportError("Drop an .osz beatmap archive");
-      return;
-    }
+    setScreen("osz-select");
     setOszImporting(true);
     setOszImportError(null);
+    if (!file.name.toLowerCase().endsWith(".osz")) {
+      setOszImportError("Drop an .osz beatmap archive");
+      setOszImporting(false);
+      return;
+    }
     try {
       const archive = await readOszArchive(file);
       osz_archive_ref.current?.dispose();
@@ -145,6 +147,7 @@ export function App() {
       setOszArchive(archive);
       setScreen("osz-select");
     } catch (reason) {
+      console.error(`Failed to import ${file.name}`, reason);
       setOszImportError(reason instanceof Error ? reason.message : "Failed to open the .osz archive");
     } finally {
       setOszImporting(false);
@@ -439,7 +442,6 @@ export function App() {
         </ScreenTransition>
       );
     case "osz-select":
-      if (!osz_archive) return null;
       return (
         <ScreenTransition key="osz-select">
           <OszSelectScreen archive={osz_archive} importing={osz_importing} import_error={osz_import_error}
