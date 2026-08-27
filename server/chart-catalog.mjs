@@ -59,6 +59,137 @@ function sliderEndTime(start_time, fields, timing_points, slider_multiplier) {
     : start_time;
 }
 
+function computeOsuDifficulty(hit_objects, duration_seconds) {
+  const objects = hit_objects.filter((object) => !object.spinner);
+  if (objects.length === 0) return 0;
+
+  const strains = [];
+  let previous_delta = 0;
+  let stamina_seconds = 0;
+  for (let index = 1; index < objects.length; index += 1) {
+    const previous = objects[index - 1];
+    const object = objects[index];
+    const delta = object.time - previous.time;
+    if (!(delta > 0)) continue;
+
+    const spacing = Math.hypot(object.x - previous.x, object.y - previous.y);
+    const speed = 200 / Math.max(delta, 50);
+    const rhythm = previous_delta > 0
+      ? Math.min(Math.abs(Math.log2(delta / previous_delta)), 2) * 1.2
+      : 0;
+    const jump = Math.min((spacing / 150) * speed * 1.2, 5);
+    let reversal = 0;
+    const earlier = objects[index - 2];
+    if (earlier) {
+      const incoming_x = previous.x - earlier.x;
+      const incoming_y = previous.y - earlier.y;
+      const outgoing_x = object.x - previous.x;
+      const outgoing_y = object.y - previous.y;
+      const incoming_distance = Math.hypot(incoming_x, incoming_y);
+      if (incoming_distance > 0 && spacing > 0) {
+        const angle_factor = Math.max(0,
+          -(incoming_x * outgoing_x + incoming_y * outgoing_y) / (incoming_distance * spacing));
+        reversal = Math.min((Math.min(incoming_distance, spacing) / 150) * speed * angle_factor, 3);
+      }
+    }
+    const stream = delta <= 200 && spacing <= 140
+      ? speed * 0.75 * (1 + Math.min(spacing / 120, 1) * 0.6)
+      : 0;
+    if (delta >= 30_000) stamina_seconds = 0;
+    else if (delta > 200) stamina_seconds *= 10 ** (-delta / 5000);
+    if (stream > 0) stamina_seconds = Math.min(120, stamina_seconds + delta / 1000);
+    const stamina = stream > 0 ? Math.sqrt(stamina_seconds / 120) * stream * 0.8 : 0;
+    strains.push(rhythm + jump + reversal + stream + stamina);
+    previous_delta = delta;
+  }
+
+  for (const object of objects) {
+    if (!Number.isFinite(object.slider_length)) continue;
+    const slider_length = Math.max(0, object.slider_length);
+    const slider_speed = object.slider_span_duration > 0
+      ? slider_length / object.slider_span_duration
+      : 0;
+    strains.push(
+      Math.sqrt(slider_length / 100) * 0.9
+      + slider_speed * 0.9
+      + Math.max(0, object.slider_repeats - 1) * 0.35,
+    );
+  }
+
+  const length_multiplier = duration_seconds < 35 ? 0.8 : duration_seconds < 60 ? 0.85 : duration_seconds < 120 ? 0.95 : 1;
+  if (strains.length === 0) return 0.5 * length_multiplier;
+  strains.sort((left, right) => right - left);
+  const hardest_count = Math.max(1, Math.ceil(strains.length * 0.2));
+  return (0.5 + strains.slice(0, hardest_count)
+    .reduce((sum, strain) => sum + strain, 0) / hardest_count) * length_multiplier;
+}
+
+function computeManiaDifficulty(hit_objects, column_count, duration_seconds) {
+  const events = hit_objects.flatMap((object) => object.hold
+    ? [{ time: object.time, kind: "hold_start" }, { time: object.end_time, kind: "hold_end" }]
+    : [{ time: object.time, kind: "regular" }])
+    .sort((left, right) => left.time - right.time);
+  if (events.length === 0) return 0;
+
+  const groups = [];
+  for (const event of events) {
+    const group = groups.at(-1);
+    if (group?.time === event.time) {
+      group.actions += 1;
+      group.regular_notes += event.kind === "regular" ? 1 : 0;
+      group.hold_starts += event.kind === "hold_start" ? 1 : 0;
+      group.hold_ends += event.kind === "hold_end" ? 1 : 0;
+      group.hold_change = group.hold_starts - group.hold_ends;
+    } else {
+      groups.push({
+        time: event.time,
+        actions: 1,
+        regular_notes: event.kind === "regular" ? 1 : 0,
+        hold_starts: event.kind === "hold_start" ? 1 : 0,
+        hold_ends: event.kind === "hold_end" ? 1 : 0,
+        hold_change: event.kind === "hold_start" ? 1 : event.kind === "hold_end" ? -1 : 0,
+      });
+    }
+  }
+
+  const strains = [];
+  let active_holds = 0;
+  let previous_delta = 0;
+  let stamina_seconds = 0;
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index];
+    const delta = index > 0 ? group.time - groups[index - 1].time : 0;
+    active_holds = Math.max(0, active_holds + group.hold_change);
+    const chord = Math.max(0, group.actions - 1) * 0.45;
+    if (!(delta > 0)) {
+      strains.push(chord);
+      continue;
+    }
+
+    const speed = 200 / Math.max(delta, 30);
+    const rhythm = previous_delta > 0
+      ? Math.min(Math.abs(Math.log2(delta / previous_delta)), 2) * 1.2
+      : 0;
+    const action_weight = Math.min(1,
+      group.regular_notes + group.hold_starts * 0.7 + group.hold_ends * 0.25);
+    const stream = delta <= 200 ? speed * action_weight * (1 + chord * 0.35) : 0;
+    const regular_note_bonus = delta <= 200 && group.regular_notes > 0 ? speed * 0.6 : 0;
+    if (delta >= 30_000) stamina_seconds = 0;
+    else if (delta > 200) stamina_seconds *= 10 ** (-delta / 5000);
+    if (stream > 0) stamina_seconds = Math.min(120, stamina_seconds + delta / 1000);
+    const stamina = stream > 0 ? Math.sqrt(stamina_seconds / 120) * stream * 0.75 : 0;
+    const hold_pressure = stream * Math.min(active_holds / Math.max(column_count, 1), 1) * 0.25;
+    strains.push(rhythm + chord + stream + regular_note_bonus + stamina + hold_pressure);
+    previous_delta = delta;
+  }
+
+  const length_multiplier = duration_seconds < 35 ? 0.8 : duration_seconds < 60 ? 0.85 : duration_seconds < 120 ? 0.95 : 1;
+  strains.sort((left, right) => right - left);
+  const hardest_count = Math.max(1, Math.ceil(strains.length * 0.2));
+  return (0.5 + strains.slice(0, hardest_count)
+    .reduce((sum, strain) => sum + strain, 0) / hardest_count) * length_multiplier;
+}
+
 function computeBpm(timing_points, start_time, end_time) {
   const tempo_points = timing_points.filter((point) => point.uninherited && point.beat_length > 0);
   if (tempo_points.length === 0) return { bpm_min: 0, bpm_max: 0, bpm_avg: 0 };
@@ -95,6 +226,8 @@ function computeBpm(timing_points, start_time, end_time) {
 function computeChartStats(source) {
   const timing_points = parseTimingPoints(source);
   const slider_multiplier = readNumber(source, "SliderMultiplier") ?? 1.4;
+  const mode = readNumber(source, "Mode") ?? 0;
+  const hit_objects = [];
   let start_time = Infinity;
   let end_time = -Infinity;
   let note_count = 0;
@@ -113,6 +246,19 @@ function computeChartStats(source) {
     } else if ((type & 2) !== 0) {
       note_end_time = sliderEndTime(note_time, fields, timing_points, slider_multiplier);
     }
+    hit_objects.push({
+      x: Number(fields[0]) || 0,
+      y: Number(fields[1]) || 0,
+      time: note_time,
+      end_time: note_end_time,
+      hold: (type & 128) !== 0,
+      spinner: (type & 8) !== 0,
+      slider_length: (type & 2) !== 0 ? Number(fields[7]) : null,
+      slider_repeats: (type & 2) !== 0 ? Number(fields[6]) : 0,
+      slider_span_duration: (type & 2) !== 0 && Number(fields[6]) > 0
+        ? (note_end_time - note_time) / Number(fields[6])
+        : 0,
+    });
     note_count += 1;
     if ((type & 128) !== 0) long_note_count += 1;
     start_time = Math.min(start_time, note_time, note_end_time);
@@ -125,7 +271,11 @@ function computeChartStats(source) {
     duration_seconds,
     note_count,
     long_note_ratio: note_count > 0 ? long_note_count / note_count : 0,
-    difficulty: duration_seconds > 0 ? note_count / duration_seconds : 0,
+    difficulty: mode === 0
+      ? computeOsuDifficulty(hit_objects, duration_seconds)
+      : mode === 3
+        ? computeManiaDifficulty(hit_objects, readNumber(source, "CircleSize") ?? 4, duration_seconds)
+        : duration_seconds > 0 ? note_count / duration_seconds : 0,
     ...computeBpm(timing_points, start_time, end_time),
   };
 }
@@ -267,7 +417,7 @@ export function gameplayAssetManifest(charts) {
   return assets.length ? `${assets.join("\0")}\0` : "";
 }
 
-async function scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path) {
+async function scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path, generate_previews) {
   const locations = [];
   const songs = new Map();
   const charts = [];
@@ -329,12 +479,14 @@ async function scanCharts(charts_directory, background_previews_directory, audio
           AUDIO_PREVIEW_PROFILE,
         ].join("\0")).digest("hex").slice(0, 24);
         const audio_preview_file = `${audio_preview_key}.webm`;
-        await generateAudioPreview(
-          audio_path,
-          path.join(audio_previews_directory, audio_preview_file),
-          metadata.preview_seconds,
-          ffmpeg_path,
-        );
+        if (generate_previews) {
+          await generateAudioPreview(
+            audio_path,
+            path.join(audio_previews_directory, audio_preview_file),
+            metadata.preview_seconds,
+            ffmpeg_path,
+          );
+        }
 
         const background_file = metadata.background_file
           && await readableFile(path.join(folder_path, metadata.background_file))
@@ -349,8 +501,10 @@ async function scanCharts(charts_directory, background_previews_directory, audio
           const source_path = path.join(folder_path, background_file);
           const background_path = path.posix.join("charts", location_name, folder, background_file);
           const preview_file = `${createHash("sha256").update(background_path).digest("hex").slice(0, 24)}.webp`;
-          await rm(`${source_path}.rizu-preview.webp`, { force: true });
-          await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
+          if (generate_previews) {
+            await rm(`${source_path}.rizu-preview.webp`, { force: true });
+            await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
+          }
           background_preview_path = path.posix.join("chart-previews", preview_file);
         }
 
@@ -419,26 +573,31 @@ export async function cacheCharts({
   background_previews_directory = path.join(path.dirname(charts_directory), "chart-previews"),
   audio_previews_directory = path.join(path.dirname(charts_directory), "audio-previews"),
   ffmpeg_path = "ffmpeg",
+  generate_previews = true,
 }) {
   const client_temp = `${client_database}.tmp`;
-  await Promise.all([
-    mkdir(background_previews_directory, { recursive: true }),
-    mkdir(audio_previews_directory, { recursive: true }),
-  ]);
+  if (generate_previews) {
+    await Promise.all([
+      mkdir(background_previews_directory, { recursive: true }),
+      mkdir(audio_previews_directory, { recursive: true }),
+    ]);
+  }
   await rm(client_temp, { force: true });
 
   try {
     const [data, client_schema] = await Promise.all([
-      scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path),
+      scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path, generate_previews),
       readFile(path.join(schema_directory, "client-catalog.sql"), "utf8"),
     ]);
     const generated_at = Math.floor(Date.now() / 1000);
     const version = writeDatabases(client_temp, client_schema, data, generated_at);
     await rename(client_temp, client_database);
-    await removeStaleAudioPreviews(
-      audio_previews_directory,
-      new Set(data.charts.map((chart) => path.basename(chart.audio_preview_path))),
-    );
+    if (generate_previews) {
+      await removeStaleAudioPreviews(
+        audio_previews_directory,
+        new Set(data.charts.map((chart) => path.basename(chart.audio_preview_path))),
+      );
+    }
     return { ...data, version };
   } catch (reason) {
     await rm(client_temp, { force: true });

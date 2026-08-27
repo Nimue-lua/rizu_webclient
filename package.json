@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "cache:charts": "node server/cache-charts.mjs",
+    "cache:database": "node server/cache-charts.mjs --skip-previews",
     "deploy": "bash deploy.sh",
     "upload:songs": "bash upload-songs.sh",
     "dev": "vite",

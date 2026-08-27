@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -45,7 +45,7 @@ CircleSize:7
   assert.equal(metadata.duration_seconds, 10);
   assert.equal(metadata.note_count, 3);
   assert.equal(metadata.long_note_ratio, 1 / 3);
-  assert.equal(metadata.difficulty, 0.3);
+  assert.ok(metadata.difficulty > 0);
   assert.equal(metadata.bpm_min, 120);
   assert.equal(metadata.bpm_max, 150);
   assert.equal(metadata.bpm_avg, 123);
@@ -55,6 +55,60 @@ test("caches all osu modes and only assigns keys to mania", () => {
   const metadata = parseOsuMetadata("Mode:1\nCircleSize:5", "folder", "chart.osu");
   assert.equal(metadata.mode, 1);
   assert.equal(metadata.keys, null);
+});
+
+test("uses mode-specific difficulty calculators", () => {
+  const chart = (mode, times, positions) => `Mode:${mode}\n[HitObjects]\n${times.map((time, index) => `${positions[index] ?? 256},192,${time},1,0,0:0:0:0:`).join("\n")}`;
+  const even = parseOsuMetadata(chart(0, [0, 500, 1000, 1500], [256, 256, 256, 256]), "folder", "even.osu");
+  const technical = parseOsuMetadata(chart(0, [0, 500, 750, 875], [0, 300, 0, 300]), "folder", "technical.osu");
+  const mania = parseOsuMetadata(chart(3, [0, 500, 1000], []), "folder", "mania.osu");
+
+  assert.ok(technical.difficulty > even.difficulty);
+  assert.ok(mania.difficulty > 0);
+});
+
+test("adds strain for alternating jump angles", () => {
+  const chart = (positions) => `Mode:0\n[HitObjects]\n${positions.map((x, index) => `${x},192,${index * 200},1,0,0:0:0:0:`).join("\n")}`;
+  const straight = parseOsuMetadata(chart([0, 150, 300]), "folder", "straight.osu");
+  const alternating = parseOsuMetadata(chart([0, 150, 0]), "folder", "alternating.osu");
+  assert.ok(alternating.difficulty > straight.difficulty + 0.5);
+});
+
+test("builds stamina strain during long streams", () => {
+  const chart = (count) => `Mode:0\n[HitObjects]\n${Array.from({ length: count }, (_, index) => `256,192,${index * 100},1,0,0:0:0:0:`).join("\n")}`;
+  const short_stream = parseOsuMetadata(chart(21), "folder", "short.osu");
+  const long_stream = parseOsuMetadata(chart(601), "folder", "long.osu");
+  assert.ok(long_stream.difficulty > short_stream.difficulty + 0.2);
+});
+
+test("discounts short osu charts", () => {
+  const chart = (mode, end_time) => `Mode:${mode}\n[HitObjects]\n0,192,0,1,0,0:0:0:0:\n300,192,200,1,0,0:0:0:0:\n300,192,${end_time},8,0,${end_time}`;
+  const short = parseOsuMetadata(chart(0, 34_999), "folder", "short.osu");
+  const full = parseOsuMetadata(chart(0, 120_000), "folder", "full.osu");
+  assert.ok(Math.abs(short.difficulty / full.difficulty - 0.8) < 1e-10);
+});
+
+test("uses mania LN releases in difficulty timing", () => {
+  const taps = parseOsuMetadata(`Mode:3\nCircleSize:4\n[HitObjects]\n64,192,0,1,0,0:0:0:0:\n192,192,400,1,0,0:0:0:0:`, "folder", "taps.osu");
+  const hold = parseOsuMetadata(`Mode:3\nCircleSize:4\n[HitObjects]\n64,192,0,128,0,200:0:0:0:0:\n192,192,400,1,0,0:0:0:0:`, "folder", "hold.osu");
+  assert.ok(hold.difficulty > taps.difficulty);
+});
+
+test("rates dense regular mania notes above dense LN actions", () => {
+  const regular_objects = Array.from({ length: 101 }, (_, index) => `${64 + index % 4 * 128},192,${index * 100},1,0,0:0:0:0:`).join("\n");
+  const hold_objects = Array.from({ length: 50 }, (_, index) => `${64 + index % 4 * 128},192,${index * 200},128,0,${index * 200 + 100}:0:0:0:0:`).join("\n");
+  const regular = parseOsuMetadata(`Mode:3\nCircleSize:4\n[HitObjects]\n${regular_objects}`, "folder", "regular.osu");
+  const holds = parseOsuMetadata(`Mode:3\nCircleSize:4\n[HitObjects]\n${hold_objects}`, "folder", "holds.osu");
+  assert.ok(regular.difficulty > holds.difficulty + 0.5);
+});
+
+test("distinguishes extreme mania stream interval speeds", () => {
+  const chart = (interval) => `Mode:3\nCircleSize:4\n[HitObjects]\n${Array.from({ length: 401 }, (_, index) => `${64 + index % 4 * 128},192,${index * interval},1,0,0:0:0:0:`).join("\n")}`;
+  const delta_like = parseOsuMetadata(chart(39), "folder", "delta.osu");
+  const epsilon_like = parseOsuMetadata(chart(32), "folder", "epsilon.osu");
+  const final_like = parseOsuMetadata(chart(30), "folder", "final.osu");
+  assert.ok(final_like.difficulty > epsilon_like.difficulty);
+  assert.ok(epsilon_like.difficulty > delta_like.difficulty);
 });
 
 test("rejects asset paths outside a chart folder", () => {
@@ -232,6 +286,48 @@ CircleSize:4
     } finally {
       client.close();
     }
+  } finally {
+    await rm(temporary_directory, { recursive: true, force: true });
+  }
+});
+
+test("updates the database without creating previews", async () => {
+  const temporary_directory = await mkdtemp(path.join(os.tmpdir(), "rizu-catalog-database-"));
+  const charts_directory = path.join(temporary_directory, "public", "charts");
+  const chart_directory = path.join(charts_directory, "Collection", "Song");
+  const client_database = path.join(temporary_directory, "catalog.sqlite");
+  const background_previews_directory = path.join(temporary_directory, "chart-previews");
+  const audio_previews_directory = path.join(temporary_directory, "audio-previews");
+
+  try {
+    await mkdir(chart_directory, { recursive: true });
+    await writeFile(path.join(chart_directory, "song.ogg"), "audio");
+    await writeFile(path.join(chart_directory, "background.png"), "background");
+    await writeFile(path.join(chart_directory, "chart.osu"), `Mode:0
+[General]
+AudioFilename:song.ogg
+[Events]
+0,0,"background.png",0,0
+[HitObjects]
+256,192,1000,1,0,0:0:0:0:
+`);
+
+    const result = await cacheCharts({
+      charts_directory,
+      client_database,
+      schema_directory: path.dirname(fileURLToPath(import.meta.url)),
+      background_previews_directory,
+      audio_previews_directory,
+      ffmpeg_path: path.join(temporary_directory, "missing-ffmpeg"),
+      generate_previews: false,
+    });
+
+    assert.equal(result.charts.length, 1);
+    assert.match(result.charts[0]?.audio_preview_path ?? "", /^audio-previews\/[a-f0-9]{24}\.webm$/);
+    assert.match(result.charts[0]?.background_preview_path ?? "", /^chart-previews\/[a-f0-9]{24}\.webp$/);
+    await access(client_database);
+    await assert.rejects(access(background_previews_directory));
+    await assert.rejects(access(audio_previews_directory));
   } finally {
     await rm(temporary_directory, { recursive: true, force: true });
   }

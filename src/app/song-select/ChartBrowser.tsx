@@ -1,4 +1,5 @@
 import type { CSSProperties, KeyboardEvent, RefObject } from "react";
+import { Star } from "lucide-react";
 import type { ChartfileSetView, Chartview } from "../../library/views";
 import type { ChartSelectionEntry, ChartSortMode } from "../../select/ChartSelector";
 import { ChartModeBadge, chartSummaryMode, difficultyColor, formatDuration, SongSelectIcon } from "./SongSelectUi";
@@ -32,7 +33,7 @@ export function ChartBrowser({ chart_level_sort, difficulty_strip_ref, error, fi
     <div className="song-select-column right-column">
       <section className="chart-summary" aria-label="Selected chart information">
         <div className="chart-difficulty" style={{ "--difficulty-color": difficultyColor(selected_chart?.difficulty ?? 0) } as CSSProperties}>
-          <span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em>NPS</em></span>
+          <span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em><Star aria-label="stars" /></em></span>
           <span className="chart-mode">{selected_chart ? chartSummaryMode(selected_chart) : "NO CHART"}</span>
         </div>
         <div className="chart-metadata">

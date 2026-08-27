@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Clock3, Metronome } from "lucide-react";
+import { Clock3, Metronome, Star } from "lucide-react";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { JudgeSegmentsCanvas } from "./JudgeSegmentsCanvas";
 
@@ -62,7 +62,7 @@ export function ResultScreen({ score, background_url, title, artist, chart_name,
           </div>
           <div className="result-play-meta">
             <span>{music_rate.toFixed(2)}x</span>
-            <strong>{difficulty.toFixed(1)}</strong><small>NPS</small>
+            <strong>{difficulty.toFixed(1)}</strong><small><Star aria-label="stars" /></small>
           </div>
           <div className="result-score-system">
             {mode === "osu" ? "osu!standard" : "osu!mania V2"} OD{overall_difficulty.toFixed(1).replace(/\.0$/, "")}

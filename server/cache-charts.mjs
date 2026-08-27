@@ -6,6 +6,7 @@ import { cacheCharts, gameplayAssetManifest } from "./chart-catalog.mjs";
 const server_directory = path.dirname(fileURLToPath(import.meta.url));
 const root_directory = path.dirname(server_directory);
 const charts_directory = readOption("--charts", path.join(root_directory, "public/charts"));
+const generate_previews = !process.argv.includes("--skip-previews");
 
 function readOption(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -24,6 +25,7 @@ const result = await cacheCharts({
   client_database: readOption("--client-database", path.join(root_directory, "public/catalog.sqlite")),
   schema_directory: server_directory,
   ffmpeg_path: readValue("--ffmpeg", "ffmpeg"),
+  generate_previews,
 });
 
 const asset_manifest = readOption("--asset-manifest", "");

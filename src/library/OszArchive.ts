@@ -1,5 +1,7 @@
 import { unzipSync } from "fflate";
 import { parseOsuChart } from "../chart/format/osu/OsuParser";
+import { calculateManiaDifficulty } from "../gameplay/mania/scoring/ManiaDifficulty";
+import { calculateOsuDifficulty } from "../gameplay/osu/scoring/OsuDifficulty";
 import type { ChartfileSetView, Chartview } from "./views";
 
 export interface OszArchive {
@@ -127,7 +129,9 @@ export async function readOszArchive(file: File): Promise<OszArchive> {
         bpm_min: parsed.primary_tempo,
         chart_url,
         creator: property(source, "Creator") || "Unknown Creator",
-        difficulty: duration_seconds > 0 ? note_count / duration_seconds : 0,
+        difficulty: parsed.mode === "osu"
+          ? calculateOsuDifficulty(parsed)
+          : calculateManiaDifficulty(parsed),
         duration_seconds,
         format: "osu",
         id: path,
