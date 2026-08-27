@@ -72,9 +72,17 @@ export function SongSelectIcon({ name }: { name: IconName }) {
   return <Component aria-hidden="true" />;
 }
 
-export function chartMode(chart: Chartview): string {
-  const mode = mode_names[chart.mode] ?? "UNKNOWN";
-  return chart.mode === 3 && chart.keys !== null ? `${chart.keys}K ${mode}` : mode;
+export function ChartModeBadge({ chart }: { chart: Chartview }) {
+  if (chart.mode === 0) {
+    return <span className="chart-mode-badge osu" title="osu!" aria-label="osu!" />;
+  }
+  if (chart.mode === 1) {
+    return <span className="chart-mode-badge taiko" title="Taiko" aria-label="Taiko" />;
+  }
+
+  const mania = chart.mode === 3;
+  const label = mania && chart.keys !== null ? `${chart.keys}K` : mode_names[chart.mode] ?? "UNKNOWN";
+  return <span className={`chart-mode-badge text${mania ? " mania" : ""}`} title={label}>{label}</span>;
 }
 
 export function chartSummaryMode(chart: Chartview): string {

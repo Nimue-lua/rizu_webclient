@@ -1,7 +1,7 @@
 import type { CSSProperties, KeyboardEvent, RefObject } from "react";
 import type { ChartfileSetView, Chartview } from "../../library/views";
 import type { ChartSelectionEntry, ChartSortMode } from "../../select/ChartSelector";
-import { chartMode, chartSummaryMode, difficultyColor, formatDuration, SongSelectIcon } from "./SongSelectUi";
+import { ChartModeBadge, chartSummaryMode, difficultyColor, formatDuration, SongSelectIcon } from "./SongSelectUi";
 
 interface ChartBrowserProps {
   chart_level_sort: boolean;
@@ -48,7 +48,7 @@ export function ChartBrowser({ chart_level_sort, difficulty_strip_ref, error, fi
           <button aria-label="Previous difficulty" onClick={() => onMoveDifficulty(-1)}><SongSelectIcon name="chevron-left" /></button>
           <div ref={difficulty_strip_ref}>{selected_song?.charts.map((chart) =>
             <button ref={chart.id === selected_chart?.id ? selected_difficulty_ref : undefined} className={chart.id === selected_chart?.id ? "selected" : ""} key={chart.id} onClick={() => onChartSelect(chart.id)} style={{ "--difficulty-color": difficultyColor(chart.difficulty) } as CSSProperties} title={`${chart.name} by ${chart.creator}`}>
-              <strong>{chart.difficulty.toFixed(1)}</strong><span>{chartMode(chart)}</span>
+              <strong>{chart.difficulty.toFixed(1)}</strong><ChartModeBadge chart={chart} />
             </button>)}</div>
           <button aria-label="Next difficulty" onClick={() => onMoveDifficulty(1)}><SongSelectIcon name="chevron-right" /></button>
         </div>}

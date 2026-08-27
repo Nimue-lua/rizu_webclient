@@ -10,6 +10,8 @@ import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { UnlockingFpsScreen } from "./UnlockingFpsScreen";
+import { OszSelectScreen } from "./OszSelectScreen";
+import { readOszArchive, type OszArchive } from "../library/OszArchive";
 import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
@@ -33,7 +35,7 @@ import {
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
 
-type Screen = "welcome" | "unlocking-fps" | "song-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
 const OSU_HIT_SOUND_VOLUME_KEY = "rizu.osu-hit-sound-volume";
 const MUSIC_OFFSET_KEY = "rizu.music-offset";
@@ -58,6 +60,11 @@ export function App() {
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<GameplayData | null>(null);
   const [loading_location, setLoadingLocation] = useState<GameplayLocation | null>(null);
+  const [loading_return_screen, setLoadingReturnScreen] = useState<"song-select" | "osz-select">("song-select");
+  const [osz_archive, setOszArchive] = useState<OszArchive | null>(null);
+  const osz_archive_ref = useRef<OszArchive | null>(null);
+  const [osz_importing, setOszImporting] = useState(false);
+  const [osz_import_error, setOszImportError] = useState<string | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
@@ -121,6 +128,47 @@ export function App() {
       local_skin_urls.current.clear();
     };
   }, []);
+
+  useEffect(() => () => osz_archive_ref.current?.dispose(), []);
+
+  const importOsz = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".osz")) {
+      setOszImportError("Drop an .osz beatmap archive");
+      return;
+    }
+    setOszImporting(true);
+    setOszImportError(null);
+    try {
+      const archive = await readOszArchive(file);
+      osz_archive_ref.current?.dispose();
+      osz_archive_ref.current = archive;
+      setOszArchive(archive);
+      setScreen("osz-select");
+    } catch (reason) {
+      setOszImportError(reason instanceof Error ? reason.message : "Failed to open the .osz archive");
+    } finally {
+      setOszImporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (screen !== "welcome" && screen !== "song-select" && screen !== "osz-select") return;
+    const preventDrop = (event: DragEvent) => {
+      if ([...event.dataTransfer?.items ?? []].some((item) => item.kind === "file")) event.preventDefault();
+    };
+    const handleDrop = (event: DragEvent) => {
+      const file = [...event.dataTransfer?.files ?? []].find((candidate) => candidate.name.toLowerCase().endsWith(".osz"));
+      if (!file) return;
+      event.preventDefault();
+      void importOsz(file);
+    };
+    window.addEventListener("dragover", preventDrop);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragover", preventDrop);
+      window.removeEventListener("drop", handleDrop);
+    };
+  }, [screen]);
 
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
@@ -215,6 +263,7 @@ export function App() {
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
     setScore(null);
+    setLoadingReturnScreen(screen === "osz-select" ? "osz-select" : "song-select");
     setScreen("loading");
   };
 
@@ -249,7 +298,7 @@ export function App() {
 
     setAudioContext(null);
     setLoadingLocation(null);
-    setScreen("song-select");
+    setScreen(loading_return_screen);
   };
 
   const finishLoading = (loaded_assets: GameplayData) => {
@@ -267,7 +316,7 @@ export function App() {
     setScore(null);
     setAudioContext(null);
     setLoadingLocation(null);
-    setScreen("song-select");
+    setScreen(loading_return_screen);
   };
 
   switch (screen) {
@@ -387,6 +436,20 @@ export function App() {
               onExit={() => setSettingsOpen(false)}
             />
           )}
+        </ScreenTransition>
+      );
+    case "osz-select":
+      if (!osz_archive) return null;
+      return (
+        <ScreenTransition key="osz-select">
+          <OszSelectScreen archive={osz_archive} importing={osz_importing} import_error={osz_import_error}
+            onImport={(file) => void importOsz(file)} onPlay={beginLoading} onBack={() => {
+              osz_archive_ref.current?.dispose();
+              osz_archive_ref.current = null;
+              setOszArchive(null);
+              setOszImportError(null);
+              setScreen("song-select");
+            }} />
         </ScreenTransition>
       );
   }
