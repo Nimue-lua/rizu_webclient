@@ -10,7 +10,7 @@ The cache command scans your chart folders and creates:
 - `public/chart-previews/`: small background images used on song select.
 - `public/audio-previews/`: compact audio clips streamed on song select.
 
-Run the command again whenever you add, remove, rename, or move charts.
+Run `./rizu` again whenever you add, remove, rename, or move charts.
 
 ## 1. Install Requirements
 
@@ -73,15 +73,15 @@ ln -s "/path/to/my/charts" "public/charts/My Charts"
 
 Make sure the link target exists and can be read.
 
-## 4. Generate The Cache
+## 4. Generate Previews And Catalog
 
-From the project directory, run:
+From the project directory, run the CLI:
 
 ```bash
-npm run cache:charts
+./rizu
 ```
 
-A successful run looks similar to:
+Choose option 1 to generate only missing previews, then option 2 to create or update the catalog. A successful catalog run looks similar to:
 
 ```text
 Cached 1 locations, 659 songs, and 2367 charts (4 skipped).
@@ -113,7 +113,7 @@ Refresh the page after rebuilding the cache. If the old song list remains, perfo
 You do not need to copy charts into the project. Pass their directory directly:
 
 ```bash
-npm run cache:charts -- --charts "/path/to/charts"
+CHARTS_DIR="/path/to/charts" ./rizu
 ```
 
 That directory must still contain collection folders, followed by song folders:
@@ -125,18 +125,6 @@ That directory must still contain collection folders, followed by song folders:
         ├── chart.osu
         └── audio.ogg
 ```
-
-## Use Custom Output Paths
-
-```bash
-npm run cache:charts -- \
-  --charts "/path/to/charts" \
-  --background-previews "/path/to/chart-previews" \
-  --audio-previews "/path/to/audio-previews" \
-  --client-database "/path/to/catalog.sqlite"
-```
-
-The web client expects the normal output paths unless its server configuration is also changed.
 
 ## Common Problems
 
@@ -157,7 +145,7 @@ sudo apt install ffmpeg
 The browser or project has an old catalog. Generate it again:
 
 ```bash
-npm run cache:charts
+./rizu catalog
 ```
 
 Then hard-refresh the browser with `Ctrl+Shift+R`.
@@ -181,7 +169,7 @@ AudioFilename: audio.ogg
 PreviewTime: 45000
 ```
 
-`PreviewTime` is measured in milliseconds. In this example the preview starts 45 seconds into the song. Run `npm run cache:charts` again after changing it.
+`PreviewTime` is measured in milliseconds. In this example the preview starts 45 seconds into the song. Run `./rizu previews` again after changing it.
 
 ### The song appears but gameplay returns 404
 
@@ -193,6 +181,6 @@ If everything is already installed and charts are under `public/charts`, these a
 
 ```bash
 npm install
-npm run cache:charts
+./rizu
 npm run dev
 ```

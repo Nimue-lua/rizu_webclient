@@ -10,26 +10,35 @@ The current production deployment uses:
 
 ## One-Command Update
 
-For a normal production update, run:
+Open the maintenance CLI:
 
 ```bash
-npm run deploy
+./rizu
 ```
 
-This runs the frontend checks, builds the application, refreshes the previews and client catalog, checks VPS disk space, uploads changed files, activates the release, validates and reloads the checked-in Nginx configuration, and verifies the public endpoints.
+The menu exposes preview generation, catalog creation, song upload, catalog upload, and application deployment as separate operations.
 
-To deploy only a new frontend build, run:
+To deploy a new frontend build non-interactively, run:
 
 ```bash
-npm run deploy -- --code-only
+./rizu deploy
 ```
 
-Code-only deployment preserves the active catalog, chart previews, audio previews, and gameplay assets. It does not run `cache:charts`, upload chart files, or replace the Nginx configuration.
+Application deployment preserves the active catalog, chart previews, audio previews, gameplay assets, and Nginx configuration.
+
+Song and catalog uploads are deliberately separate:
+
+```bash
+./rizu upload-songs
+./rizu upload-catalog
+```
+
+Song upload sends referenced `.osu` and audio files plus generated previews. Catalog upload sends the existing `public/catalog.sqlite`. Neither operation rebuilds the application.
 
 The defaults can be overridden without editing the script:
 
 ```bash
-DEPLOY_HOST=root@example.com DEPLOY_ROOT=/srv/rizu DEPLOY_URL=https://rizu.example.com npm run deploy
+DEPLOY_HOST=root@example.com DEPLOY_ROOT=/srv/rizu DEPLOY_URL=https://rizu.example.com ./rizu
 ```
 
 Catalogs and previews are generated from local `public/charts`. Deployment uploads only `.osu` files and audio referenced by the generated catalog. Original background images, videos, storyboards, and unrelated files are excluded because song select uses generated WebP thumbnails. `CHARTS_DIR` can override the chart source, `STAGE_DIR` can override the local staging path, and `MIN_FREE_BYTES` can change the default 512 MiB post-upload safety margin.
@@ -93,35 +102,7 @@ ssh root@nimue.mom \
   'certbot --nginx -d rizu.nimue.mom --non-interactive --agree-tos --redirect'
 ```
 
-Normal `npm run deploy` runs upload `deploy/rizu.nginx`, validate it with `nginx -t`, and reload Nginx automatically. A failed validation restores the previous configuration.
-
-## Manual Bundle
-
-```bash
-rm -rf /tmp/rizu-deploy
-mkdir -p /tmp/rizu-deploy/{dist,public/chart-previews,public/audio-previews}
-npm ci
-npm run typecheck
-npm test
-npm run build
-cp -a dist/. /tmp/rizu-deploy/dist/
-npm run cache:charts -- \
-  --charts public/charts \
-  --background-previews /tmp/rizu-deploy/public/chart-previews \
-  --audio-previews /tmp/rizu-deploy/public/audio-previews \
-  --client-database /tmp/rizu-deploy/public/catalog.sqlite \
-  --asset-manifest /tmp/rizu-deploy/chart-assets.list
-```
-
-The manifest is NUL-delimited so spaces and unusual characters in chart paths are safe. Upload its referenced files with:
-
-```bash
-mkdir -p /tmp/rizu-deploy/public/charts
-rsync -a --from0 --files-from=/tmp/rizu-deploy/chart-assets.list \
-  public/charts/ /tmp/rizu-deploy/public/charts/
-```
-
-Vite uses `copyPublicDir: false`; chart assets are staged separately rather than copied into `dist`.
+The Nginx configuration is managed separately. Application deployment only replaces the built `dist` directory.
 
 ## Verify Deployment
 

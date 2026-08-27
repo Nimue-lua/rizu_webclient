@@ -332,3 +332,50 @@ AudioFilename:song.ogg
     await rm(temporary_directory, { recursive: true, force: true });
   }
 });
+
+test("creates previews without writing a database", async () => {
+  const temporary_directory = await mkdtemp(path.join(os.tmpdir(), "rizu-catalog-previews-"));
+  const charts_directory = path.join(temporary_directory, "public", "charts");
+  const chart_directory = path.join(charts_directory, "Collection", "Song");
+  const client_database = path.join(temporary_directory, "catalog.sqlite");
+  const background_previews_directory = path.join(temporary_directory, "chart-previews");
+  const audio_previews_directory = path.join(temporary_directory, "audio-previews");
+  const ffmpeg_path = path.join(temporary_directory, "ffmpeg");
+
+  try {
+    await mkdir(chart_directory, { recursive: true });
+    await writeFile(path.join(chart_directory, "song.ogg"), "audio");
+    await writeFile(path.join(chart_directory, "background.png"), "background");
+    await writeFile(path.join(chart_directory, "chart.osu"), `Mode:0
+[General]
+AudioFilename:song.ogg
+[Events]
+0,0,"background.png",0,0
+[HitObjects]
+256,192,1000,1,0,0:0:0:0:
+`);
+    await writeFile(ffmpeg_path, `#!/bin/sh
+output=""
+for argument do output="$argument"; done
+printf preview > "$output"
+`);
+    await chmod(ffmpeg_path, 0o755);
+
+    const result = await cacheCharts({
+      charts_directory,
+      client_database,
+      schema_directory: path.dirname(fileURLToPath(import.meta.url)),
+      background_previews_directory,
+      audio_previews_directory,
+      ffmpeg_path,
+      write_database: false,
+    });
+
+    assert.equal(result.version, null);
+    await access(path.join(audio_previews_directory, path.basename(result.charts[0].audio_preview_path)));
+    await access(path.join(background_previews_directory, path.basename(result.charts[0].background_preview_path)));
+    await assert.rejects(access(client_database));
+  } finally {
+    await rm(temporary_directory, { recursive: true, force: true });
+  }
+});

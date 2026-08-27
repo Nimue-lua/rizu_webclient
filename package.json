@@ -4,10 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "cache:charts": "node server/cache-charts.mjs",
-    "cache:database": "node server/cache-charts.mjs --skip-previews",
-    "deploy": "bash deploy.sh",
-    "upload:songs": "bash upload-songs.sh",
+    "rizu": "bash rizu",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",

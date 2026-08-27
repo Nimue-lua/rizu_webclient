@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+export LC_ALL=C
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly DEPLOY_HOST="${DEPLOY_HOST:-root@nimue.mom}"
+readonly DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/rizu}"
+readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.nimue.mom}"
+readonly CHARTS_DIR="${CHARTS_DIR:-$ROOT_DIR/public/charts}"
+readonly MIN_FREE_BYTES="${MIN_FREE_BYTES:-536870912}"
+readonly SSH_OPTIONS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=6)
+
+usage() {
+  cat <<'EOF'
+Usage: ./rizu [command]
+
+Commands:
+  previews        Generate missing chart and audio previews
+  catalog         Create or replace public/catalog.sqlite
+  upload-songs    Upload chart, audio, and preview files
+  upload-catalog  Upload public/catalog.sqlite
+  deploy          Check, build, and deploy the application
+
+Run without a command to open the interactive menu.
+EOF
+}
+
+require_commands() {
+  local command
+  for command in "$@"; do
+    command -v "$command" >/dev/null || {
+      printf 'Required command not found: %s\n' "$command" >&2
+      exit 1
+    }
+  done
+}
+
+require_charts() {
+  if [[ ! -d "$CHARTS_DIR" ]]; then
+    printf 'Chart directory not found: %s\n' "$CHARTS_DIR" >&2
+    exit 1
+  fi
+}
+
+generate_previews() {
+  require_commands node ffmpeg
+  require_charts
+  mkdir -p -- "$ROOT_DIR/public/chart-previews" "$ROOT_DIR/public/audio-previews"
+  node "$ROOT_DIR/server/cache-charts.mjs" \
+    --charts "$CHARTS_DIR" \
+    --background-previews "$ROOT_DIR/public/chart-previews" \
+    --audio-previews "$ROOT_DIR/public/audio-previews" \
+    --skip-database
+}
+
+create_catalog() {
+  require_commands node
+  require_charts
+  node "$ROOT_DIR/server/cache-charts.mjs" \
+    --charts "$CHARTS_DIR" \
+    --client-database "$ROOT_DIR/public/catalog.sqlite" \
+    --skip-previews
+}
+
+prepare_remote_copy() {
+  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$DEPLOY_ROOT" <<'REMOTE'
+set -Eeuo pipefail
+deploy_root="$1"
+test -d "$deploy_root/dist"
+rm -rf -- "$deploy_root.new" "$deploy_root.old"
+cp -al -- "$deploy_root" "$deploy_root.new"
+REMOTE
+}
+
+activate_remote_copy() {
+  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$DEPLOY_ROOT" <<'REMOTE'
+set -Eeuo pipefail
+deploy_root="$1"
+chown -R www-data:www-data "$deploy_root.new"
+rm -rf -- "$deploy_root"
+mv -- "$deploy_root.new" "$deploy_root"
+REMOTE
+}
+
+upload_songs() {
+  require_commands node rsync ssh curl
+  require_charts
+  local stage_dir="${STAGE_DIR:-/tmp/rizu-song-upload}"
+  if [[ ! -d "$ROOT_DIR/public/chart-previews" || ! -d "$ROOT_DIR/public/audio-previews" ]]; then
+    printf 'Preview directories are missing (run previews first).\n' >&2
+    exit 1
+  fi
+  rm -rf -- "$stage_dir"
+  mkdir -p -- "$stage_dir"
+
+  printf 'Finding referenced chart and audio files...\n'
+  node "$ROOT_DIR/server/cache-charts.mjs" \
+    --charts "$CHARTS_DIR" \
+    --asset-manifest "$stage_dir/chart-assets.list" \
+    --skip-previews \
+    --skip-database
+
+  printf 'Preparing remote song upload...\n'
+  prepare_remote_copy
+  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" \
+    "rm -rf -- '$DEPLOY_ROOT.new/public/charts' '$DEPLOY_ROOT.new/public/chart-previews' '$DEPLOY_ROOT.new/public/audio-previews'; mkdir -p -- '$DEPLOY_ROOT.new/public/charts' '$DEPLOY_ROOT.new/public/chart-previews' '$DEPLOY_ROOT.new/public/audio-previews'"
+
+  rsync -a --partial --info=progress2 \
+    --from0 --files-from="$stage_dir/chart-assets.list" \
+    --link-dest="$DEPLOY_ROOT/public/charts" \
+    -e "ssh ${SSH_OPTIONS[*]}" \
+    "$CHARTS_DIR/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/public/charts/"
+  rsync -a --delete --partial --info=progress2 \
+    --link-dest="$DEPLOY_ROOT/public/chart-previews" \
+    -e "ssh ${SSH_OPTIONS[*]}" \
+    "$ROOT_DIR/public/chart-previews/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/public/chart-previews/"
+  rsync -a --delete --partial --info=progress2 \
+    --link-dest="$DEPLOY_ROOT/public/audio-previews" \
+    -e "ssh ${SSH_OPTIONS[*]}" \
+    "$ROOT_DIR/public/audio-previews/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/public/audio-previews/"
+
+  activate_remote_copy
+  curl -fsS "$DEPLOY_URL/" >/dev/null
+  printf 'Songs uploaded: %s\n' "$DEPLOY_URL"
+}
+
+upload_catalog() {
+  require_commands rsync ssh curl
+  local catalog="$ROOT_DIR/public/catalog.sqlite"
+  if [[ ! -f "$catalog" ]]; then
+    printf 'Catalog not found: %s (run catalog first)\n' "$catalog" >&2
+    exit 1
+  fi
+
+  printf 'Preparing remote catalog upload...\n'
+  prepare_remote_copy
+  rsync -a --partial --info=progress2 \
+    -e "ssh ${SSH_OPTIONS[*]}" \
+    "$catalog" "$DEPLOY_HOST:$DEPLOY_ROOT.new/public/catalog.sqlite"
+  activate_remote_copy
+  curl -fsS "$DEPLOY_URL/catalog.sqlite" >/dev/null
+  printf 'Catalog uploaded: %s/catalog.sqlite\n' "$DEPLOY_URL"
+}
+
+deploy_application() {
+  require_commands npm node rsync ssh curl
+  local stage_dir="${STAGE_DIR:-/tmp/rizu-deploy}"
+
+  printf 'Installing dependencies and running checks...\n'
+  npm --prefix "$ROOT_DIR" ci
+  npm --prefix "$ROOT_DIR" run typecheck
+  npm --prefix "$ROOT_DIR" test
+  npm --prefix "$ROOT_DIR" run build
+
+  rm -rf -- "$stage_dir"
+  mkdir -p -- "$stage_dir/dist"
+  cp -a -- "$ROOT_DIR/dist/." "$stage_dir/dist/"
+
+  printf 'Preparing application deployment...\n'
+  prepare_remote_copy
+  local bundle_bytes available_bytes required_bytes
+  bundle_bytes="$(du -sb "$stage_dir" | cut -f1)"
+  available_bytes="$(ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "df --output=avail -B1 '$DEPLOY_ROOT.new'" | tr -dc '0-9')"
+  required_bytes=$((bundle_bytes + MIN_FREE_BYTES))
+  if (( available_bytes < required_bytes )); then
+    printf 'Insufficient VPS space: upload needs %d bytes plus %d bytes free; only %d bytes available.\n' \
+      "$bundle_bytes" "$MIN_FREE_BYTES" "$available_bytes" >&2
+    exit 1
+  fi
+
+  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "rm -rf -- '$DEPLOY_ROOT.new/dist'; mkdir -p -- '$DEPLOY_ROOT.new/dist'"
+  rsync -a --delete --partial --info=progress2 \
+    -e "ssh ${SSH_OPTIONS[*]}" \
+    "$stage_dir/dist/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/dist/"
+  activate_remote_copy
+  curl -fsS "$DEPLOY_URL/" >/dev/null
+  printf 'Application deployed: %s\n' "$DEPLOY_URL"
+}
+
+choose_command() {
+  printf '%s\n' \
+    'Rizu maintenance' \
+    '1) Generate previews for new charts' \
+    '2) Create/Update catalog.sqlite' \
+    '3) Upload songs' \
+    '4) Upload catalog.sqlite' \
+    '5) Deploy application' \
+    'q) Quit' >&2
+  read -r -p '> ' choice
+  case "$choice" in
+    1) printf 'previews' ;;
+    2) printf 'catalog' ;;
+    3) printf 'upload-songs' ;;
+    4) printf 'upload-catalog' ;;
+    5) printf 'deploy' ;;
+    q|Q) printf 'quit' ;;
+    *) printf 'Unknown selection: %s\n' "$choice" >&2; exit 2 ;;
+  esac
+}
+
+command_name="${1:-}"
+if [[ -z "$command_name" ]]; then
+  command_name="$(choose_command)"
+elif (( $# > 1 )); then
+  usage >&2
+  exit 2
+fi
+
+case "$command_name" in
+  previews) generate_previews ;;
+  catalog) create_catalog ;;
+  upload-songs) upload_songs ;;
+  upload-catalog) upload_catalog ;;
+  deploy) deploy_application ;;
+  quit) exit 0 ;;
+  -h|--help|help) usage ;;
+  *) printf 'Unknown command: %s\n\n' "$command_name" >&2; usage >&2; exit 2 ;;
+esac

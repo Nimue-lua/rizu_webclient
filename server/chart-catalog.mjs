@@ -574,6 +574,7 @@ export async function cacheCharts({
   audio_previews_directory = path.join(path.dirname(charts_directory), "audio-previews"),
   ffmpeg_path = "ffmpeg",
   generate_previews = true,
+  write_database = true,
 }) {
   const client_temp = `${client_database}.tmp`;
   if (generate_previews) {
@@ -582,16 +583,17 @@ export async function cacheCharts({
       mkdir(audio_previews_directory, { recursive: true }),
     ]);
   }
-  await rm(client_temp, { force: true });
+  if (write_database) await rm(client_temp, { force: true });
 
   try {
-    const [data, client_schema] = await Promise.all([
-      scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path, generate_previews),
-      readFile(path.join(schema_directory, "client-catalog.sql"), "utf8"),
-    ]);
-    const generated_at = Math.floor(Date.now() / 1000);
-    const version = writeDatabases(client_temp, client_schema, data, generated_at);
-    await rename(client_temp, client_database);
+    const data = await scanCharts(charts_directory, background_previews_directory, audio_previews_directory, ffmpeg_path, generate_previews);
+    let version = null;
+    if (write_database) {
+      const client_schema = await readFile(path.join(schema_directory, "client-catalog.sql"), "utf8");
+      const generated_at = Math.floor(Date.now() / 1000);
+      version = writeDatabases(client_temp, client_schema, data, generated_at);
+      await rename(client_temp, client_database);
+    }
     if (generate_previews) {
       await removeStaleAudioPreviews(
         audio_previews_directory,
@@ -600,7 +602,7 @@ export async function cacheCharts({
     }
     return { ...data, version };
   } catch (reason) {
-    await rm(client_temp, { force: true });
+    if (write_database) await rm(client_temp, { force: true });
     throw reason;
   }
 }

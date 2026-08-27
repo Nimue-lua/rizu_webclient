@@ -7,6 +7,7 @@ const server_directory = path.dirname(fileURLToPath(import.meta.url));
 const root_directory = path.dirname(server_directory);
 const charts_directory = readOption("--charts", path.join(root_directory, "public/charts"));
 const generate_previews = !process.argv.includes("--skip-previews");
+const write_database = !process.argv.includes("--skip-database");
 
 function readOption(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -26,6 +27,7 @@ const result = await cacheCharts({
   schema_directory: server_directory,
   ffmpeg_path: readValue("--ffmpeg", "ffmpeg"),
   generate_previews,
+  write_database,
 });
 
 const asset_manifest = readOption("--asset-manifest", "");
@@ -34,4 +36,4 @@ if (asset_manifest) {
 }
 
 console.log(`Cached ${result.locations.length} locations, ${result.songs.length} songs, and ${result.charts.length} charts (${result.skipped} skipped).`);
-console.log(`Catalog version: ${result.version}`);
+if (result.version) console.log(`Catalog version: ${result.version}`);
