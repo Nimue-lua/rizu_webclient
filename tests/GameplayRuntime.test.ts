@@ -135,6 +135,7 @@ interface RuntimeHarness {
   renderer: { draw_calls: number; destroy_calls: number };
   scores: ScoreResult[];
   completions: CompletedGameplay[];
+  reached_chart_end: boolean[];
 }
 
 function createRuntime(notes: readonly ManiaNoteEvent[], options: {
@@ -174,6 +175,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
   replay.rate = options.rate ?? 1;
   const scores: ScoreResult[] = [];
   const completions: CompletedGameplay[] = [];
+  const reached_chart_end: boolean[] = [];
   const dependencies: ManiaGameplayRuntimeDependencies = {
     event_target: events as unknown as ManiaGameplayRuntimeDependencies["event_target"],
     request_animation_frame: frames.request,
@@ -186,11 +188,12 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
     }),
   };
   const runtime = new ManiaGameplayRuntime({} as HTMLCanvasElement, data, 0.6, options.offset ?? 0, 2,
-    replay, ["KeyA"], "earliest", (completed) => {
+    replay, ["KeyA"], "earliest", (completed, reached_end) => {
       completions.push(completed);
+      reached_chart_end.push(reached_end);
       scores.push(completed.score);
     }, dependencies, options.playback);
-  return { runtime, events, frames, source, gain, renderer, scores, completions };
+  return { runtime, events, frames, source, gain, renderer, scores, completions, reached_chart_end };
 }
 
 function key(code: string, timeStamp: number, repeat = false): KeyboardEvent {
@@ -221,6 +224,7 @@ test("runs a deterministic mania tap and hold session through completion", () =>
   assert.equal(harness.scores[0]?.judges?.perfect, 3);
   assert.equal(harness.scores[0]?.judges?.miss, 0);
   assert.equal(harness.scores[0]?.accuracy, 1);
+  assert.deepEqual(harness.reached_chart_end, [true]);
   assert.equal(harness.frames.callbacks.size, 0);
   assert.equal(harness.renderer.draw_calls, 2);
   assert.deepEqual(harness.completions[0]?.replay.mode, "mania");
@@ -317,6 +321,15 @@ test("Escape releases held input, misses the remaining chart, and finishes once"
   assert.equal(harness.scores.length, 1);
   assert.equal(harness.scores[0]?.judges?.perfect, 1);
   assert.equal(harness.scores[0]?.judges?.miss, 3);
+  assert.deepEqual(harness.reached_chart_end, [false]);
+});
+
+test("Escape after the last mania note allows replay saving", () => {
+  const harness = createRuntime([{ column: 1, absolute_time: 1, weight: 0 }]);
+  harness.runtime.start();
+  harness.events.dispatch("keydown", key("Escape", 3100));
+
+  assert.deepEqual(harness.reached_chart_end, [true]);
 });
 
 test("destroy releases listeners, animation, audio, gain, and renderer exactly once", () => {

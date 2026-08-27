@@ -224,7 +224,7 @@ export function App() {
     setScreen("gameplay");
   };
 
-  const leaveResults = () => {
+  const leaveResults = (return_screen = loading_return_screen) => {
     if (audio_context) {
       void audio_context.close();
     }
@@ -236,7 +236,7 @@ export function App() {
     setPlayback(null);
     setAudioContext(null);
     setLoadingLocation(null);
-    setScreen(loading_return_screen);
+    setScreen(return_screen);
   };
 
   switch (screen) {
@@ -276,10 +276,14 @@ export function App() {
             input_bindings={input_bindings}
             hit_registration={hit_registration}
             playback={playback ?? undefined}
-            onFinish={(completed) => {
+            onFinish={(completed, reached_chart_end) => {
               if (playback) {
                 setPlayback(null);
                 setScreen("result");
+                return;
+              }
+              if (!reached_chart_end) {
+                leaveResults("song-select");
                 return;
               }
               setCompletedGameplay(completed);
@@ -333,7 +337,7 @@ export function App() {
               setPlayback(completed_gameplay);
               setScreen("gameplay");
             }}
-            onExit={leaveResults}
+            onExit={() => leaveResults()}
           />
         </ScreenTransition>
       );

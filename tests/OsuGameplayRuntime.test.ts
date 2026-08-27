@@ -49,6 +49,7 @@ function createHarness(playback?: OsuRecordedReplay) {
   const cursor_states: OsuCursorState[] = [];
   const results: ScoreResult[] = [];
   const completions: CompletedGameplay[] = [];
+  const reached_chart_end: boolean[] = [];
   let destroy_calls = 0;
   const gain = { gain: { value: 1 }, connect() {}, disconnect() {} };
   const source = { buffer: null, playbackRate: { value: 1 }, connect() {}, start() {}, stop() {}, disconnect() {} };
@@ -81,11 +82,13 @@ function createHarness(playback?: OsuRecordedReplay) {
     }),
   };
   const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 1, 0,
-    1, "webgl", createOsuReplayBase(1, 5), "direct", ["KeyZ", "KeyX"], (completed) => {
+    1, "webgl", createOsuReplayBase(1, 5), "direct", ["KeyZ", "KeyX"], (completed, reached_end) => {
       completions.push(completed);
+      reached_chart_end.push(reached_end);
       results.push(completed.score);
     }, dependencies, playback);
-  return { runtime, events, frames, cursor_states, results, completions, get destroy_calls() { return destroy_calls; } };
+  return { runtime, events, frames, cursor_states, results, completions, reached_chart_end,
+    get destroy_calls() { return destroy_calls; } };
 }
 
 test("records aim and actions at corrected event time between render frames", () => {
@@ -233,6 +236,15 @@ test("feeds corrected circle clicks into osu scoring and renderer state", () => 
     { type: "aim", time: 16384, x: 2097152, y: 1572864 },
     { type: "action", time: 16384, action: "primary", pressed: true },
   ]);
+  assert.deepEqual(harness.reached_chart_end, [false]);
+});
+
+test("Escape after the last osu object allows replay saving", () => {
+  const harness = createHarness();
+  harness.runtime.start();
+  harness.events.dispatch("keydown", key("Escape", 11100));
+
+  assert.deepEqual(harness.reached_chart_end, [true]);
 });
 
 test("registers and cleans up keyboard, animation, audio, and renderer resources", () => {

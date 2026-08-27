@@ -70,7 +70,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
     cursor_renderer: OsuCursorRendererMode, replay_base: OsuReplayBaseValues,
     slider_renderer: OsuSliderRendererMode, input_bindings: readonly (string | null)[],
-    private readonly finish: (completed: CompletedGameplay) => void,
+    private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
     private readonly playback_replay?: OsuRecordedReplay) {
     this.dependencies = dependencies;
@@ -180,8 +180,9 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.code === "Escape") {
+      const song_time = this.clock.timeAt(event.timeStamp).corrected;
       this.rules_engine.update(Number.POSITIVE_INFINITY);
-      this.finishGameplay();
+      this.finishGameplay(this.chart.hit_objects.length > 0 && song_time >= this.chart.end_time);
       return;
     }
     if (this.playback_replay) return;
@@ -217,7 +218,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     }
   }
 
-  private finishGameplay(): void {
+  private finishGameplay(reached_chart_end = true): void {
     if (this.finished) return;
     this.finished = true;
     this.flushPendingAim(Number.POSITIVE_INFINITY, true);
@@ -237,7 +238,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
           ...("delta_time" in event ? { delta_time: replayTick(event.delta_time) } : {}),
         })),
       },
-    });
+    }, reached_chart_end);
   }
 
   private readonly render = (timestamp: number) => {

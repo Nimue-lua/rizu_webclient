@@ -26,7 +26,7 @@ export interface GameplaySessionOptions {
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
   playback?: CompletedGameplay;
-  finish: (completed: CompletedGameplay) => void;
+  finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
 }
 
 export interface GameplaySessionFactoryDependencies {

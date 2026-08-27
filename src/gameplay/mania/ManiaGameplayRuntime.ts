@@ -40,7 +40,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly scroll_speed: number;
   private readonly music_rate: number;
   readonly input_events: ManiaRecordedInputEvent[] = [];
-  private readonly finish: (completed: CompletedGameplay) => void;
+  private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
   private readonly replay_base: ManiaReplayBase;
   private readonly rules_engine: ManiaRulesEngine;
   private readonly renderer: ManiaRenderer;
@@ -58,17 +58,20 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private destroyed = false;
   private readonly hud_state = new HudStateDeriver();
   private readonly gameplay_end_time: number;
+  private readonly last_note_time: number;
   private replay_event_index = 0;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
-    finish: (completed: CompletedGameplay) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
+    finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
+    dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
     private readonly playback_replay?: ManiaRecordedReplay) {
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
     this.replay_base = replay_base;
     this.gameplay_end_time = getGameplayEndTime(data, this.music_rate);
+    this.last_note_time = data.chart.notes.reduce((last, note) => Math.max(last, note.absolute_time), -Infinity);
     this.finish = finish;
     this.dependencies = dependencies;
     const timing_identity = replay_base.timings.name === "sphere" && replay_base.subtimings === null
@@ -187,10 +190,10 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.pointer_columns.clear();
     this.pressed_columns.fill(0);
     this.rules_engine.update(this.gameplay_end_time, 0, 0);
-    this.finishGameplay();
+    this.finishGameplay(Number.isFinite(this.last_note_time) && song_time >= this.last_note_time);
   }
 
-  private readonly finishGameplay = () => {
+  private readonly finishGameplay = (reached_chart_end = true) => {
     if (this.finished) return;
     this.finished = true;
     this.finish({
@@ -205,7 +208,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
           ...event, time: replayTick(event.time), delta_time: replayTick(event.delta_time),
         })),
       },
-    });
+    }, reached_chart_end);
   };
 
   private recordInput(column: number, pressed: boolean, time: number, note_index: number | undefined,

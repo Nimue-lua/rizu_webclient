@@ -24,7 +24,7 @@ interface GameplayScreenProps {
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
   playback?: CompletedGameplay;
-  onFinish: (completed: CompletedGameplay) => void;
+  onFinish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
 }
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
