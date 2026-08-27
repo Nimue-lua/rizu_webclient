@@ -346,9 +346,10 @@ svg { width: 22px; height: 22px; }
 .chart-mode-badge.text.mania { color: var(--text); font-size: 16px; }
 .difficulty-strip div button.selected { padding-bottom: 4px; border-bottom: 3px solid var(--difficulty-color); background: linear-gradient(to top, color-mix(in srgb, var(--difficulty-color) 30%, transparent), transparent 88%), var(--surface-raised); }
 
-.chart-list { position: relative; min-height: 0; overflow: auto; border-top: 1px solid var(--divider); outline: 0; scrollbar-color: var(--outline) color-mix(in srgb, var(--background) 44%, transparent); scrollbar-width: thin; font-family: "Zen Maru Gothic", sans-serif; }
-.chart-list-space { position: relative; }
+.chart-list { position: relative; min-height: 0; overflow: auto; border-top: 1px solid var(--divider); outline: 0; contain: layout paint; scrollbar-color: var(--outline) color-mix(in srgb, var(--background) 44%, transparent); scrollbar-width: thin; font-family: "Zen Maru Gothic", sans-serif; }
+.chart-list-space { position: relative; contain: layout paint; }
 .chart-row { position: absolute; top: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; width: calc(100% - 5px); height: 79px; margin-top: 2px; padding: 4px 16px 4px 20px; transform: translateY(var(--row-offset)); color: var(--text); background: linear-gradient(to right, color-mix(in srgb, var(--difficulty-color) 20%, transparent), transparent 38%), var(--surface); border-left: 4px solid var(--difficulty-color); border-radius: 3px; text-align: left; }
+.chart-row:hover { filter: none; }
 .chart-row > span { display: grid; min-width: 0; }
 .chart-row strong, .chart-row small, .chart-row em { overflow: hidden; font-family: "Zen Maru Gothic", sans-serif; font-size: 24px; font-weight: 700; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .chart-row small { padding-bottom: 3px; color: var(--muted); line-height: 1.25; }

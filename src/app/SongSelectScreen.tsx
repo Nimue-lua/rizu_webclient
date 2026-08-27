@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { inputLayout, loadInputBindings } from "../gameplay/InputBindings";
 import type { Chartview } from "../library/views";
 import type { ChartSelectionEntry, ChartSelector, ChartSortMode } from "../select/ChartSelector";
@@ -17,7 +17,6 @@ import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
 
 const ROW_HEIGHT = 82;
-const OVERSCAN = 5;
 const BACKGROUND_DEBOUNCE_MS = 200;
 const AUDIO_PREVIEW_DEBOUNCE_MS = 200;
 const SESSION_STARTED_AT = Date.now();
@@ -76,8 +75,7 @@ export function SongSelectScreen({
   const preview_unlocked_ref = useRef(false);
   const last_preview_change_ref = useRef<number | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
-  const [scroll_top, setScrollTop] = useState(0);
-  const [viewport_height, setViewportHeight] = useState(0);
+  const scroll_top_ref = useRef(0);
   const [now, setNow] = useState(() => new Date());
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [loaded_background_url, setLoadedBackgroundUrl] = useState<string | null>(null);
@@ -111,24 +109,11 @@ export function SongSelectScreen({
     return () => abort_controller.abort();
   }, [chart_selector]);
 
-  useEffect(() => {
-    const viewport = viewport_ref.current;
-    if (!viewport) return;
-    setViewportHeight(viewport.clientHeight);
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setViewportHeight(entry.contentRect.height);
-    });
-    observer.observe(viewport);
-    return () => observer.disconnect();
-  }, [global_leaderboard_open]);
-
-  useLayoutEffect(() => {
-    if (!global_leaderboard_open && viewport_ref.current) viewport_ref.current.scrollTop = scroll_top;
-  }, [global_leaderboard_open]);
-
-  const selection_entries = chart_selector.getSelectionEntries();
-  const selected_song = chart_selector.getSelectedSong();
-  const selected_chart = chart_selector.getSelectedChart();
+  const { selection_entries, selected_song, selected_chart } = useMemo(() => ({
+    selection_entries: chart_selector.getSelectionEntries(),
+    selected_song: chart_selector.getSelectedSong(),
+    selected_chart: chart_selector.getSelectedChart(),
+  }), [selection]);
   const chart_level_sort = selection.sort_mode === "difficulty" || selection.sort_mode === "duration";
 
   useEffect(() => {
@@ -150,9 +135,9 @@ export function SongSelectScreen({
     if (!viewport || selected_index < 0 || viewport.clientHeight === 0) return;
     const centered_scroll_top = Math.max(0, selected_index * ROW_HEIGHT + ROW_HEIGHT / 2 - viewport.clientHeight / 2);
     viewport.scrollTop = centered_scroll_top;
-    setScrollTop(centered_scroll_top);
+    scroll_top_ref.current = centered_scroll_top;
     restored_song_scroll_ref.current = true;
-  }, [selection_entries.length, selection.selected_chart_id, selection.selected_song_id, selection.sort_mode, viewport_height]);
+  }, [selection_entries.length, selection.selected_chart_id, selection.selected_song_id, selection.sort_mode]);
 
   useEffect(() => {
     if (selection.sort_mode !== "difficulty" && selection.sort_mode !== "duration") return;
@@ -165,7 +150,7 @@ export function SongSelectScreen({
     else if (row_top + ROW_HEIGHT > viewport.scrollTop + viewport.clientHeight) next_scroll_top = row_top + ROW_HEIGHT - viewport.clientHeight;
     if (next_scroll_top === viewport.scrollTop) return;
     viewport.scrollTop = next_scroll_top;
-    setScrollTop(next_scroll_top);
+    scroll_top_ref.current = next_scroll_top;
   }, [selection.selected_chart_id, selection.sort_mode, selection_entries.length]);
 
   useEffect(() => {
@@ -213,29 +198,25 @@ export function SongSelectScreen({
     return () => window.clearTimeout(timer);
   }, [selected_chart?.audio_preview_url]);
 
-  const first_index = Math.max(0, Math.floor(scroll_top / ROW_HEIGHT) - OVERSCAN);
-  const visible_count = Math.ceil(viewport_height / ROW_HEIGHT) + OVERSCAN * 2;
-  const visible_entries = selection_entries.slice(first_index, first_index + visible_count);
-
   const selectEntry = (entry: ChartSelectionEntry) => {
     chart_selector.selectEntry(entry);
   };
 
   const selectLocation = (location_id: number | null) => {
     chart_selector.selectLocation(location_id);
-    setScrollTop(0);
+    scroll_top_ref.current = 0;
     if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
   };
 
   const selectMode = (mode: number | null) => {
     chart_selector.selectMode(mode);
-    setScrollTop(0);
+    scroll_top_ref.current = 0;
     if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
   };
 
   const selectSortMode = (sort_mode: ChartSortMode) => {
     chart_selector.setSortMode(sort_mode);
-    setScrollTop(0);
+    scroll_top_ref.current = 0;
     if (viewport_ref.current) viewport_ref.current.scrollTop = 0;
   };
 
@@ -299,7 +280,7 @@ export function SongSelectScreen({
         onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings} />
       {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> : <>
         <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
-          onQueryChange={(query) => { chart_selector.setQuery(query); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
+          onQueryChange={(query) => { chart_selector.setQuery(query); scroll_top_ref.current = 0; if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
           onSortChange={selectSortMode} />
 
         <section className="song-select-content">
@@ -307,14 +288,15 @@ export function SongSelectScreen({
             selected_song={selected_song} stored_plays={stored_plays} nickname={nickname}
             onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
           <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
-            first_index={first_index} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
+            initial_scroll_top={scroll_top_ref.current} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
             selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}
-            visible_entries={visible_entries} onChartSelect={(chart_id) => chart_selector.selectChart(chart_id)}
+            onChartSelect={(chart_id) => chart_selector.selectChart(chart_id)}
             onEntryPlay={(entry) => { const chart = entry.chart ?? entry.song.charts.at(-1); if (chart) playChart(chart, entry.song); }}
             onEntrySelect={selectEntry} onKeyDown={(event) => {
               if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
               if (event.key === "Enter" && selected_chart) playChart(selected_chart);
-            }} onMoveDifficulty={selectDifficulty} onScroll={setScrollTop} isEntrySelected={(entry) => chart_selector.isEntrySelected(entry)} />
+            }} onMoveDifficulty={selectDifficulty} onScrollPositionChange={(scroll_top) => { scroll_top_ref.current = scroll_top; }}
+            isEntrySelected={(entry) => chart_selector.isEntrySelected(entry)} />
         </section>
 
         <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
