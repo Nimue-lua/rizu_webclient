@@ -5,6 +5,7 @@ import { OsuGameplayRuntime, type OsuGameplayRuntimeDependencies } from "../src/
 import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
 import type { OsuCursorState } from "../src/gameplay/osu/OsuInputEvent";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
+import type { CompletedGameplay } from "../src/replay/RecordedReplay";
 
 class FakeEventTarget {
   private readonly listeners = new Map<string, Set<EventListener>>();
@@ -47,6 +48,7 @@ function createHarness() {
   const frames = new FakeAnimationFrames();
   const cursor_states: OsuCursorState[] = [];
   const results: ScoreResult[] = [];
+  const completions: CompletedGameplay[] = [];
   let destroy_calls = 0;
   const gain = { gain: { value: 1 }, connect() {}, disconnect() {} };
   const source = { buffer: null, playbackRate: { value: 1 }, connect() {}, start() {}, stop() {}, disconnect() {} };
@@ -59,7 +61,7 @@ function createHarness() {
     resume: async () => undefined,
   } as unknown as AudioContext;
   const data: OsuGameplayData = {
-    mode: "osu", audio_buffer: {} as AudioBuffer, audio_context,
+    mode: "osu", chart_id: "test-osu-chart", audio_buffer: {} as AudioBuffer, audio_context,
     chart: { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
       object_count: 1, drain_length_seconds: 1, end_time: 10, primary_tempo: 120,
       slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [],
@@ -79,8 +81,11 @@ function createHarness() {
     }),
   };
   const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 1, 0,
-    1, "webgl", createOsuReplayBase(1, 5), "direct", ["KeyZ", "KeyX"], (result) => results.push(result), dependencies);
-  return { runtime, events, frames, cursor_states, results, get destroy_calls() { return destroy_calls; } };
+    1, "webgl", createOsuReplayBase(1, 5), "direct", ["KeyZ", "KeyX"], (completed) => {
+      completions.push(completed);
+      results.push(completed.score);
+    }, dependencies);
+  return { runtime, events, frames, cursor_states, results, completions, get destroy_calls() { return destroy_calls; } };
 }
 
 test("records aim and actions at corrected event time between render frames", () => {
@@ -96,6 +101,25 @@ test("records aim and actions at corrected event time between render frames", ()
   assert.ok(Math.abs(harness.runtime.input_events[0]!.time - 0.15) < 1e-12);
   assert.ok(Math.abs(harness.runtime.input_events[1]!.time - 0.16) < 1e-12);
   assert.deepEqual(harness.runtime.cursor_state, { position: { x: 100, y: 200 }, primary: true, secondary: false });
+});
+
+test("samples only the latest osu aim position at up to 60 FPS", () => {
+  const harness = createHarness();
+  const bounds = { left: 0, top: 0, width: 640, height: 480 };
+  harness.runtime.start();
+  harness.frames.run(1000);
+
+  harness.runtime.aimPointer(1, 100, 100, bounds, 1005);
+  harness.runtime.aimPointer(1, 200, 200, bounds, 1010);
+  harness.frames.run(1016);
+  harness.runtime.aimPointer(1, 300, 300, bounds, 1020);
+  harness.frames.run(1025);
+  harness.frames.run(1033);
+
+  assert.deepEqual(harness.runtime.input_events.map(({ time: _time, ...event }) => event), [
+    { type: "aim", x: 200, y: 200 },
+    { type: "aim", x: 300, y: 300 },
+  ]);
 });
 
 test("keeps an action pressed while another input source still holds it", () => {
@@ -143,6 +167,12 @@ test("feeds corrected circle clicks into osu scoring and renderer state", () => 
 
   assert.equal(harness.results[0]?.judges?.["300"], 1);
   assert.equal(harness.cursor_states.length, 1);
+  const replay = harness.completions[0]?.replay;
+  assert.equal(replay?.mode, "osu");
+  assert.deepEqual(replay?.input_events, [
+    { type: "aim", time: 16384, x: 2097152, y: 1572864 },
+    { type: "action", time: 16384, action: "primary", pressed: true },
+  ]);
 });
 
 test("registers and cleans up keyboard, animation, audio, and renderer resources", () => {

@@ -36,6 +36,7 @@ import {
 } from "../gameplay/renderer/LocalNoteSkinStore";
 import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { osuCursorRendererMode, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
+import { savePlay, storedPlay } from "../replay/ReplayStore";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -269,6 +270,7 @@ export function App() {
     const note_skin = skin_mode === null ? undefined : selectedNoteSkin(skin_mode, chart.mode === 3 ? chart.keys : null,
       note_skin_selections, available_note_skins);
     setLoadingLocation({
+      chart_id: chart.id,
       audio_url: chart.audio_url,
       artist: song.artist,
       background_url: chart.background_url,
@@ -376,9 +378,12 @@ export function App() {
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
-            onFinish={(gameplay_score) => {
-              setScore(gameplay_score);
+            onFinish={(completed) => {
+              setScore(completed.score);
               setScreen("result");
+              void savePlay(storedPlay(assets.chart_id, completed)).catch((error: unknown) => {
+                console.error("Could not save gameplay replay", error);
+              });
             }}
           />
         </ScreenTransition>

@@ -8,7 +8,7 @@ import type { ManiaHitRegistration } from "./mania/ManiaRulesEngine";
 import { ManiaGameplayRuntime } from "./mania/ManiaGameplayRuntime";
 import { OsuGameplayRuntime } from "./osu/OsuGameplayRuntime";
 import type { GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPointerInput } from "./GameplaySession";
-import type { ScoreResult } from "./scoring/ScoreResult";
+import type { CompletedGameplay } from "../replay/RecordedReplay";
 import type { OsuSliderRendererMode } from "./osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "./osu/OsuHardwareCursor";
 
@@ -25,7 +25,7 @@ export interface GameplaySessionOptions {
   replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
-  finish: (score: ScoreResult) => void;
+  finish: (completed: CompletedGameplay) => void;
 }
 
 export interface GameplaySessionFactoryDependencies {

@@ -5,6 +5,7 @@ import { getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/Gameplay
 import { ManiaGameplayRuntime, type ManiaGameplayRuntimeDependencies } from "../src/gameplay/mania/ManiaGameplayRuntime";
 import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
+import type { CompletedGameplay } from "../src/replay/RecordedReplay";
 import type { ManiaNoteEvent } from "../src/chart/Chart";
 
 function createData(note_times: readonly number[]): GameplayData {
@@ -133,6 +134,7 @@ interface RuntimeHarness {
   gain: FakeGain;
   renderer: { draw_calls: number; destroy_calls: number };
   scores: ScoreResult[];
+  completions: CompletedGameplay[];
 }
 
 function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: number; offset?: number } = {}): RuntimeHarness {
@@ -151,6 +153,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: numbe
   } as unknown as AudioContext;
   const data: ManiaGameplayData = {
     mode: "mania",
+    chart_id: "test-mania-chart",
     audio_buffer: {} as AudioBuffer,
     audio_context,
     chart: {
@@ -166,6 +169,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: numbe
   const replay = new ManiaReplayBase();
   replay.rate = options.rate ?? 1;
   const scores: ScoreResult[] = [];
+  const completions: CompletedGameplay[] = [];
   const dependencies: ManiaGameplayRuntimeDependencies = {
     event_target: events as unknown as ManiaGameplayRuntimeDependencies["event_target"],
     request_animation_frame: frames.request,
@@ -178,8 +182,11 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: numbe
     }),
   };
   const runtime = new ManiaGameplayRuntime({} as HTMLCanvasElement, data, 0.6, options.offset ?? 0, 2,
-    replay, ["KeyA"], "earliest", (score) => scores.push(score), dependencies);
-  return { runtime, events, frames, source, gain, renderer, scores };
+    replay, ["KeyA"], "earliest", (completed) => {
+      completions.push(completed);
+      scores.push(completed.score);
+    }, dependencies);
+  return { runtime, events, frames, source, gain, renderer, scores, completions };
 }
 
 function key(code: string, timeStamp: number, repeat = false): KeyboardEvent {
@@ -212,6 +219,13 @@ test("runs a deterministic mania tap and hold session through completion", () =>
   assert.equal(harness.scores[0]?.accuracy, 1);
   assert.equal(harness.frames.callbacks.size, 0);
   assert.equal(harness.renderer.draw_calls, 2);
+  assert.deepEqual(harness.completions[0]?.replay.mode, "mania");
+  assert.deepEqual(harness.completions[0]?.replay.input_events, [
+    { time: 4096, column: 0, pressed: true, note_index: 0, delta_time: 0 },
+    { time: 4104, column: 0, pressed: false, note_index: 0, delta_time: null },
+    { time: 8192, column: 0, pressed: true, note_index: 1, delta_time: 0 },
+    { time: 12288, column: 0, pressed: false, note_index: 1, delta_time: 0 },
+  ]);
 });
 
 test("applies rate and offset to runtime input timestamps", () => {

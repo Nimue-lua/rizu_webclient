@@ -1,6 +1,5 @@
 import type { ManiaGameplayData } from "../../library/GameplayLoader";
 import { ManiaRulesEngine, type ManiaHitRegistration, type ManiaVisualNote } from "./ManiaRulesEngine";
-import type { ScoreResult } from "../scoring/ScoreResult";
 import type { GameplaySession, ManiaPointerInput } from "../GameplaySession";
 import { ManiaRenderer as WebGlManiaRenderer } from "./rendering/ManiaRenderer";
 import { HudStateDeriver, type GameplayPresentationState } from "../HudState";
@@ -8,6 +7,7 @@ import type { ManiaReplayBase } from "../../replay/mania/ManiaReplayBase";
 import { getAudioStartDelay, getGameplayEndTime } from "../GameplayTiming";
 import { AudioGameplayClock } from "../AudioGameplayClock";
 import { WebAudioPlayback } from "../audio/WebAudioPlayback";
+import { replayTick, type CompletedGameplay, type ManiaRecordedInputEvent } from "../../replay/RecordedReplay";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -38,7 +38,9 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly data: ManiaGameplayData;
   private readonly scroll_speed: number;
   private readonly music_rate: number;
-  private readonly finish: (score: ScoreResult) => void;
+  readonly input_events: ManiaRecordedInputEvent[] = [];
+  private readonly finish: (completed: CompletedGameplay) => void;
+  private readonly replay_base: ManiaReplayBase;
   private readonly rules_engine: ManiaRulesEngine;
   private readonly renderer: ManiaRenderer;
   private readonly playback: WebAudioPlayback;
@@ -58,10 +60,11 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
-    finish: (score: ScoreResult) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies()) {
+    finish: (completed: CompletedGameplay) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
+    this.replay_base = replay_base;
     this.gameplay_end_time = getGameplayEndTime(data, this.music_rate);
     this.finish = finish;
     this.dependencies = dependencies;
@@ -111,7 +114,10 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     if (this.pointer_columns.has(pointer_id)) return;
     this.pointer_columns.set(pointer_id, column);
     this.pressed_columns[column]! += 1;
-    const note_index = this.rules_engine.press(column, this.clock.timeAt(performance_time).corrected);
+    const time = this.clock.timeAt(performance_time).corrected;
+    const previous_logic_event_count = this.rules_engine.logic_events.length;
+    const note_index = this.rules_engine.press(column, time);
+    this.recordInput(column, true, time, note_index, previous_logic_event_count);
     if (note_index !== undefined) this.pointer_catches.set(pointer_id, note_index);
   }
 
@@ -122,7 +128,10 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.pressed_columns[column]! -= 1;
     const note_index = this.pointer_catches.get(pointer_id);
     this.pointer_catches.delete(pointer_id);
-    if (note_index !== undefined) this.rules_engine.release(note_index, this.clock.timeAt(performance_time).corrected);
+    const time = this.clock.timeAt(performance_time).corrected;
+    const previous_logic_event_count = this.rules_engine.logic_events.length;
+    if (note_index !== undefined) this.rules_engine.release(note_index, time);
+    this.recordInput(column, false, time, note_index, previous_logic_event_count);
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
@@ -136,7 +145,10 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     if (event.repeat) return;
     this.pressed_keys.add(event.code);
     this.pressed_columns[column]! += 1;
-    const note_index = this.rules_engine.press(column, this.clock.timeAt(event.timeStamp).corrected);
+    const time = this.clock.timeAt(event.timeStamp).corrected;
+    const previous_logic_event_count = this.rules_engine.logic_events.length;
+    const note_index = this.rules_engine.press(column, time);
+    this.recordInput(column, true, time, note_index, previous_logic_event_count);
     if (note_index !== undefined) this.key_catches.set(event.code, note_index);
   };
 
@@ -147,7 +159,10 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.pressed_columns[column]! -= 1;
     const note_index = this.key_catches.get(event.code);
     this.key_catches.delete(event.code);
-    if (note_index !== undefined) this.rules_engine.release(note_index, this.clock.timeAt(event.timeStamp).corrected);
+    const time = this.clock.timeAt(event.timeStamp).corrected;
+    const previous_logic_event_count = this.rules_engine.logic_events.length;
+    if (note_index !== undefined) this.rules_engine.release(note_index, time);
+    this.recordInput(column, false, time, note_index, previous_logic_event_count);
   };
 
   private abortGameplay(song_time: number): void {
@@ -170,8 +185,31 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly finishGameplay = () => {
     if (this.finished) return;
     this.finished = true;
-    this.finish(this.rules_engine.score);
+    this.finish({
+      score: this.rules_engine.score,
+      replay_base: this.replay_base.exportReplayBase(),
+      replay: {
+        version: 1,
+        mode: "mania",
+        time_unit: "1/8192 second",
+        input_events: this.input_events,
+        logic_events: this.rules_engine.logic_events.map((event) => ({
+          ...event, time: replayTick(event.time), delta_time: replayTick(event.delta_time),
+        })),
+      },
+    });
   };
+
+  private recordInput(column: number, pressed: boolean, time: number, note_index: number | undefined,
+    previous_logic_event_count: number): void {
+    const logic_event = this.rules_engine.logic_events[previous_logic_event_count];
+    const delta_time = logic_event !== undefined && logic_event.index === note_index
+      ? replayTick(logic_event.delta_time)
+      : null;
+    this.input_events.push({
+      time: replayTick(time), column, pressed, note_index: note_index ?? null, delta_time,
+    });
+  }
 
   private readonly render = (timestamp: number) => {
     const visual_scroll_speed = this.scroll_speed / this.music_rate;

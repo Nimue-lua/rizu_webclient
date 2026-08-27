@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { GameplayData } from "../library/GameplayLoader";
 import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
-import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import type { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../gameplay/GameplaySession";
 import { createGameplaySession } from "../gameplay/createGameplaySession";
@@ -9,6 +8,7 @@ import { bindOsuPointerAim, osuPointerMovementEvent } from "../gameplay/osu/OsuP
 import { ManiaTouchControls } from "./ManiaTouchControls";
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { bindOsuHardwareCursor, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
+import type { CompletedGameplay } from "../replay/RecordedReplay";
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -23,7 +23,7 @@ interface GameplayScreenProps {
   replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
-  onFinish: (score: ScoreResult) => void;
+  onFinish: (completed: CompletedGameplay) => void;
 }
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,

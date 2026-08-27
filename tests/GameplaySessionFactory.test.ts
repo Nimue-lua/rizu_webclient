@@ -9,6 +9,7 @@ import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 function createManiaData(): ManiaGameplayData {
   return {
     mode: "mania",
+    chart_id: "mania-chart",
     audio_buffer: {} as AudioBuffer,
     audio_context: {} as AudioContext,
     chart: { mode: "mania", column_count: 1, primary_tempo: 120, notes: [], visual_points: [] },
@@ -19,6 +20,7 @@ function createManiaData(): ManiaGameplayData {
 function createOsuData(): OsuGameplayData {
   return {
     mode: "osu",
+    chart_id: "osu-chart",
     audio_buffer: {} as AudioBuffer,
     audio_context: {} as AudioContext,
     chart: { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, end_time: 1, overall_difficulty: 5,

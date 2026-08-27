@@ -11,11 +11,11 @@ import { WebAudioPlayback } from "../audio/WebAudioPlayback";
 import { OsuHitSoundPlayer } from "./audio/OsuHitSoundPlayer";
 import { OsuRenderer, type OsuGameplayRenderer } from "./rendering/OsuRenderer";
 import { calculateOsuStandardDifficultyMultiplier } from "./scoring/OsuStandardDifficulty";
-import type { ScoreResult } from "../scoring/ScoreResult";
 import type { OsuSliderRendererMode } from "./rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "./OsuHardwareCursor";
 import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
 import { Timings } from "../timing/Timings";
+import { replayTick, type CompletedGameplay } from "../../replay/RecordedReplay";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;
@@ -46,6 +46,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly hit_sound_player: OsuHitSoundPlayer;
   private readonly clock: AudioGameplayClock;
   private readonly music_rate: number;
+  private readonly replay_base: OsuReplayBaseValues;
   private readonly hud_state = new HudStateDeriver();
   private readonly rules_engine: OsuRulesEngine;
   private readonly chart: OsuGameplayData["chart"];
@@ -59,15 +60,18 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private finished = false;
   private destroyed = false;
   private played_judgment_events = 0;
+  private pending_aim: Extract<OsuInputEvent, { type: "aim" }> | null = null;
+  private last_recorded_aim_performance_time = Number.NEGATIVE_INFINITY;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
     cursor_renderer: OsuCursorRendererMode, replay_base: OsuReplayBaseValues,
     slider_renderer: OsuSliderRendererMode, input_bindings: readonly (string | null)[],
-    private readonly finish: (score: ScoreResult) => void,
+    private readonly finish: (completed: CompletedGameplay) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
+    this.replay_base = replay_base;
     const timing_configuration = resolveOsuStandardTimingValues(Timings.fromValue(replay_base.timings));
     const chart = applyOsuHitObjectStacking(data.chart, replay_base.approach_rate ?? data.chart.approach_rate,
       replay_base.circle_size ?? data.chart.circle_size);
@@ -134,7 +138,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const position = this.renderer.clientToPlayfield({ x: client_x, y: client_y }, bounds);
     this.cursor_position = position;
     const time = this.clock.timeAt(performance_time).corrected;
-    this.input_events.push({ type: "aim", time, x: position.x, y: position.y });
+    this.pending_aim = { type: "aim", time, x: position.x, y: position.y };
     this.rules_engine.setInput(position.x, position.y,
       this.action_sources.primary > 0 || this.action_sources.secondary > 0, time);
   }
@@ -189,6 +193,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     if ((previous === 0) === (current === 0)) return;
     const time = this.clock.timeAt(performance_time).corrected;
     const pressed_now = current > 0;
+    this.flushPendingAim(performance_time, true);
     this.input_events.push({ type: "action", time, action, pressed: pressed_now });
     this.rules_engine.setInput(this.cursor_position.x, this.cursor_position.y,
       this.action_sources.primary > 0 || this.action_sources.secondary > 0, time);
@@ -201,10 +206,28 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private finishGameplay(): void {
     if (this.finished) return;
     this.finished = true;
-    this.finish(this.rules_engine.score);
+    this.flushPendingAim(Number.POSITIVE_INFINITY, true);
+    this.finish({
+      score: this.rules_engine.score,
+      replay_base: this.replay_base,
+      replay: {
+        version: 1,
+        mode: "osu",
+        time_unit: "1/8192 second",
+        input_events: this.input_events.map((event) => event.type === "aim"
+          ? { ...event, time: replayTick(event.time), x: replayTick(event.x), y: replayTick(event.y) }
+          : { ...event, time: replayTick(event.time) }),
+        judgment_events: this.rules_engine.judgment_events.map((event) => ({
+          ...event,
+          time: replayTick(event.time),
+          ...("delta_time" in event ? { delta_time: replayTick(event.delta_time) } : {}),
+        })),
+      },
+    });
   }
 
   private readonly render = (timestamp: number) => {
+    this.flushPendingAim(timestamp, false);
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.rules_engine.update(song_time);
     this.playHitSounds();
@@ -218,6 +241,14 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     }
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   };
+
+  private flushPendingAim(performance_time: number, force: boolean): void {
+    if (this.pending_aim === null) return;
+    if (!force && performance_time - this.last_recorded_aim_performance_time < 1000 / 60) return;
+    this.input_events.push(this.pending_aim);
+    this.pending_aim = null;
+    this.last_recorded_aim_performance_time = performance_time;
+  }
 
   private playHitSounds(): void {
     while (this.played_judgment_events < this.rules_engine.judgment_events.length) {
