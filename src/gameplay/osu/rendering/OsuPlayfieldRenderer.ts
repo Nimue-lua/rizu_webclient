@@ -19,6 +19,7 @@ const JUDGMENT_HOLD = 0.5;
 const JUDGMENT_LIFETIME = 1.1;
 const OSU_HIT_OBJECT_TEXTURE_SIZE = 128;
 const REVERSE_ARROW_FADE_IN = 0.15;
+const REVERSE_ARROW_PULSE_DURATION = 0.3;
 const FOLLOW_FADE_IN = 0.06;
 const FOLLOW_SCALE_IN = 0.18;
 
@@ -185,11 +186,17 @@ export class OsuPlayfieldRenderer {
     const rotation = Math.atan2(outgoing_y, outgoing_x);
     const repeat_time = slider.absolute_time + (span_index + 1) * slider.span_duration;
     const appear_time = span_index === 0
-      ? slider.absolute_time - preempt
+      ? slider.absolute_time - preempt * 2 / 3
       : slider.absolute_time + span_index * slider.span_duration;
     const fade_alpha = Math.min(1, Math.max(0, (song_time - appear_time) / REVERSE_ARROW_FADE_IN));
     if (song_time >= repeat_time || fade_alpha <= 0) return;
-    const scale = circle_diameter / OSU_HIT_OBJECT_TEXTURE_SIZE;
+    const pulse_start = appear_time + Math.floor((song_time - appear_time) / REVERSE_ARROW_PULSE_DURATION) *
+      REVERSE_ARROW_PULSE_DURATION;
+    const pulse_duration = Math.min(REVERSE_ARROW_PULSE_DURATION, repeat_time - pulse_start);
+    const pulse_progress = Math.min(1, Math.max(0, (song_time - pulse_start) / pulse_duration));
+    const eased_progress = 2 * pulse_progress - pulse_progress * pulse_progress;
+    const pulse_scale = 1.3 - 0.3 * eased_progress;
+    const scale = circle_diameter / OSU_HIT_OBJECT_TEXTURE_SIZE * pulse_scale;
     const width = sprite.sourceSize.w * scale;
     const height = sprite.sourceSize.h * scale;
     write(center.x - width / 2, center.y - height / 2, width, height,

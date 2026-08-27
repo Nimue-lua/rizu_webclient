@@ -470,6 +470,40 @@ test("draws the next repeat arrow in the outgoing endpoint direction", () => {
   assert.ok(Math.abs(Math.abs(reverse[9]!) - Math.PI) < 1e-9);
 });
 
+test("pulses reverse arrows with osu's quadratic 300ms scale animation", () => {
+  const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const arrow = { sourceSize: { w: 128, h: 128 } } as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: circle, hitCircleOverlay: circle, approachCircle: circle,
+    comboColor: [1, 1, 1, 1], sliderBallFrames: [], reverseArrow: arrow } as unknown as OsuStandardSkin;
+  const slider: OsuSlider = {
+    kind: "slider", x: 100, y: 100, absolute_time: 1, hit_sound: 0, curve_type: "linear",
+    control_points: [{ x: 200, y: 100 }], repeat_count: 2, pixel_length: 100,
+    edge_sounds: [0, 0, 0], edge_sets: [{ normal_set: 0, addition_set: 0 },
+      { normal_set: 0, addition_set: 0 }, { normal_set: 0, addition_set: 0 }],
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+    span_duration: 0.5, total_duration: 1, end_time: 2, tick_distances: [],
+  };
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 1, drain_length_seconds: 1, end_time: 2, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: [slider] } as const;
+  const path = OsuSliderPath.create(slider, 14);
+  const drawAt = (song_time: number) => {
+    const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+    new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], song_time,
+      (...quad) => quads.push(quad), () => path, () => undefined);
+    return quads.find((quad) => quad[5] === arrow)!;
+  };
+
+  const circle_diameter = osuCircleDiameter(5);
+  const early_cycle = drawAt(1.15);
+  const early_progress = 0.05 / 0.3;
+  const early_scale = 1.3 - 0.3 * (2 * early_progress - early_progress * early_progress);
+  assert.ok(Math.abs(early_cycle[2] - circle_diameter * early_scale) < 1e-9);
+
+  const truncated_final_cycle = drawAt(1.45);
+  assert.ok(Math.abs(truncated_final_cycle[2] - circle_diameter * 1.075) < 1e-9);
+});
+
 test("draws only upcoming ticks for the current slider span", () => {
   const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
   const tick = { sourceSize: { w: 16, h: 17 } } as OsuStandardSkin["hitCircle"];
