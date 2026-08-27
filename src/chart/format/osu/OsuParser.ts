@@ -125,6 +125,8 @@ const CURVE_TYPES: Readonly<Record<string, OsuSliderCurveType>> = {
   L: "linear", B: "bezier", P: "perfect", C: "catmull",
 };
 
+const MAX_SLIDER_TICK_DISTANCE = 100_000;
+
 function normalizeStandardHitObject(object: RawHitObject, timing_points: readonly RawTimingPoint[],
   slider_multiplier: number, slider_tick_rate: number, format_version: number): OsuHitObject {
   const line = object.fields.join(",");
@@ -161,10 +163,12 @@ function normalizeStandardHitObject(object: RawHitObject, timing_points: readonl
     const tick_distance = Math.min(pixel_length, format_version < 8
       ? base_tick_distance
       : base_tick_distance * timing.velocity);
+    // lazer caps tick generation for pathological edited sliders while preserving their actual length and duration.
+    const tick_generation_length = Math.min(pixel_length, MAX_SLIDER_TICK_DISTANCE);
     const tick_distances: number[] = [];
     if (tick_distance > 0 && velocity > 0) {
-      for (let distance = tick_distance; distance <= pixel_length; distance += tick_distance) {
-        if (pixel_length - distance <= velocity * 0.01) break;
+      for (let distance = tick_distance; distance <= tick_generation_length; distance += tick_distance) {
+        if (tick_generation_length - distance <= velocity * 0.01) break;
         tick_distances.push(distance);
       }
     }

@@ -201,6 +201,30 @@ SliderTickRate:2
   }
 });
 
+test("bounds tick generation for pathological sliders without changing their duration", () => {
+  const chart = parseOsuChart(`osu file format v14
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+SliderMultiplier:1
+SliderTickRate:1
+[TimingPoints]
+0,1000,4,2,0,100,1,0
+[HitObjects]
+64,64,1000,2,0,L|164:64,1,1000000000
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  const slider = chart.hit_objects[0];
+  assert.equal(slider?.kind, "slider");
+  if (slider?.kind === "slider") {
+    assert.equal(slider.end_time, 10000001);
+    assert.equal(slider.tick_distances.length, 999);
+    assert.equal(slider.tick_distances.at(-1), 99900);
+  }
+});
+
 test("preserves source order for same-time standard objects", () => {
   const chart = parseOsuChart(`
 [General]
