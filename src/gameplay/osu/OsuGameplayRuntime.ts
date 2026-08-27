@@ -13,6 +13,7 @@ import { OsuRenderer, type OsuGameplayRenderer } from "./rendering/OsuRenderer";
 import { calculateOsuStandardDifficultyMultiplier } from "./scoring/OsuStandardDifficulty";
 import type { ScoreResult } from "../scoring/ScoreResult";
 import type { OsuSliderRendererMode } from "./rendering/WebGlSliderGraphics";
+import type { OsuCursorRendererMode } from "./OsuHardwareCursor";
 import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
 import { Timings } from "../timing/Timings";
 
@@ -22,7 +23,8 @@ export interface OsuGameplayRuntimeDependencies {
   cancel_animation_frame: (handle: number) => void;
   performance_now: () => number;
   create_renderer: (canvas: HTMLCanvasElement, data: OsuGameplayData,
-    replay_base: OsuReplayBaseValues, cursor_scale: number, slider_renderer: OsuSliderRendererMode) => OsuGameplayRenderer;
+    replay_base: OsuReplayBaseValues, cursor_scale: number, cursor_renderer: OsuCursorRendererMode,
+    slider_renderer: OsuSliderRendererMode) => OsuGameplayRenderer;
 }
 
 function createDefaultDependencies(): OsuGameplayRuntimeDependencies {
@@ -31,8 +33,9 @@ function createDefaultDependencies(): OsuGameplayRuntimeDependencies {
     request_animation_frame: (callback) => window.requestAnimationFrame(callback),
     cancel_animation_frame: (handle) => window.cancelAnimationFrame(handle),
     performance_now: () => performance.now(),
-    create_renderer: (canvas, data, replay_base, cursor_scale, slider_renderer) => new OsuRenderer(canvas, data.note_skin,
-      undefined, replay_base.x_flip, replay_base.y_flip, cursor_scale, slider_renderer),
+    create_renderer: (canvas, data, replay_base, cursor_scale, cursor_renderer, slider_renderer) =>
+      new OsuRenderer(canvas, data.note_skin, undefined, replay_base.x_flip, replay_base.y_flip,
+        cursor_scale, cursor_renderer === "webgl", slider_renderer),
   };
 }
 
@@ -58,7 +61,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private played_judgment_events = 0;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
-    master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number, replay_base: OsuReplayBaseValues,
+    master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
+    cursor_renderer: OsuCursorRendererMode, replay_base: OsuReplayBaseValues,
     slider_renderer: OsuSliderRendererMode, input_bindings: readonly (string | null)[],
     private readonly finish: (score: ScoreResult) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
@@ -68,7 +72,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const chart = applyOsuHitObjectStacking(data.chart, replay_base.approach_rate ?? data.chart.approach_rate,
       replay_base.circle_size ?? data.chart.circle_size);
     this.chart = chart;
-    this.renderer = dependencies.create_renderer(canvas, { ...data, chart }, replay_base, cursor_scale, slider_renderer);
+    this.renderer = dependencies.create_renderer(canvas, { ...data, chart }, replay_base, cursor_scale,
+      cursor_renderer, slider_renderer);
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
       replay_base.overall_difficulty ?? chart.overall_difficulty ?? 5,
       replay_base.circle_size ?? chart.circle_size, chart.object_count, chart.drain_length_seconds);

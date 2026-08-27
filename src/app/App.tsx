@@ -35,6 +35,7 @@ import {
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
 import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
+import { osuCursorRendererMode, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -43,6 +44,7 @@ const MUSIC_OFFSET_KEY = "rizu.music-offset";
 const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
 const CURSOR_SCALE_KEY = "rizu.cursor-scale";
+const OSU_CURSOR_RENDERER_KEY = "rizu.osu-cursor-renderer";
 const OSU_RAW_INPUT_KEY = "rizu.osu-raw-input";
 const OSU_SLIDER_RENDERER_KEY = "rizu.osu-slider-renderer";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
@@ -99,6 +101,8 @@ export function App() {
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     return Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 2 ? stored_value : 1;
   });
+  const [osu_cursor_renderer, setOsuCursorRenderer] = useState<OsuCursorRendererMode>(() =>
+    osuCursorRendererMode(localStorage.getItem(OSU_CURSOR_RENDERER_KEY)));
   const [osu_raw_input, setOsuRawInput] = useState(() => localStorage.getItem(OSU_RAW_INPUT_KEY) === "true");
   const [osu_slider_renderer, setOsuSliderRenderer] = useState<OsuSliderRendererMode>(() =>
     osuSliderRendererMode(localStorage.getItem(OSU_SLIDER_RENDERER_KEY)));
@@ -212,6 +216,11 @@ export function App() {
   const changeOsuRawInput = (enabled: boolean) => {
     localStorage.setItem(OSU_RAW_INPUT_KEY, String(enabled));
     setOsuRawInput(enabled);
+  };
+
+  const changeOsuCursorRenderer = (renderer: OsuCursorRendererMode) => {
+    localStorage.setItem(OSU_CURSOR_RENDERER_KEY, renderer);
+    setOsuCursorRenderer(renderer);
   };
 
   const changeOsuSliderRenderer = (renderer: OsuSliderRendererMode) => {
@@ -361,6 +370,7 @@ export function App() {
             music_offset={music_offset}
             scroll_speed={scroll_speed}
             cursor_scale={cursor_scale}
+            osu_cursor_renderer={osu_cursor_renderer}
             osu_raw_input={osu_raw_input}
             osu_slider_renderer={osu_slider_renderer}
             replay_base={replay_base}
@@ -436,6 +446,7 @@ export function App() {
               scroll_speed={scroll_speed}
               scroll_speed_type={scroll_speed_type}
               cursor_scale={cursor_scale}
+              osu_cursor_renderer={osu_cursor_renderer}
               osu_raw_input={osu_raw_input}
               osu_slider_renderer={osu_slider_renderer}
               hit_registration={hit_registration}
@@ -445,6 +456,7 @@ export function App() {
               onScrollSpeedChange={changeScrollSpeed}
               onScrollSpeedTypeChange={changeScrollSpeedType}
               onCursorScaleChange={changeCursorScale}
+              onOsuCursorRendererChange={changeOsuCursorRenderer}
               onOsuRawInputChange={changeOsuRawInput}
               onOsuSliderRendererChange={changeOsuSliderRenderer}
               onHitRegistrationChange={changeHitRegistration}

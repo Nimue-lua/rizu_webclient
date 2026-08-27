@@ -39,15 +39,18 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private readonly x_flip: boolean;
   private readonly y_flip: boolean;
   private readonly cursor_scale: number;
+  private readonly draw_cursor: boolean;
   private readonly slider_paths = new Map<OsuSlider, OsuSliderPath>();
   private readonly rejected_slider_paths = new WeakSet<OsuSlider>();
 
   constructor(canvas: HTMLCanvasElement, skin: OsuStandardSkin, hud?: GameplayHudRenderer,
-    x_flip = false, y_flip = false, cursor_scale = 1, slider_renderer: OsuSliderRendererMode = "direct") {
+    x_flip = false, y_flip = false, cursor_scale = 1, draw_cursor = true,
+    slider_renderer: OsuSliderRendererMode = "direct") {
     this.skin = skin;
     this.x_flip = x_flip;
     this.y_flip = y_flip;
     this.cursor_scale = cursor_scale;
+    this.draw_cursor = draw_cursor;
     this.playfield = new OsuPlayfieldRenderer(skin);
     this.combo = new OsuComboRenderer(skin);
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
@@ -102,12 +105,14 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.combo.draw(state.combo, state.comboAnimationAge, state.comboAnimationFrom,
       8, frame.logical_height - 8, write);
     this.hud.drawScore(state.hud, getGameplayHudLayout(frame.logical_width));
-    const cursor_center = viewport.playfieldToScreen(cursor.position);
-    const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
-    const cursor_width = this.skin.cursor.sourceSize.w * viewport.scale * cursor_scale;
-    const cursor_height = this.skin.cursor.sourceSize.h * viewport.scale * cursor_scale;
-    write(cursor_center.x - cursor_width / 2, cursor_center.y - cursor_height / 2,
-      cursor_width, cursor_height, [1, 1, 1, 1], this.skin.cursor);
+    if (this.draw_cursor) {
+      const cursor_center = viewport.playfieldToScreen(cursor.position);
+      const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
+      const cursor_width = this.skin.cursor.sourceSize.w * viewport.scale * cursor_scale;
+      const cursor_height = this.skin.cursor.sourceSize.h * viewport.scale * cursor_scale;
+      write(cursor_center.x - cursor_width / 2, cursor_center.y - cursor_height / 2,
+        cursor_width, cursor_height, [1, 1, 1, 1], this.skin.cursor);
+    }
     this.active_commands = null;
     this.graphics.submit(commands);
   }

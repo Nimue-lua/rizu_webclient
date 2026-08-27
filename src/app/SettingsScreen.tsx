@@ -7,6 +7,7 @@ import {
   type ScrollSpeedType,
 } from "../gameplay/mania/ScrollSpeed";
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
+import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 
 interface SettingsScreenProps {
   master_volume: number;
@@ -15,6 +16,7 @@ interface SettingsScreenProps {
   scroll_speed: number;
   scroll_speed_type: ScrollSpeedType;
   cursor_scale: number;
+  osu_cursor_renderer: OsuCursorRendererMode;
   osu_raw_input: boolean;
   osu_slider_renderer: OsuSliderRendererMode;
   hit_registration: ManiaHitRegistration;
@@ -24,6 +26,7 @@ interface SettingsScreenProps {
   onScrollSpeedChange: (scroll_speed: number) => void;
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
   onCursorScaleChange: (cursor_scale: number) => void;
+  onOsuCursorRendererChange: (renderer: OsuCursorRendererMode) => void;
   onOsuRawInputChange: (enabled: boolean) => void;
   onOsuSliderRendererChange: (renderer: OsuSliderRendererMode) => void;
   onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
@@ -41,6 +44,7 @@ export function SettingsScreen({
   scroll_speed,
   scroll_speed_type,
   cursor_scale,
+  osu_cursor_renderer,
   osu_raw_input,
   osu_slider_renderer,
   hit_registration,
@@ -50,6 +54,7 @@ export function SettingsScreen({
   onScrollSpeedChange,
   onScrollSpeedTypeChange,
   onCursorScaleChange,
+  onOsuCursorRendererChange,
   onOsuRawInputChange,
   onOsuSliderRendererChange,
   onHitRegistrationChange,
@@ -213,6 +218,15 @@ export function SettingsScreen({
             <option value="stable">Stable experimental</option>
           </select>
           <small>Stable experimental reproduces legacy framebuffer and GPU viewport artifacts for Aspire maps.</small>
+        </label>
+        <label className="settings-control" htmlFor="settings-osu-cursor-renderer">
+          <span>osu! cursor renderer</span>
+          <select id="settings-osu-cursor-renderer" value={osu_cursor_renderer}
+            onChange={(event) => onOsuCursorRendererChange(event.target.value as OsuCursorRendererMode)}>
+            <option value="os">OS cursor (low latency)</option>
+            <option value="webgl">WebGL cursor</option>
+          </select>
+          <small>OS cursor reduces visual latency. WebGL supports the original pressed cursor animation.</small>
         </label>
         <div className="settings-control">
           <span>osu! raw pointer input</span>
