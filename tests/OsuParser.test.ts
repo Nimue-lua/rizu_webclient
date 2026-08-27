@@ -139,6 +139,28 @@ SliderMultiplier:1.4
   assert.equal(chart.end_time, 2.115);
 });
 
+test("applies the first red timing point to a slider just before its timestamp", () => {
+  const chart = parseOsuChart(`osu file format v12
+[General]
+Mode:0
+[Difficulty]
+CircleSize:4
+SliderMultiplier:1.8
+[TimingPoints]
+852.123875140607,468.75,4,2,1,50,1,0
+[HitObjects]
+352,332,852,2,0,P|384:300|400:240,1,90
+`);
+  assert.equal(chart.mode, "osu");
+  if (chart.mode !== "osu") return;
+  const slider = chart.hit_objects[0];
+  assert.equal(slider?.kind, "slider");
+  if (slider?.kind === "slider") {
+    assert.equal(slider.end_time, 1.086);
+    assert.equal(slider.span_duration, 0.2340000000000001);
+  }
+});
+
 test("precomputes stable slider tick distances with versioned SV behavior", () => {
   const modern = parseOsuChart(`osu file format v14
 [General]

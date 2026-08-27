@@ -112,6 +112,7 @@ function activeSliderTiming(points: readonly RawTimingPoint[], start_time: numbe
     if (points[index]!.uninherited) red_index = index;
     else inherited_index = index;
   }
+  if (red_index < 0) red_index = points.findIndex((point) => point.uninherited && point.beat_length > 0);
   const red = points[red_index];
   const inherited = points[inherited_index];
   const velocity = inherited_index > red_index && inherited && inherited.beat_length < 0
