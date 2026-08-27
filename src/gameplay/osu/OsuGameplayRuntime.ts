@@ -15,7 +15,7 @@ import type { OsuSliderRendererMode } from "./rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "./OsuHardwareCursor";
 import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
 import { Timings } from "../timing/Timings";
-import { replayTick, type CompletedGameplay } from "../../replay/RecordedReplay";
+import { replayTick, replayValue, type CompletedGameplay, type OsuRecordedReplay } from "../../replay/RecordedReplay";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;
@@ -62,16 +62,23 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private played_judgment_events = 0;
   private pending_aim: Extract<OsuInputEvent, { type: "aim" }> | null = null;
   private last_recorded_aim_performance_time = Number.NEGATIVE_INFINITY;
+  private replay_event_index = 0;
+  private replay_aim_index = 0;
+  private readonly replay_aim_events: Array<{ time: number; x: number; y: number }>;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
     cursor_renderer: OsuCursorRendererMode, replay_base: OsuReplayBaseValues,
     slider_renderer: OsuSliderRendererMode, input_bindings: readonly (string | null)[],
     private readonly finish: (completed: CompletedGameplay) => void,
-    dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
+    dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
+    private readonly playback_replay?: OsuRecordedReplay) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
     this.replay_base = replay_base;
+    this.replay_aim_events = (playback_replay?.input_events ?? []).flatMap((event) => event.type === "aim"
+      ? [{ time: replayValue(event.time), x: replayValue(event.x), y: replayValue(event.y) }]
+      : []);
     const timing_configuration = resolveOsuStandardTimingValues(Timings.fromValue(replay_base.timings));
     const chart = applyOsuHitObjectStacking(data.chart, replay_base.approach_rate ?? data.chart.approach_rate,
       replay_base.circle_size ?? data.chart.circle_size);
@@ -115,7 +122,9 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
 
   start(): void {
     this.dependencies.event_target.addEventListener("keydown", this.handleKeyDown as EventListener);
-    this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
+    if (!this.playback_replay) {
+      this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
+    }
     const lead_in = getAudioStartDelay(this.data, this.music_rate);
     this.playback.start(lead_in);
     this.clock.start(lead_in);
@@ -135,6 +144,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
 
   aimPointer(_pointer_id: number, client_x: number, client_y: number,
     bounds: { left: number; top: number; width: number; height: number }, performance_time: number): void {
+    if (this.playback_replay) return;
     const position = this.renderer.clientToPlayfield({ x: client_x, y: client_y }, bounds);
     this.cursor_position = position;
     const time = this.clock.timeAt(performance_time).corrected;
@@ -144,6 +154,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   }
 
   pressPointer(pointer_id: number, action: OsuAction, performance_time: number): void {
+    if (this.playback_replay) return;
     const actions = this.pointer_actions.get(pointer_id) ?? new Set<OsuAction>();
     if (actions.has(action)) return;
     actions.add(action);
@@ -152,6 +163,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   }
 
   releasePointer(pointer_id: number, action: OsuAction, performance_time: number): void {
+    if (this.playback_replay) return;
     const actions = this.pointer_actions.get(pointer_id);
     if (!actions?.delete(action)) return;
     if (actions.size === 0) this.pointer_actions.delete(pointer_id);
@@ -159,6 +171,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   }
 
   cancelPointer(pointer_id: number, performance_time: number): void {
+    if (this.playback_replay) return;
     const actions = this.pointer_actions.get(pointer_id);
     if (!actions) return;
     this.pointer_actions.delete(pointer_id);
@@ -171,6 +184,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       this.finishGameplay();
       return;
     }
+    if (this.playback_replay) return;
     const action = this.key_actions.get(event.code);
     if (action === undefined) return;
     event.preventDefault();
@@ -229,6 +243,12 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly render = (timestamp: number) => {
     this.flushPendingAim(timestamp, false);
     const song_time = this.clock.timeAt(timestamp).monotonic;
+    this.applyReplayEvents(song_time);
+    if (this.playback_replay) {
+      this.updateReplayCursor(song_time);
+      this.rules_engine.setInput(this.cursor_position.x, this.cursor_position.y,
+        this.action_sources.primary > 0 || this.action_sources.secondary > 0, song_time);
+    }
     this.rules_engine.update(song_time);
     this.playHitSounds();
       this.renderer.draw(this.chart, this.rules_engine.circle_states,
@@ -241,6 +261,47 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     }
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   };
+
+  private applyReplayEvents(song_time: number): void {
+    const events = this.playback_replay?.input_events;
+    if (!events) return;
+    while (this.replay_event_index < events.length) {
+      const event = events[this.replay_event_index]!;
+      const event_time = replayValue(event.time);
+      if (event_time > song_time) break;
+      if (event.type === "aim") {
+        this.updateReplayCursor(event_time);
+      } else {
+        this.updateReplayCursor(event_time);
+        this.action_sources[event.action] = event.pressed ? 1 : 0;
+      }
+      const pressed = this.action_sources.primary > 0 || this.action_sources.secondary > 0;
+      this.rules_engine.setInput(this.cursor_position.x, this.cursor_position.y, pressed, event_time);
+      if (event.type === "action" && event.pressed) {
+        this.rules_engine.click(this.cursor_position.x, this.cursor_position.y, event_time);
+      }
+      this.replay_event_index += 1;
+    }
+  }
+
+  private updateReplayCursor(song_time: number): void {
+    if (this.replay_aim_events.length === 0) return;
+    while (this.replay_aim_index + 1 < this.replay_aim_events.length &&
+      this.replay_aim_events[this.replay_aim_index + 1]!.time <= song_time) {
+      this.replay_aim_index += 1;
+    }
+    const previous = this.replay_aim_events[this.replay_aim_index]!;
+    const next = this.replay_aim_events[this.replay_aim_index + 1];
+    if (!next || next.time <= previous.time) {
+      this.cursor_position = { x: previous.x, y: previous.y };
+      return;
+    }
+    const progress = Math.max(0, Math.min(1, (song_time - previous.time) / (next.time - previous.time)));
+    this.cursor_position = {
+      x: previous.x + (next.x - previous.x) * progress,
+      y: previous.y + (next.y - previous.y) * progress,
+    };
+  }
 
   private flushPendingAim(performance_time: number, force: boolean): void {
     if (this.pending_aim === null) return;

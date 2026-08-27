@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { replayTick, type CompletedGameplay } from "../src/replay/RecordedReplay";
+import { replayTick, replayValue, type CompletedGameplay } from "../src/replay/RecordedReplay";
 import { storedPlay } from "../src/replay/ReplayStore";
 import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
 
@@ -8,6 +8,7 @@ test("quantizes replay values to integer 1/8192 ticks", () => {
   assert.equal(replayTick(1), 8192);
   assert.equal(replayTick(-0.001), -8);
   assert.equal(replayTick(12.3456), 101135);
+  assert.equal(replayValue(8192), 1);
 });
 
 test("builds a searchable stored play with replay data as JSON", () => {

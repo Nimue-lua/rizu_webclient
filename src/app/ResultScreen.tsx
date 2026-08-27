@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Clock3, Metronome, Star } from "lucide-react";
+import { Clock3, Metronome, Play, Star } from "lucide-react";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { JudgeSegmentsCanvas } from "./JudgeSegmentsCanvas";
 
@@ -31,11 +31,12 @@ interface ResultScreenProps {
   difficulty: number;
   overall_difficulty: number;
   mode: "mania" | "osu";
+  onReplay: () => void;
   onExit: () => void;
 }
 
 export function ResultScreen({ score, background_url, title, artist, chart_name, duration_seconds,
-  long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, mode, onExit }: ResultScreenProps) {
+  long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, mode, onReplay, onExit }: ResultScreenProps) {
   const grade_color = GRADE_COLORS[score?.grade ?? ""] ?? FALLBACK_GRADE_COLOR;
 
   useEffect(() => {
@@ -53,6 +54,9 @@ export function ResultScreen({ score, background_url, title, artist, chart_name,
     <main className="screen result-screen">
       {background_url && <img className="result-background" src={background_url} alt="" />}
       <div className="result-bottom-gradient" />
+      <button className="result-replay" type="button" onClick={onReplay}>
+        <Play fill="currentColor" aria-hidden="true" /> Watch replay
+      </button>
       <div className="result-panels">
         <div className="result-side-panel">
           <div className="result-chart-meta">

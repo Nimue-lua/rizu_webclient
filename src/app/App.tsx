@@ -37,6 +37,7 @@ import {
 import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { osuCursorRendererMode, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import { savePlay, storedPlay } from "../replay/ReplayStore";
+import type { CompletedGameplay } from "../replay/RecordedReplay";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -72,6 +73,8 @@ export function App() {
   const [osz_import_error, setOszImportError] = useState<string | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
+  const [completed_gameplay, setCompletedGameplay] = useState<CompletedGameplay | null>(null);
+  const [playback, setPlayback] = useState<CompletedGameplay | null>(null);
   const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const local_skin_urls = useRef(new Map<string, string>());
@@ -286,6 +289,8 @@ export function App() {
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
     setScore(null);
+    setCompletedGameplay(null);
+    setPlayback(null);
     setLoadingReturnScreen(screen === "osz-select" ? "osz-select" : "song-select");
     setScreen("loading");
   };
@@ -337,6 +342,8 @@ export function App() {
     if (assets) destroyNoteSkin(assets.note_skin);
     setAssets(null);
     setScore(null);
+    setCompletedGameplay(null);
+    setPlayback(null);
     setAudioContext(null);
     setLoadingLocation(null);
     setScreen(loading_return_screen);
@@ -378,7 +385,14 @@ export function App() {
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
+            playback={playback ?? undefined}
             onFinish={(completed) => {
+              if (playback) {
+                setPlayback(null);
+                setScreen("result");
+                return;
+              }
+              setCompletedGameplay(completed);
               setScore(completed.score);
               setScreen("result");
               void savePlay(storedPlay(assets.chart_id, completed)).catch((error: unknown) => {
@@ -416,10 +430,15 @@ export function App() {
             duration_seconds={loading_location?.duration_seconds ?? 0}
             long_note_ratio={loading_location?.long_note_ratio ?? 0}
             bpm={loading_location?.bpm ?? 0}
-            music_rate={replay_base.rate}
+            music_rate={completed_gameplay?.replay_base.rate ?? replay_base.rate}
             difficulty={loading_location?.difficulty ?? 0}
             overall_difficulty={assets?.chart.overall_difficulty ?? 5}
             mode={assets?.mode ?? "mania"}
+            onReplay={() => {
+              if (!completed_gameplay) return;
+              setPlayback(completed_gameplay);
+              setScreen("gameplay");
+            }}
             onExit={leaveResults}
           />
         </ScreenTransition>

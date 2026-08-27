@@ -5,7 +5,7 @@ import { OsuGameplayRuntime, type OsuGameplayRuntimeDependencies } from "../src/
 import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
 import type { OsuCursorState } from "../src/gameplay/osu/OsuInputEvent";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
-import type { CompletedGameplay } from "../src/replay/RecordedReplay";
+import { replayTick, type CompletedGameplay, type OsuRecordedReplay } from "../src/replay/RecordedReplay";
 
 class FakeEventTarget {
   private readonly listeners = new Map<string, Set<EventListener>>();
@@ -43,7 +43,7 @@ function key(code: string, timeStamp: number, repeat = false): KeyboardEvent {
   return { code, timeStamp, repeat, preventDefault() {} } as KeyboardEvent;
 }
 
-function createHarness() {
+function createHarness(playback?: OsuRecordedReplay) {
   const events = new FakeEventTarget();
   const frames = new FakeAnimationFrames();
   const cursor_states: OsuCursorState[] = [];
@@ -84,7 +84,7 @@ function createHarness() {
     1, "webgl", createOsuReplayBase(1, 5), "direct", ["KeyZ", "KeyX"], (completed) => {
       completions.push(completed);
       results.push(completed.score);
-    }, dependencies);
+    }, dependencies, playback);
   return { runtime, events, frames, cursor_states, results, completions, get destroy_calls() { return destroy_calls; } };
 }
 
@@ -132,6 +132,66 @@ test("keeps an action pressed while another input source still holds it", () => 
   harness.events.dispatch("keyup", key("KeyZ", 1400));
   assert.equal(harness.runtime.cursor_state.primary, false);
   assert.deepEqual(harness.runtime.input_events.filter((event) => event.type === "action").map((event) => event.pressed), [true, false]);
+});
+
+test("plays quantized osu aim and action events with the rendered replay cursor", () => {
+  const playback: OsuRecordedReplay = {
+    version: 1,
+    mode: "osu",
+    time_unit: "1/8192 second",
+    input_events: [
+      { type: "aim", time: replayTick(2), x: replayTick(256), y: replayTick(192) },
+      { type: "action", time: replayTick(2), action: "primary", pressed: true },
+      { type: "action", time: replayTick(2.01), action: "primary", pressed: false },
+    ],
+    judgment_events: [],
+  };
+  const harness = createHarness(playback);
+
+  harness.runtime.start();
+  assert.equal(harness.events.count("keydown"), 1);
+  assert.equal(harness.events.count("keyup"), 0);
+  harness.runtime.aimPointer(1, 0, 0, { left: 0, top: 0, width: 640, height: 480 }, 3000);
+  harness.frames.run(3120);
+  harness.frames.run(12300);
+
+  assert.equal(harness.results[0]?.judges?.["300"], 1);
+  assert.deepEqual(harness.cursor_states[0]?.position, { x: 256, y: 192 });
+});
+
+test("Escape exits osu replay playback", () => {
+  const playback: OsuRecordedReplay = {
+    version: 1,
+    mode: "osu",
+    time_unit: "1/8192 second",
+    input_events: [],
+    judgment_events: [],
+  };
+  const harness = createHarness(playback);
+
+  harness.runtime.start();
+  harness.events.dispatch("keydown", key("Escape", 1200));
+
+  assert.equal(harness.completions.length, 1);
+});
+
+test("linearly interpolates the replay cursor between aim samples", () => {
+  const playback: OsuRecordedReplay = {
+    version: 1,
+    mode: "osu",
+    time_unit: "1/8192 second",
+    input_events: [
+      { type: "aim", time: replayTick(1), x: replayTick(100), y: replayTick(300) },
+      { type: "aim", time: replayTick(3), x: replayTick(300), y: replayTick(100) },
+    ],
+    judgment_events: [],
+  };
+  const harness = createHarness(playback);
+
+  harness.runtime.start();
+  harness.frames.run(3100);
+
+  assert.deepEqual(harness.cursor_states[0]?.position, { x: 200, y: 200 });
 });
 
 test("tracks both mouse buttons independently on one pointer", () => {

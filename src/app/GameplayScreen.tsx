@@ -23,12 +23,13 @@ interface GameplayScreenProps {
   replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
+  playback?: CompletedGameplay;
   onFinish: (completed: CompletedGameplay) => void;
 }
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
   osu_cursor_renderer, osu_raw_input, osu_slider_renderer, replay_base, input_bindings, hit_registration,
-  onFinish }: GameplayScreenProps) {
+  playback, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
@@ -38,16 +39,18 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
     const canvas = canvas_ref.current;
     if (!canvas) return;
 
+    const effective_cursor_renderer = playback?.replay.mode === "osu" ? "webgl" : osu_cursor_renderer;
     const binding = createGameplaySession({ canvas, data: assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed,
-      cursor_scale, osu_cursor_renderer, osu_slider_renderer, replay_base, input_bindings, hit_registration, finish: onFinish });
+      cursor_scale, osu_cursor_renderer: effective_cursor_renderer, osu_slider_renderer, replay_base, input_bindings,
+      hit_registration, playback, finish: onFinish });
     session_ref.current = binding.session;
-    mania_input_ref.current = binding.mode === "mania" ? binding.pointer_input : null;
-    osu_input_ref.current = binding.mode === "osu" ? binding.pointer_input : null;
+    mania_input_ref.current = !playback && binding.mode === "mania" ? binding.pointer_input : null;
+    osu_input_ref.current = !playback && binding.mode === "osu" ? binding.pointer_input : null;
     let unbind_pointer_aim: (() => void) | undefined;
-    const unbind_hardware_cursor = assets.mode === "osu" && osu_cursor_renderer === "os"
+    const unbind_hardware_cursor = !playback && assets.mode === "osu" && effective_cursor_renderer === "os"
       ? bindOsuHardwareCursor(canvas, assets.note_skin.cursor, cursor_scale)
       : undefined;
-    if (binding.mode === "osu") {
+    if (!playback && binding.mode === "osu") {
       unbind_pointer_aim = bindOsuPointerAim(binding.pointer_input,
         osuPointerMovementEvent(osu_raw_input, "onpointerrawupdate" in window), {
           event_target: canvas,
@@ -70,7 +73,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       binding.session.destroy();
     };
   }, [assets, cursor_scale, hit_registration, input_bindings, master_volume, music_offset, onFinish, osu_cursor_renderer,
-    osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, replay_base, scroll_speed]);
+    osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, playback, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">
@@ -94,7 +97,8 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
         onLostPointerCapture={(event) => osu_input_ref.current?.cancelPointer(event.pointerId, event.timeStamp)}
         onContextMenu={(event) => assets.mode === "osu" && event.preventDefault()}
       />
-      {assets.mode === "mania" && <ManiaTouchControls column_count={assets.chart.column_count} input_ref={mania_input_ref} />}
+      {!playback && assets.mode === "mania" &&
+        <ManiaTouchControls column_count={assets.chart.column_count} input_ref={mania_input_ref} />}
     </main>
   );
 }

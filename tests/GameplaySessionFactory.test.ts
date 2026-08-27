@@ -5,6 +5,8 @@ import { createGameplaySession, type GameplaySessionFactoryDependencies,
   type GameplaySessionOptions } from "../src/gameplay/createGameplaySession";
 import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../src/gameplay/GameplaySession";
 import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
+import type { CompletedGameplay } from "../src/replay/RecordedReplay";
+import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
 
 function createManiaData(): ManiaGameplayData {
   return {
@@ -140,4 +142,55 @@ test("each factory call creates an independently owned play attempt", () => {
   assert.equal(harness.mania_sessions[0]?.destroys, 1);
   assert.equal(harness.mania_sessions[1]?.starts, 0);
   assert.equal(harness.mania_sessions[1]?.destroys, 0);
+});
+
+test("uses recorded mania rules during replay playback", () => {
+  const harness = createDependencies();
+  const options = createOptions(createManiaData());
+  const replay_base = new ManiaReplayBase();
+  replay_base.rate = 1.5;
+  replay_base.nearest = false;
+  replay_base.tap_only = true;
+  options.playback = {
+    score: {},
+    replay_base: replay_base.exportReplayBase(),
+    replay: { version: 1, mode: "mania", time_unit: "1/8192 second", input_events: [], logic_events: [] },
+  };
+
+  createGameplaySession(options, harness.dependencies);
+
+  assert.equal(harness.mania_options[0]?.replay_base.rate, 1.5);
+  assert.equal(harness.mania_options[0]?.replay_base.tap_only, true);
+  assert.equal(harness.mania_options[0]?.hit_registration, "earliest");
+  assert.equal(harness.mania_options[0]?.playback_replay, options.playback.replay);
+});
+
+test("uses recorded osu rules and forces the WebGL cursor during playback", () => {
+  const harness = createDependencies();
+  const options = createOptions(createOsuData());
+  options.osu_cursor_renderer = "os";
+  const replay_base = createOsuReplayBase(1.75, 8);
+  const playback: CompletedGameplay = {
+    score: {},
+    replay_base,
+    replay: { version: 1, mode: "osu", time_unit: "1/8192 second", input_events: [], judgment_events: [] },
+  };
+  options.playback = playback;
+
+  createGameplaySession(options, harness.dependencies);
+
+  assert.equal(harness.osu_options[0]?.replay_base, replay_base);
+  assert.equal(harness.osu_options[0]?.osu_cursor_renderer, "webgl");
+  assert.equal(harness.osu_options[0]?.playback_replay, playback.replay);
+});
+
+test("rejects replay playback for a different gameplay mode", () => {
+  const options = createOptions(createManiaData());
+  options.playback = {
+    score: {},
+    replay_base: createOsuReplayBase(),
+    replay: { version: 1, mode: "osu", time_unit: "1/8192 second", input_events: [], judgment_events: [] },
+  };
+
+  assert.throws(() => createGameplaySession(options, createDependencies().dependencies), /mode does not match/);
 });

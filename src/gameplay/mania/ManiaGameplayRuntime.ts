@@ -7,7 +7,8 @@ import type { ManiaReplayBase } from "../../replay/mania/ManiaReplayBase";
 import { getAudioStartDelay, getGameplayEndTime } from "../GameplayTiming";
 import { AudioGameplayClock } from "../AudioGameplayClock";
 import { WebAudioPlayback } from "../audio/WebAudioPlayback";
-import { replayTick, type CompletedGameplay, type ManiaRecordedInputEvent } from "../../replay/RecordedReplay";
+import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInputEvent,
+  type ManiaRecordedReplay } from "../../replay/RecordedReplay";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -57,10 +58,12 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private destroyed = false;
   private readonly hud_state = new HudStateDeriver();
   private readonly gameplay_end_time: number;
+  private replay_event_index = 0;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
-    finish: (completed: CompletedGameplay) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies()) {
+    finish: (completed: CompletedGameplay) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
+    private readonly playback_replay?: ManiaRecordedReplay) {
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
@@ -93,7 +96,9 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
 
   start(): void {
     this.dependencies.event_target.addEventListener("keydown", this.handleKeyDown as EventListener);
-    this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
+    if (!this.playback_replay) {
+      this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
+    }
     const lead_in = getAudioStartDelay(this.data, this.music_rate);
     this.playback.start(lead_in);
     this.clock.start(lead_in);
@@ -111,6 +116,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   }
 
   pressPointer(pointer_id: number, column: number, performance_time: number): void {
+    if (this.playback_replay) return;
     if (this.pointer_columns.has(pointer_id)) return;
     this.pointer_columns.set(pointer_id, column);
     this.pressed_columns[column]! += 1;
@@ -122,6 +128,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   }
 
   releasePointer(pointer_id: number, performance_time: number): void {
+    if (this.playback_replay) return;
     const column = this.pointer_columns.get(pointer_id);
     if (column === undefined) return;
     this.pointer_columns.delete(pointer_id);
@@ -139,6 +146,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
       this.abortGameplay(this.clock.timeAt(event.timeStamp).corrected);
       return;
     }
+    if (this.playback_replay) return;
     const column = this.key_columns.get(event.code);
     if (column === undefined) return;
     event.preventDefault();
@@ -215,6 +223,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     const visual_scroll_speed = this.scroll_speed / this.music_rate;
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
     const song_time = this.clock.timeAt(timestamp).monotonic;
+    this.applyReplayEvents(song_time);
     this.rules_engine.update(song_time, range.past, range.future);
     const score = this.rules_engine.score;
     this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed,
@@ -225,4 +234,22 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     }
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   };
+
+  private applyReplayEvents(song_time: number): void {
+    const events = this.playback_replay?.input_events;
+    if (!events) return;
+    while (this.replay_event_index < events.length) {
+      const event = events[this.replay_event_index]!;
+      const event_time = replayValue(event.time);
+      if (event_time > song_time) break;
+      if (event.pressed) {
+        this.pressed_columns[event.column]! += 1;
+        this.rules_engine.press(event.column, event_time);
+      } else {
+        this.pressed_columns[event.column] = Math.max(0, this.pressed_columns[event.column]! - 1);
+        if (event.note_index !== null) this.rules_engine.release(event.note_index, event_time);
+      }
+      this.replay_event_index += 1;
+    }
+  }
 }

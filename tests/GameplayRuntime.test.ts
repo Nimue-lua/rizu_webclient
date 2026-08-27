@@ -5,7 +5,7 @@ import { getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/Gameplay
 import { ManiaGameplayRuntime, type ManiaGameplayRuntimeDependencies } from "../src/gameplay/mania/ManiaGameplayRuntime";
 import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
-import type { CompletedGameplay } from "../src/replay/RecordedReplay";
+import { replayTick, type CompletedGameplay, type ManiaRecordedReplay } from "../src/replay/RecordedReplay";
 import type { ManiaNoteEvent } from "../src/chart/Chart";
 
 function createData(note_times: readonly number[]): GameplayData {
@@ -137,7 +137,11 @@ interface RuntimeHarness {
   completions: CompletedGameplay[];
 }
 
-function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: number; offset?: number } = {}): RuntimeHarness {
+function createRuntime(notes: readonly ManiaNoteEvent[], options: {
+  rate?: number;
+  offset?: number;
+  playback?: ManiaRecordedReplay;
+} = {}): RuntimeHarness {
   const events = new FakeEventTarget();
   const frames = new FakeAnimationFrames();
   const source = new FakeSource();
@@ -185,7 +189,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: numbe
     replay, ["KeyA"], "earliest", (completed) => {
       completions.push(completed);
       scores.push(completed.score);
-    }, dependencies);
+    }, dependencies, options.playback);
   return { runtime, events, frames, source, gain, renderer, scores, completions };
 }
 
@@ -239,6 +243,49 @@ test("applies rate and offset to runtime input timestamps", () => {
 
   assert.equal(harness.scores[0]?.judges?.perfect, 1);
   assert.equal(harness.scores[0]?.accuracy, 1);
+});
+
+test("plays quantized mania press and release events without live input listeners", () => {
+  const playback: ManiaRecordedReplay = {
+    version: 1,
+    mode: "mania",
+    time_unit: "1/8192 second",
+    input_events: [
+      { time: replayTick(0.5), column: 0, pressed: true, note_index: 0, delta_time: 0 },
+      { time: replayTick(1), column: 0, pressed: false, note_index: 0, delta_time: 0 },
+    ],
+    logic_events: [],
+  };
+  const harness = createRuntime([
+    { column: 1, absolute_time: 0.5, weight: 1 },
+    { column: 1, absolute_time: 1, weight: -1 },
+  ], { playback });
+
+  harness.runtime.start();
+  assert.equal(harness.events.count("keydown"), 1);
+  assert.equal(harness.events.count("keyup"), 0);
+  harness.runtime.pressPointer(1, 0, 2200);
+  harness.frames.run(2200);
+  harness.frames.run(3900);
+
+  assert.equal(harness.scores[0]?.judges?.perfect, 2);
+  assert.equal(harness.scores[0]?.accuracy, 1);
+});
+
+test("Escape exits mania replay playback", () => {
+  const playback: ManiaRecordedReplay = {
+    version: 1,
+    mode: "mania",
+    time_unit: "1/8192 second",
+    input_events: [],
+    logic_events: [],
+  };
+  const harness = createRuntime([{ column: 1, absolute_time: 1, weight: 0 }], { playback });
+
+  harness.runtime.start();
+  harness.events.dispatch("keydown", key("Escape", 1200));
+
+  assert.equal(harness.completions.length, 1);
 });
 
 test("prevents browser shortcuts for repeated gameplay keys", () => {

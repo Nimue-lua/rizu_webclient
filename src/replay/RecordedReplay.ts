@@ -11,6 +11,10 @@ export function replayTick(value: number): number {
   return Math.round(value * REPLAY_TICKS_PER_UNIT);
 }
 
+export function replayValue(ticks: number): number {
+  return ticks / REPLAY_TICKS_PER_UNIT;
+}
+
 export interface ManiaRecordedInputEvent {
   readonly time: number;
   readonly column: number;
