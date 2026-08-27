@@ -13,7 +13,7 @@ import type { OsuCircleTransient } from "../OsuCirclePresentation";
 import type { OsuSlider } from "../../chart/Chart";
 import { OsuSliderPath } from "../OsuSliderPath";
 import { osuCircleDiameter } from "../OsuCircleGeometry";
-import { WebGlSliderGraphics } from "./WebGlSliderGraphics";
+import { WebGlSliderGraphics, type OsuSliderRendererMode } from "./WebGlSliderGraphics";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
 
 const MAX_SLIDER_UPLOADS_PER_FRAME = 2;
@@ -43,7 +43,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private readonly rejected_slider_paths = new WeakSet<OsuSlider>();
 
   constructor(canvas: HTMLCanvasElement, skin: OsuStandardSkin, hud?: GameplayHudRenderer,
-    x_flip = false, y_flip = false, cursor_scale = 1) {
+    x_flip = false, y_flip = false, cursor_scale = 1, slider_renderer: OsuSliderRendererMode = "direct") {
     this.skin = skin;
     this.x_flip = x_flip;
     this.y_flip = y_flip;
@@ -51,7 +51,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.playfield = new OsuPlayfieldRenderer(skin);
     this.combo = new OsuComboRenderer(skin);
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
-    this.slider_graphics = new WebGlSliderGraphics(canvas);
+    this.slider_graphics = new WebGlSliderGraphics(canvas, slider_renderer);
     this.hud = hud ?? new SpriteGameplayHudRenderer(skin, this.writeHudCommand);
   }
 

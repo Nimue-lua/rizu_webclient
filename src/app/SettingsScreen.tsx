@@ -6,6 +6,7 @@ import {
   scrollSpeedToDisplay,
   type ScrollSpeedType,
 } from "../gameplay/ScrollSpeed";
+import type { OsuSliderRendererMode } from "../gameplay/renderer/WebGlSliderGraphics";
 
 interface SettingsScreenProps {
   master_volume: number;
@@ -15,6 +16,7 @@ interface SettingsScreenProps {
   scroll_speed_type: ScrollSpeedType;
   cursor_scale: number;
   osu_raw_input: boolean;
+  osu_slider_renderer: OsuSliderRendererMode;
   hit_registration: ManiaHitRegistration;
   onMasterVolumeChange: (master_volume: number) => void;
   onOsuHitSoundVolumeChange: (volume: number) => void;
@@ -23,6 +25,7 @@ interface SettingsScreenProps {
   onScrollSpeedTypeChange: (scroll_speed_type: ScrollSpeedType) => void;
   onCursorScaleChange: (cursor_scale: number) => void;
   onOsuRawInputChange: (enabled: boolean) => void;
+  onOsuSliderRendererChange: (renderer: OsuSliderRendererMode) => void;
   onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
   onExit: () => void;
 }
@@ -39,6 +42,7 @@ export function SettingsScreen({
   scroll_speed_type,
   cursor_scale,
   osu_raw_input,
+  osu_slider_renderer,
   hit_registration,
   onMasterVolumeChange,
   onOsuHitSoundVolumeChange,
@@ -47,6 +51,7 @@ export function SettingsScreen({
   onScrollSpeedTypeChange,
   onCursorScaleChange,
   onOsuRawInputChange,
+  onOsuSliderRendererChange,
   onHitRegistrationChange,
   onExit,
 }: SettingsScreenProps) {
@@ -199,6 +204,15 @@ export function SettingsScreen({
             onChange={(event) => onCursorScaleChange(Number(event.target.value) / 100)}
           />
           <small>Scales the cursor during osu! gameplay.</small>
+        </label>
+        <label className="settings-control" htmlFor="settings-osu-slider-renderer">
+          <span>osu! slider renderer</span>
+          <select id="settings-osu-slider-renderer" value={osu_slider_renderer}
+            onChange={(event) => onOsuSliderRendererChange(event.target.value as OsuSliderRendererMode)}>
+            <option value="direct">Normal</option>
+            <option value="stable">Stable experimental</option>
+          </select>
+          <small>Stable experimental reproduces legacy framebuffer and GPU viewport artifacts for Aspire maps.</small>
         </label>
         <div className="settings-control">
           <span>osu! raw pointer input</span>

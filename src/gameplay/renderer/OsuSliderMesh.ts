@@ -1,5 +1,6 @@
 import type { Point } from "../OsuViewport";
 import type { OsuSliderPath } from "../OsuSliderPath";
+import type { OsuSlider } from "../../chart/Chart";
 
 const CIRCLE_SEGMENTS = 24;
 const MAX_RENDER_POINTS = 2_048;
@@ -11,6 +12,95 @@ export interface OsuSliderMeshData {
   readonly indices: Uint32Array;
   readonly wireframe_indices: Uint32Array;
   readonly bounds: Readonly<{ left: number; top: number; right: number; bottom: number }>;
+}
+
+export interface OsuStableLinearMeshData {
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array;
+  readonly bounds: Readonly<{ left: number; top: number; right: number; bottom: number }>;
+}
+
+export function createOsuStableLinearMesh(slider: OsuSlider, radius: number): OsuStableLinearMeshData {
+  const points = [{ x: slider.x, y: slider.y }, ...slider.control_points];
+  let generated_length = 0;
+  let last_nonzero = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const length = Math.hypot(points[index]!.x - points[index - 1]!.x, points[index]!.y - points[index - 1]!.y);
+    generated_length += length;
+    if (length > 0) last_nonzero = index;
+  }
+  const target_length = Math.max(0, slider.pixel_length);
+  let remaining = target_length;
+  let segment_count = 0;
+  for (let index = 1; index < points.length && remaining > 0; index += 1) {
+    const length = Math.hypot(points[index]!.x - points[index - 1]!.x, points[index]!.y - points[index - 1]!.y);
+    if (length === 0) continue;
+    segment_count += 1;
+    remaining -= Math.min(length, remaining);
+  }
+  if (target_length > generated_length && last_nonzero > 0) segment_count += 1;
+
+  const vertices = new Float32Array(segment_count * 6 * VERTEX_FLOATS);
+  const indices = new Uint32Array(segment_count * 12);
+  let vertex_offset = 0;
+  let index_offset = 0;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  const writeSegment = (start: Point, end: Point) => {
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length === 0) return;
+    const normal_x = -(end.y - start.y) / length * radius;
+    const normal_y = (end.x - start.x) / length * radius;
+    const values = [start.x + normal_x, start.y + normal_y, 1, start.x, start.y, 0,
+      start.x - normal_x, start.y - normal_y, 1,
+      end.x + normal_x, end.y + normal_y, 1,
+      end.x, end.y, 0, end.x - normal_x, end.y - normal_y, 1];
+    const base = vertex_offset / VERTEX_FLOATS;
+    vertices.set(values, vertex_offset);
+    vertex_offset += values.length;
+    indices.set([base, base + 1, base + 3, base + 3, base + 1, base + 4,
+      base + 1, base + 2, base + 4, base + 4, base + 2, base + 5], index_offset);
+    index_offset += 12;
+    left = Math.min(left, start.x - radius, end.x - radius);
+    top = Math.min(top, start.y - radius, end.y - radius);
+    right = Math.max(right, start.x + radius, end.x + radius);
+    bottom = Math.max(bottom, start.y + radius, end.y + radius);
+  };
+
+  remaining = target_length;
+  let final_start: Point | null = null;
+  let final_end: Point | null = null;
+  for (let index = 1; index < points.length && remaining > 0; index += 1) {
+    const start = points[index - 1]!;
+    const end = points[index]!;
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length === 0) continue;
+    const used = Math.min(length, remaining);
+    const adjusted_end = used === length ? end : {
+      x: start.x + (end.x - start.x) * used / length,
+      y: start.y + (end.y - start.y) * used / length,
+    };
+    writeSegment(start, adjusted_end);
+    final_start = start;
+    final_end = adjusted_end;
+    remaining -= used;
+  }
+  if (remaining > 0 && final_start && final_end) {
+    const length = Math.hypot(final_end.x - final_start.x, final_end.y - final_start.y);
+    writeSegment(final_end, {
+      x: final_end.x + (final_end.x - final_start.x) * remaining / length,
+      y: final_end.y + (final_end.y - final_start.y) * remaining / length,
+    });
+  }
+  if (!Number.isFinite(left)) {
+    left = slider.x - radius;
+    top = slider.y - radius;
+    right = slider.x + radius;
+    bottom = slider.y + radius;
+  }
+  return { vertices, indices, bounds: { left, top, right, bottom } };
 }
 
 export function createOsuSliderMesh(path: OsuSliderPath, radius: number): OsuSliderMeshData {

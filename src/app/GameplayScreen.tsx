@@ -7,6 +7,7 @@ import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../gam
 import { createGameplaySession } from "../gameplay/createGameplaySession";
 import { bindOsuPointerAim, osuPointerMovementEvent } from "../gameplay/OsuPointerAimBinding";
 import { ManiaTouchControls } from "./ManiaTouchControls";
+import type { OsuSliderRendererMode } from "../gameplay/renderer/WebGlSliderGraphics";
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -16,6 +17,7 @@ interface GameplayScreenProps {
   scroll_speed: number;
   cursor_scale: number;
   osu_raw_input: boolean;
+  osu_slider_renderer: OsuSliderRendererMode;
   replay_base: ReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
@@ -23,7 +25,7 @@ interface GameplayScreenProps {
 }
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
-  osu_raw_input, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
+  osu_raw_input, osu_slider_renderer, replay_base, input_bindings, hit_registration, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
@@ -34,7 +36,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
     if (!canvas) return;
 
     const binding = createGameplaySession({ canvas, data: assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed,
-      cursor_scale, replay_base, input_bindings, hit_registration, finish: onFinish });
+      cursor_scale, osu_slider_renderer, replay_base, input_bindings, hit_registration, finish: onFinish });
     session_ref.current = binding.session;
     mania_input_ref.current = binding.mode === "mania" ? binding.pointer_input : null;
     osu_input_ref.current = binding.mode === "osu" ? binding.pointer_input : null;
@@ -61,7 +63,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       binding.session.destroy();
     };
   }, [assets, cursor_scale, hit_registration, input_bindings, master_volume, music_offset, onFinish, osu_raw_input,
-    osu_hit_sound_volume, replay_base, scroll_speed]);
+    osu_hit_sound_volume, osu_slider_renderer, replay_base, scroll_speed]);
 
   return (
     <main className="gameplay-screen">

@@ -8,6 +8,7 @@ import { ManiaGameplayRuntime } from "./ManiaGameplayRuntime";
 import { OsuGameplayRuntime } from "./OsuGameplayRuntime";
 import type { GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPointerInput } from "./GameplaySession";
 import type { ScoreResult } from "./scoring/ScoreResult";
+import type { OsuSliderRendererMode } from "./renderer/WebGlSliderGraphics";
 
 export interface GameplaySessionOptions {
   canvas: HTMLCanvasElement;
@@ -17,6 +18,7 @@ export interface GameplaySessionOptions {
   music_offset: number;
   scroll_speed: number;
   cursor_scale: number;
+  osu_slider_renderer: OsuSliderRendererMode;
   replay_base: ReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
@@ -35,7 +37,7 @@ const default_dependencies: GameplaySessionFactoryDependencies = {
     options.hit_registration, options.finish),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.replay_base,
-    options.input_bindings, options.finish),
+    options.osu_slider_renderer, options.input_bindings, options.finish),
 };
 
 export function createGameplaySession(options: GameplaySessionOptions,

@@ -34,6 +34,7 @@ import {
   saveLocalNoteSkin,
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
+import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/renderer/WebGlSliderGraphics";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -43,6 +44,7 @@ const SCROLL_SPEED_KEY = "rizu.scroll-speed";
 const SCROLL_SPEED_TYPE_KEY = "rizu.scroll-speed-type";
 const CURSOR_SCALE_KEY = "rizu.cursor-scale";
 const OSU_RAW_INPUT_KEY = "rizu.osu-raw-input";
+const OSU_SLIDER_RENDERER_KEY = "rizu.osu-slider-renderer";
 const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const MUSIC_RATE_KEY = "rizu.music-rate";
 const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
@@ -98,6 +100,8 @@ export function App() {
     return Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 2 ? stored_value : 1;
   });
   const [osu_raw_input, setOsuRawInput] = useState(() => localStorage.getItem(OSU_RAW_INPUT_KEY) === "true");
+  const [osu_slider_renderer, setOsuSliderRenderer] = useState<OsuSliderRendererMode>(() =>
+    osuSliderRendererMode(localStorage.getItem(OSU_SLIDER_RENDERER_KEY)));
   const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
   const [replay_base, setReplayBase] = useState(() => {
@@ -208,6 +212,11 @@ export function App() {
   const changeOsuRawInput = (enabled: boolean) => {
     localStorage.setItem(OSU_RAW_INPUT_KEY, String(enabled));
     setOsuRawInput(enabled);
+  };
+
+  const changeOsuSliderRenderer = (renderer: OsuSliderRendererMode) => {
+    localStorage.setItem(OSU_SLIDER_RENDERER_KEY, renderer);
+    setOsuSliderRenderer(renderer);
   };
 
   const changeHitRegistration = (value: ManiaHitRegistration) => {
@@ -353,6 +362,7 @@ export function App() {
             scroll_speed={scroll_speed}
             cursor_scale={cursor_scale}
             osu_raw_input={osu_raw_input}
+            osu_slider_renderer={osu_slider_renderer}
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
@@ -427,6 +437,7 @@ export function App() {
               scroll_speed_type={scroll_speed_type}
               cursor_scale={cursor_scale}
               osu_raw_input={osu_raw_input}
+              osu_slider_renderer={osu_slider_renderer}
               hit_registration={hit_registration}
               onMasterVolumeChange={changeMasterVolume}
               onOsuHitSoundVolumeChange={changeOsuHitSoundVolume}
@@ -435,6 +446,7 @@ export function App() {
               onScrollSpeedTypeChange={changeScrollSpeedType}
               onCursorScaleChange={changeCursorScale}
               onOsuRawInputChange={changeOsuRawInput}
+              onOsuSliderRendererChange={changeOsuSliderRenderer}
               onHitRegistrationChange={changeHitRegistration}
               onExit={() => setSettingsOpen(false)}
             />
