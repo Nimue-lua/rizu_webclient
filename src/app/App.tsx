@@ -103,7 +103,7 @@ export function App() {
   });
   const [osu_cursor_renderer, setOsuCursorRenderer] = useState<OsuCursorRendererMode>(() =>
     osuCursorRendererMode(localStorage.getItem(OSU_CURSOR_RENDERER_KEY)));
-  const [osu_raw_input, setOsuRawInput] = useState(() => localStorage.getItem(OSU_RAW_INPUT_KEY) === "true");
+  const [osu_raw_input, setOsuRawInput] = useState(() => localStorage.getItem(OSU_RAW_INPUT_KEY) !== "false");
   const [osu_slider_renderer, setOsuSliderRenderer] = useState<OsuSliderRendererMode>(() =>
     osuSliderRendererMode(localStorage.getItem(OSU_SLIDER_RENDERER_KEY)));
   const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
