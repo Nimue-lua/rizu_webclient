@@ -23,6 +23,7 @@ const SESSION_STARTED_AT = Date.now();
 
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
+  nickname: string;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onReplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }, playback: CompletedGameplay) => void;
   onSettings: () => void;
@@ -32,6 +33,7 @@ interface SongSelectScreenProps {
   tap_only: boolean;
   note_skin_selections: NoteSkinSelections;
   available_note_skins: readonly NoteSkinOption[];
+  score_storage_revision: number;
   onMusicRateChange: (music_rate: number) => void;
   onConstantScrollChange: (constant_scroll: boolean) => void;
   onTapOnlyChange: (tap_only: boolean) => void;
@@ -48,6 +50,7 @@ function formatSessionDuration(duration_seconds: number): string {
 
 export function SongSelectScreen({
   chart_selector,
+  nickname,
   onPlay,
   onReplay,
   onSettings,
@@ -57,6 +60,7 @@ export function SongSelectScreen({
   tap_only,
   note_skin_selections,
   available_note_skins,
+  score_storage_revision,
   onMusicRateChange,
   onConstantScrollChange,
   onTapOnlyChange,
@@ -130,7 +134,7 @@ export function SongSelectScreen({
       console.error("Could not load chart scores", error);
     });
     return () => { active = false; };
-  }, [selected_chart?.id]);
+  }, [selected_chart?.id, score_storage_revision]);
 
   useEffect(() => {
     if (restored_song_scroll_ref.current) return;
@@ -284,14 +288,15 @@ export function SongSelectScreen({
   return (
     <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
       <audio ref={audio_ref} preload="auto" />
-      <SongSelectHeader date_text={date_text} session_duration={session_duration} onSettings={onSettings} />
+      <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration} onSettings={onSettings} />
       <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
         onQueryChange={(query) => { chart_selector.setQuery(query); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
         onSortChange={selectSortMode} />
 
       <section className="song-select-content">
         <SelectedSongPanel background_url={background_url} background_loaded={hero_loaded} selected_chart={selected_chart}
-          selected_song={selected_song} stored_plays={stored_plays} onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
+          selected_song={selected_song} stored_plays={stored_plays} nickname={nickname}
+          onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
         <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
           first_index={first_index} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
           selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}

@@ -36,8 +36,9 @@ import {
 } from "../gameplay/renderer/LocalNoteSkinStore";
 import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { osuCursorRendererMode, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
-import { savePlay, storedPlay } from "../replay/ReplayStore";
+import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
+import { submitPlay } from "../replay/ReplayServer";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -53,6 +54,7 @@ const HIT_REGISTRATION_KEY = "rizu.hit-registration";
 const MUSIC_RATE_KEY = "rizu.music-rate";
 const CONSTANT_SCROLL_KEY = "rizu.constant-scroll-speed";
 const TAP_ONLY_KEY = "rizu.no-long-notes";
+const NICKNAME_KEY = "rizu.nickname";
 const gameplay_loader = new HttpGameplayLoader();
 const chart_selector = new ChartSelector(new SqliteLibrary());
 
@@ -63,6 +65,7 @@ function ScreenTransition({ children }: PropsWithChildren) {
 export function App() {
   const [screen, setScreen] = useState<Screen>("welcome");
   const [settings_open, setSettingsOpen] = useState(false);
+  const [score_storage_revision, setScoreStorageRevision] = useState(0);
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<GameplayData | null>(null);
   const [loading_location, setLoadingLocation] = useState<GameplayLocation | null>(null);
@@ -78,6 +81,7 @@ export function App() {
   const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const local_skin_urls = useRef(new Map<string, string>());
+  const [nickname, setNickname] = useState(() => localStorage.getItem(NICKNAME_KEY) ?? "Anonymous");
   const [master_volume, setMasterVolume] = useState(() => {
     const stored_setting = localStorage.getItem(MASTER_VOLUME_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
@@ -188,6 +192,11 @@ export function App() {
   const changeMasterVolume = (value: number) => {
     localStorage.setItem(MASTER_VOLUME_KEY, String(value));
     setMasterVolume(value);
+  };
+
+  const changeNickname = (value: string) => {
+    localStorage.setItem(NICKNAME_KEY, value);
+    setNickname(value);
   };
 
   const changeOsuHitSoundVolume = (value: number) => {
@@ -395,8 +404,12 @@ export function App() {
               setCompletedGameplay(completed);
               setScore(completed.score);
               setScreen("result");
-              void savePlay(storedPlay(assets.chart_id, completed)).catch((error: unknown) => {
+              const play = storedPlay(assets.chart_id, completed);
+              void savePlay(play).catch((error: unknown) => {
                 console.error("Could not save gameplay replay", error);
+              });
+              void submitPlay(play, nickname).catch((error: unknown) => {
+                console.error("Could not submit gameplay replay", error);
               });
             }}
           />
@@ -448,12 +461,14 @@ export function App() {
         <ScreenTransition key="song-select">
           <SongSelectScreen
             chart_selector={chart_selector}
+            nickname={nickname.trim() || "Anonymous"}
             master_volume={master_volume}
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}
             tap_only={replay_base.tap_only}
             note_skin_selections={note_skin_selections}
             available_note_skins={available_note_skins}
+            score_storage_revision={score_storage_revision}
             onPlay={beginLoading}
             onReplay={(chart, bindings, song, requested_playback) => beginLoading(chart, bindings, song, requested_playback)}
             onSettings={() => setSettingsOpen(true)}
@@ -465,6 +480,7 @@ export function App() {
           />
           {settings_open && (
             <SettingsScreen
+              nickname={nickname}
               master_volume={master_volume}
               osu_hit_sound_volume={osu_hit_sound_volume}
               music_offset={music_offset}
@@ -475,6 +491,7 @@ export function App() {
               osu_raw_input={osu_raw_input}
               osu_slider_renderer={osu_slider_renderer}
               hit_registration={hit_registration}
+              onNicknameChange={changeNickname}
               onMasterVolumeChange={changeMasterVolume}
               onOsuHitSoundVolumeChange={changeOsuHitSoundVolume}
               onMusicOffsetChange={changeMusicOffset}
@@ -485,6 +502,10 @@ export function App() {
               onOsuRawInputChange={changeOsuRawInput}
               onOsuSliderRendererChange={changeOsuSliderRenderer}
               onHitRegistrationChange={changeHitRegistration}
+              onDeleteScores={async () => {
+                await deleteScoreDatabase();
+                setScoreStorageRevision((revision) => revision + 1);
+              }}
               onExit={() => setSettingsOpen(false)}
             />
           )}

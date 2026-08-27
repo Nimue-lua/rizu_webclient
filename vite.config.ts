@@ -33,6 +33,14 @@ export default defineConfig({
   build: {
     copyPublicDir: false,
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://rizu.nimue.mom",
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     {

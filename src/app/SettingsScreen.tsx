@@ -1,5 +1,5 @@
 import { useEffect, type CSSProperties } from "react";
-import { Gamepad2, Settings, Undo2, Volume2 } from "lucide-react";
+import { Database, Gamepad2, Settings, Trash2, Undo2, UserRound, Volume2 } from "lucide-react";
 import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import {
   scrollSpeedToCanonical,
@@ -10,6 +10,7 @@ import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSlide
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 
 interface SettingsScreenProps {
+  nickname: string;
   master_volume: number;
   osu_hit_sound_volume: number;
   music_offset: number;
@@ -20,6 +21,7 @@ interface SettingsScreenProps {
   osu_raw_input: boolean;
   osu_slider_renderer: OsuSliderRendererMode;
   hit_registration: ManiaHitRegistration;
+  onNicknameChange: (nickname: string) => void;
   onMasterVolumeChange: (master_volume: number) => void;
   onOsuHitSoundVolumeChange: (volume: number) => void;
   onMusicOffsetChange: (music_offset: number) => void;
@@ -30,6 +32,7 @@ interface SettingsScreenProps {
   onOsuRawInputChange: (enabled: boolean) => void;
   onOsuSliderRendererChange: (renderer: OsuSliderRendererMode) => void;
   onHitRegistrationChange: (hit_registration: ManiaHitRegistration) => void;
+  onDeleteScores: () => Promise<void>;
   onExit: () => void;
 }
 
@@ -38,6 +41,7 @@ function sliderStyle(value: number, minimum: number, maximum: number): CSSProper
 }
 
 export function SettingsScreen({
+  nickname,
   master_volume,
   osu_hit_sound_volume,
   music_offset,
@@ -48,6 +52,7 @@ export function SettingsScreen({
   osu_raw_input,
   osu_slider_renderer,
   hit_registration,
+  onNicknameChange,
   onMasterVolumeChange,
   onOsuHitSoundVolumeChange,
   onMusicOffsetChange,
@@ -58,6 +63,7 @@ export function SettingsScreen({
   onOsuRawInputChange,
   onOsuSliderRendererChange,
   onHitRegistrationChange,
+  onDeleteScores,
   onExit,
 }: SettingsScreenProps) {
   useEffect(() => {
@@ -100,8 +106,10 @@ export function SettingsScreen({
         </div>
         <nav aria-label="Settings sections">
           <a href="#settings-all"><Settings aria-hidden="true" />All</a>
+          <a href="#online-settings"><UserRound aria-hidden="true" />Online</a>
           <a href="#audio-volume"><Volume2 aria-hidden="true" />Audio Volume</a>
           <a href="#gameplay-settings"><Gamepad2 aria-hidden="true" />Gameplay</a>
+          <a href="#local-data"><Database aria-hidden="true" />Local Data</a>
         </nav>
         <button className="settings-back" type="button" onClick={onExit}>
           <Undo2 aria-hidden="true" />
@@ -110,9 +118,20 @@ export function SettingsScreen({
       </aside>
 
       <section className="settings-panel" id="settings-all">
+        <header className="settings-heading" id="online-settings">
+          <UserRound aria-hidden="true" />
+          <h1 id="settings-title">Online</h1>
+        </header>
+        <label className="settings-control" htmlFor="settings-nickname">
+          <span>Nickname</span>
+          <input id="settings-nickname" type="text" value={nickname} placeholder="Anonymous"
+            onChange={(event) => onNicknameChange(event.target.value)} />
+          <small>Used for scores submitted to the online leaderboard.</small>
+        </label>
+
         <header className="settings-heading" id="audio-volume">
           <Volume2 aria-hidden="true" />
-          <h1 id="settings-title">Audio Volume</h1>
+          <h2>Audio Volume</h2>
         </header>
         <label className="settings-control" htmlFor="master-volume">
           <span>Master volume <output htmlFor="master-volume">{master_volume_percent}%</output></span>
@@ -237,6 +256,18 @@ export function SettingsScreen({
             <strong>{osu_raw_input ? "Enabled" : "Disabled"}</strong>
           </label>
           <small>Uses high-frequency pointer updates for mouse and pen input when supported by the browser.</small>
+        </div>
+
+        <header className="settings-heading settings-heading-spaced" id="local-data">
+          <Database aria-hidden="true" />
+          <h2>Local Data</h2>
+        </header>
+        <div className="settings-control settings-danger-control">
+          <span>Scores and replays</span>
+          <button type="button" onClick={() => {
+            if (window.confirm("Delete all local scores and replays? This cannot be undone.")) void onDeleteScores();
+          }}><Trash2 aria-hidden="true" />Delete all local scores</button>
+          <small>Permanently removes every score and replay stored by this browser.</small>
         </div>
         </section>
       </main>

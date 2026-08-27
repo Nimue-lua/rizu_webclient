@@ -1,0 +1,17 @@
+[Unit]
+Description=Rizu replay server
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=rizu-replay
+ExecStart=/usr/bin/python3 -u /srv/rizu-replay/replay_server.py --database /var/lib/rizu-replay/scores.sqlite3
+Restart=on-failure
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

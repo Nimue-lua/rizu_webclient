@@ -436,7 +436,8 @@ svg { width: 22px; height: 22px; }
 .note-skin-list small.session-only { color: var(--accent); }
 .note-skin-list label:has(input:focus-visible) { border-color: var(--blue); outline: 2px solid color-mix(in srgb, var(--blue) 33%, transparent); }
 .note-skin-empty { display: grid; margin: 0; padding: 70px 32px; color: var(--muted); font-size: 17px; text-align: center; place-items: center; }
-.settings-control select { width: 100%; height: 39px; padding: 0 34px 0 12px; color: var(--text); appearance: none; background: var(--background); border: 1px solid var(--outline); border-radius: 6px; font: inherit; cursor: pointer; }
+.settings-control select, .settings-control input[type="text"] { width: 100%; height: 39px; padding: 0 12px; color: var(--text); background: var(--background); border: 1px solid var(--outline); border-radius: 6px; font: inherit; }
+.settings-control select { padding-right: 34px; appearance: none; cursor: pointer; }
 .note-skins-modal > footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 48px; background: var(--surface); }
 .note-skins-modal > footer span { color: var(--muted); font-size: 13px; }
 .note-skins-modal > footer button { min-width: 120px; padding: 12px 22px; background: var(--blue); border-radius: 6px; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
@@ -568,6 +569,10 @@ svg { width: 22px; height: 22px; }
 .settings-control > span { font-size: 18px; font-weight: 600; }
 .settings-control output { margin-left: 7px; font-variant-numeric: tabular-nums; }
 .settings-control small { color: var(--muted); font-size: 13px; }
+.settings-control input[type="text"]:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 28%, transparent); }
+.settings-danger-control button { display: flex; align-items: center; justify-content: center; gap: 12px; width: fit-content; min-width: 260px; height: 48px; padding: 0 24px; color: var(--text); background: color-mix(in srgb, var(--danger) 72%, var(--background)); border: 1px solid color-mix(in srgb, var(--danger) 70%, var(--text)); border-radius: 7px; font-size: 14px; font-weight: 700; }
+.settings-danger-control button:hover { background: var(--danger); }
+.settings-danger-control button svg { width: 20px; height: 20px; }
 .settings-control input[type="range"] {
   width: 100%;
   height: 28px;
