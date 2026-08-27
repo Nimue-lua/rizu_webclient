@@ -1,5 +1,13 @@
-import { useEffect, type CSSProperties } from "react";
-import { Database, Gamepad2, Settings, Trash2, Undo2, UserRound, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type UIEvent } from "react";
+import {
+  Database,
+  Gauge,
+  Image,
+  Play,
+  Trash2,
+  UserRound,
+  Volume2,
+} from "lucide-react";
 import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import {
   scrollSpeedToCanonical,
@@ -36,6 +44,17 @@ interface SettingsScreenProps {
   onExit: () => void;
 }
 
+type SettingsSection = "audio" | "gameplay" | "offset" | "renderer" | "online" | "data";
+
+const sections: { id: SettingsSection; label: string; icon: ReactNode }[] = [
+  { id: "audio", label: "Audio Volume", icon: <Volume2 aria-hidden="true" /> },
+  { id: "gameplay", label: "Gameplay", icon: <Play aria-hidden="true" /> },
+  { id: "offset", label: "Offset", icon: <Gauge aria-hidden="true" /> },
+  { id: "renderer", label: "Renderer", icon: <Image aria-hidden="true" /> },
+  { id: "online", label: "Online", icon: <UserRound aria-hidden="true" /> },
+  { id: "data", label: "Local Data", icon: <Database aria-hidden="true" /> },
+];
+
 function sliderStyle(value: number, minimum: number, maximum: number): CSSProperties {
   return { "--slider-progress": `${((value - minimum) / (maximum - minimum)) * 100}%` } as CSSProperties;
 }
@@ -66,6 +85,9 @@ export function SettingsScreen({
   onDeleteScores,
   onExit,
 }: SettingsScreenProps) {
+  const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
+  const panel_ref = useRef<HTMLElement>(null);
+
   useEffect(() => {
     const resizeUi = () => {
       const scale = window.innerHeight / 1080;
@@ -92,183 +114,173 @@ export function SettingsScreen({
   const displayed_scroll_speed = scrollSpeedToDisplay(scroll_speed_type, scroll_speed);
   const scroll_speed_range = scroll_speed_type === "osu"
     ? { minimum: 1, maximum: 40, step: 1 }
-    : { minimum: 0.05, maximum: 3, step: 0.05 };
+    : { minimum: 0.05, maximum: 3, step: 0.01 };
+  const selectSection = (section: SettingsSection) => {
+    setSelectedSection(section);
+    document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const syncSelectedSection = (event: UIEvent<HTMLElement>) => {
+    const panel = event.currentTarget;
+    if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1) {
+      setSelectedSection(sections.at(-1)!.id);
+      return;
+    }
+
+    const panel_top = panel.getBoundingClientRect().top;
+    let current_section = sections[0].id;
+    for (const section of sections) {
+      const element = document.getElementById(`settings-${section.id}`);
+      if (element && element.getBoundingClientRect().top <= panel_top + 32) current_section = section.id;
+    }
+    setSelectedSection(current_section);
+  };
 
   return (
     <div className="settings-modal-layer" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onExit();
     }}>
-      <main className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <main className="settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
         <aside className="settings-sidebar">
-        <div className="settings-brand">
-          <img src="/rizu-logo.svg" alt="" />
-          <span>SETTINGS</span>
-        </div>
-        <nav aria-label="Settings sections">
-          <a href="#settings-all"><Settings aria-hidden="true" />All</a>
-          <a href="#online-settings"><UserRound aria-hidden="true" />Online</a>
-          <a href="#audio-volume"><Volume2 aria-hidden="true" />Audio Volume</a>
-          <a href="#gameplay-settings"><Gamepad2 aria-hidden="true" />Gameplay</a>
-          <a href="#local-data"><Database aria-hidden="true" />Local Data</a>
-        </nav>
-        <button className="settings-back" type="button" onClick={onExit}>
-          <Undo2 aria-hidden="true" />
-          <span>BACK</span>
-        </button>
-      </aside>
+          <nav aria-label="Settings sections">
+            {sections.map((section) => (
+              <button
+                className={selected_section === section.id ? "selected" : ""}
+                type="button"
+                key={section.id}
+                onClick={() => selectSection(section.id)}
+              >
+                {section.icon}
+                <span>{section.label}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
 
-      <section className="settings-panel" id="settings-all">
-        <header className="settings-heading" id="online-settings">
-          <UserRound aria-hidden="true" />
-          <h1 id="settings-title">Online</h1>
-        </header>
-        <label className="settings-control" htmlFor="settings-nickname">
-          <span>Nickname</span>
-          <input id="settings-nickname" type="text" value={nickname} placeholder="Anonymous"
-            onChange={(event) => onNicknameChange(event.target.value)} />
-          <small>Used for scores submitted to the online leaderboard.</small>
-        </label>
+        <section className="settings-panel" ref={panel_ref} onScroll={syncSelectedSection}>
+          <section className="settings-section" id="settings-audio">
+              <header className="settings-heading">
+                <Volume2 aria-hidden="true" />
+                <h1>Audio Volume</h1>
+              </header>
+              <div className="settings-control settings-slider-control">
+                <label htmlFor="master-volume">Master volume&nbsp;&nbsp;<output>{master_volume_percent}%</output></label>
+                <input id="master-volume" type="range" min="0" max="100" step="1"
+                  value={master_volume_percent} style={sliderStyle(master_volume_percent, 0, 100)}
+                  onChange={(event) => onMasterVolumeChange(Number(event.target.value) / 100)} />
+              </div>
+              <div className="settings-control settings-slider-control">
+                <label htmlFor="osu-hit-sound-volume">osu! hit sound volume&nbsp;&nbsp;<output>{osu_hit_sound_volume_percent}%</output></label>
+                <input id="osu-hit-sound-volume" type="range" min="0" max="100" step="1"
+                  value={osu_hit_sound_volume_percent} style={sliderStyle(osu_hit_sound_volume_percent, 0, 100)}
+                  onChange={(event) => onOsuHitSoundVolumeChange(Number(event.target.value) / 100)} />
+              </div>
+          </section>
 
-        <header className="settings-heading settings-heading-spaced" id="audio-volume">
-          <Volume2 aria-hidden="true" />
-          <h2>Audio Volume</h2>
-        </header>
-        <label className="settings-control" htmlFor="master-volume">
-          <span>Master volume <output htmlFor="master-volume">{master_volume_percent}%</output></span>
-          <input
-            id="master-volume"
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value={master_volume_percent}
-            style={sliderStyle(master_volume_percent, 0, 100)}
-            onChange={(event) => onMasterVolumeChange(Number(event.target.value) / 100)}
-          />
-          <small>Controls preview and gameplay audio.</small>
-        </label>
-        <label className="settings-control" htmlFor="osu-hit-sound-volume">
-          <span>osu! hit sound volume <output htmlFor="osu-hit-sound-volume">{osu_hit_sound_volume_percent}%</output></span>
-          <input
-            id="osu-hit-sound-volume"
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value={osu_hit_sound_volume_percent}
-            style={sliderStyle(osu_hit_sound_volume_percent, 0, 100)}
-            onChange={(event) => onOsuHitSoundVolumeChange(Number(event.target.value) / 100)}
-          />
-          <small>Controls osu! gameplay hit sounds independently from music.</small>
-        </label>
-        <label className="settings-control" htmlFor="music-offset">
-          <span>Music offset <output htmlFor="music-offset">{music_offset} ms</output></span>
-          <input
-            id="music-offset"
-            type="range"
-            min="-200"
-            max="200"
-            step="1"
-            value={music_offset}
-            style={sliderStyle(music_offset, -200, 200)}
-            onChange={(event) => onMusicOffsetChange(Number(event.target.value))}
-          />
-          <small>Positive values delay the music relative to the notes.</small>
-        </label>
+          <section className="settings-section" id="settings-gameplay">
+              <header className="settings-heading">
+                <Play aria-hidden="true" />
+                <h2>Gameplay</h2>
+              </header>
+              <div className="settings-control settings-segmented-control">
+                <span>Scroll speed type</span>
+                <div role="group" aria-label="Scroll speed type">
+                  <button type="button" className={scroll_speed_type === "default" ? "selected" : ""}
+                    onClick={() => onScrollSpeedTypeChange("default")}>Rizu</button>
+                  <button type="button" className={scroll_speed_type === "osu" ? "selected" : ""}
+                    onClick={() => onScrollSpeedTypeChange("osu")}>osu!</button>
+                </div>
+              </div>
+              <div className="settings-control settings-slider-control">
+                <label htmlFor="settings-scroll-speed">Scroll speed&nbsp;&nbsp;<output>
+                  {scroll_speed_type === "osu" ? displayed_scroll_speed : displayed_scroll_speed.toFixed(2)}
+                </output></label>
+                <input id="settings-scroll-speed" type="range" min={scroll_speed_range.minimum}
+                  max={scroll_speed_range.maximum} step={scroll_speed_range.step} value={displayed_scroll_speed}
+                  style={sliderStyle(displayed_scroll_speed, scroll_speed_range.minimum, scroll_speed_range.maximum)}
+                  onChange={(event) => onScrollSpeedChange(scrollSpeedToCanonical(scroll_speed_type, Number(event.target.value)))} />
+              </div>
+              <label className="settings-checkbox-control">
+                <input type="checkbox" checked={osu_raw_input}
+                  onChange={(event) => onOsuRawInputChange(event.target.checked)} />
+                <span aria-hidden="true" />
+                <strong>osu! raw pointer input</strong>
+              </label>
+              <label className="settings-control settings-select-control" htmlFor="settings-hit-registration">
+                <span>Hit registration</span>
+                <select id="settings-hit-registration" value={hit_registration}
+                  onChange={(event) => onHitRegistrationChange(event.target.value as ManiaHitRegistration)}>
+                  <option value="earliest">Earliest note</option>
+                  <option value="nearest">Nearest note</option>
+                </select>
+              </label>
+          </section>
 
-        <header className="settings-heading settings-heading-spaced" id="gameplay-settings">
-          <Gamepad2 aria-hidden="true" />
-          <h2>Gameplay</h2>
-        </header>
-        <label className="settings-control" htmlFor="settings-scroll-speed-type">
-          <span>Scroll speed type</span>
-          <select id="settings-scroll-speed-type" value={scroll_speed_type}
-            onChange={(event) => onScrollSpeedTypeChange(event.target.value as ScrollSpeedType)}>
-            <option value="default">Rizu</option>
-            <option value="osu">osu!</option>
-          </select>
-          <small>Chooses the scale used by the scroll speed slider.</small>
-        </label>
-        <label className="settings-control" htmlFor="settings-scroll-speed">
-          <span>Scroll speed <output htmlFor="settings-scroll-speed">
-            {scroll_speed_type === "osu" ? displayed_scroll_speed : `${displayed_scroll_speed.toFixed(2)}x`}
-          </output></span>
-          <input
-            id="settings-scroll-speed"
-            type="range"
-            min={scroll_speed_range.minimum}
-            max={scroll_speed_range.maximum}
-            step={scroll_speed_range.step}
-            value={displayed_scroll_speed}
-            style={sliderStyle(displayed_scroll_speed, scroll_speed_range.minimum, scroll_speed_range.maximum)}
-            onChange={(event) => onScrollSpeedChange(
-              scrollSpeedToCanonical(scroll_speed_type, Number(event.target.value)))}
-          />
-          <small>Multiplies the visual-time scroll distance.</small>
-        </label>
-        <label className="settings-control" htmlFor="settings-hit-registration">
-          <span>Hit registration</span>
-          <select id="settings-hit-registration" value={hit_registration}
-            onChange={(event) => onHitRegistrationChange(event.target.value as ManiaHitRegistration)}>
-            <option value="earliest">Earliest note</option>
-            <option value="nearest">Nearest note</option>
-          </select>
-          <small>Chooses between the first active note and the note nearest to the music time.</small>
-        </label>
-        <label className="settings-control" htmlFor="settings-cursor-scale">
-          <span>osu! cursor scale <output htmlFor="settings-cursor-scale">{Math.round(cursor_scale * 100)}%</output></span>
-          <input
-            id="settings-cursor-scale"
-            type="range"
-            min="25"
-            max="200"
-            step="5"
-            value={Math.round(cursor_scale * 100)}
-            style={sliderStyle(cursor_scale * 100, 25, 200)}
-            onChange={(event) => onCursorScaleChange(Number(event.target.value) / 100)}
-          />
-          <small>Scales the cursor during osu! gameplay.</small>
-        </label>
-        <label className="settings-control" htmlFor="settings-osu-slider-renderer">
-          <span>osu! slider renderer</span>
-          <select id="settings-osu-slider-renderer" value={osu_slider_renderer}
-            onChange={(event) => onOsuSliderRendererChange(event.target.value as OsuSliderRendererMode)}>
-            <option value="direct">Normal</option>
-            <option value="stable">Stable experimental</option>
-          </select>
-          <small>Stable experimental reproduces legacy framebuffer and GPU viewport artifacts for Aspire maps.</small>
-        </label>
-        <label className="settings-control" htmlFor="settings-osu-cursor-renderer">
-          <span>osu! cursor renderer</span>
-          <select id="settings-osu-cursor-renderer" value={osu_cursor_renderer}
-            onChange={(event) => onOsuCursorRendererChange(event.target.value as OsuCursorRendererMode)}>
-            <option value="os">OS cursor (low latency)</option>
-            <option value="webgl">WebGL cursor</option>
-          </select>
-          <small>OS cursor reduces visual latency. WebGL supports the original pressed cursor animation.</small>
-        </label>
-        <div className="settings-control">
-          <span>osu! raw pointer input</span>
-          <label className="modifier-checkbox">
-            <input type="checkbox" checked={osu_raw_input}
-              onChange={(event) => onOsuRawInputChange(event.target.checked)} />
-            <span aria-hidden="true" />
-            <strong>{osu_raw_input ? "Enabled" : "Disabled"}</strong>
-          </label>
-          <small>Uses high-frequency pointer updates for mouse and pen input when supported by the browser.</small>
-        </div>
+          <section className="settings-section" id="settings-offset">
+              <header className="settings-heading">
+                <Gauge aria-hidden="true" />
+                <h2>Offset</h2>
+              </header>
+              <div className="settings-control settings-slider-control">
+                <label htmlFor="music-offset">Music offset&nbsp;&nbsp;<output>{music_offset} ms</output></label>
+                <input id="music-offset" type="range" min="-200" max="200" step="1" value={music_offset}
+                  style={sliderStyle(music_offset, -200, 200)}
+                  onChange={(event) => onMusicOffsetChange(Number(event.target.value))} />
+              </div>
+          </section>
 
-        <header className="settings-heading settings-heading-spaced" id="local-data">
-          <Database aria-hidden="true" />
-          <h2>Local Data</h2>
-        </header>
-        <div className="settings-control settings-danger-control">
-          <span>Scores and replays</span>
-          <button type="button" onClick={() => {
-            if (window.confirm("Delete all local scores and replays? This cannot be undone.")) void onDeleteScores();
-          }}><Trash2 aria-hidden="true" />Delete all local scores</button>
-          <small>Permanently removes every score and replay stored by this browser.</small>
-        </div>
+          <section className="settings-section" id="settings-renderer">
+              <header className="settings-heading">
+                <Image aria-hidden="true" />
+                <h2>Renderer</h2>
+              </header>
+              <div className="settings-control settings-slider-control">
+                <label htmlFor="settings-cursor-scale">osu! cursor scale&nbsp;&nbsp;<output>{Math.round(cursor_scale * 100)}%</output></label>
+                <input id="settings-cursor-scale" type="range" min="25" max="200" step="5"
+                  value={Math.round(cursor_scale * 100)} style={sliderStyle(cursor_scale * 100, 25, 200)}
+                  onChange={(event) => onCursorScaleChange(Number(event.target.value) / 100)} />
+              </div>
+              <label className="settings-control settings-select-control" htmlFor="settings-osu-slider-renderer">
+                <span>osu! slider renderer</span>
+                <select id="settings-osu-slider-renderer" value={osu_slider_renderer}
+                  onChange={(event) => onOsuSliderRendererChange(event.target.value as OsuSliderRendererMode)}>
+                  <option value="direct">Normal</option>
+                  <option value="stable">Stable experimental</option>
+                </select>
+              </label>
+              <label className="settings-control settings-select-control" htmlFor="settings-osu-cursor-renderer">
+                <span>osu! cursor renderer</span>
+                <select id="settings-osu-cursor-renderer" value={osu_cursor_renderer}
+                  onChange={(event) => onOsuCursorRendererChange(event.target.value as OsuCursorRendererMode)}>
+                  <option value="os">OS cursor (low latency)</option>
+                  <option value="webgl">WebGL cursor</option>
+                </select>
+              </label>
+          </section>
+
+          <section className="settings-section" id="settings-online">
+              <header className="settings-heading">
+                <UserRound aria-hidden="true" />
+                <h2>Online</h2>
+              </header>
+              <label className="settings-control settings-text-control" htmlFor="settings-nickname">
+                <span>Nickname</span>
+                <input id="settings-nickname" type="text" value={nickname} placeholder="Anonymous"
+                  onChange={(event) => onNicknameChange(event.target.value)} />
+              </label>
+          </section>
+
+          <section className="settings-section" id="settings-data">
+              <header className="settings-heading">
+                <Database aria-hidden="true" />
+                <h2>Local Data</h2>
+              </header>
+              <div className="settings-danger-control">
+                <span>Scores and replays</span>
+                <button type="button" onClick={() => {
+                  if (window.confirm("Delete all local scores and replays? This cannot be undone.")) void onDeleteScores();
+                }}><Trash2 aria-hidden="true" />Delete all local scores</button>
+              </div>
+          </section>
         </section>
       </main>
     </div>
