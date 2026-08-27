@@ -64,7 +64,7 @@ export default defineConfig({
     {
       name: "public-logo",
       buildStart() {
-        for (const fileName of ["rizu-logo.svg", "skins/osu-default.osk"]) {
+        for (const fileName of ["rizu-logo.svg", "skins/osu-default.osk", "skins/pivnoi_skoof.osk"]) {
           this.emitFile({
             type: "asset",
             fileName,

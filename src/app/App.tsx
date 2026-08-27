@@ -61,7 +61,9 @@ export function App() {
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [completed_gameplay, setCompletedGameplay] = useState<CompletedGameplay | null>(null);
   const [playback, setPlayback] = useState<CompletedGameplay | null>(null);
-  const [note_skin_selections, setNoteSkinSelections] = useState(loadNoteSkinSelections);
+  const [note_skin_selections, setNoteSkinSelections] = useState<NoteSkinSelections>(
+    () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
+  );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const local_skin_urls = useRef(new Map<string, string>());
   const nickname = useSetting(settings.nickname);

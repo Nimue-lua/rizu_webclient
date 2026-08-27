@@ -13,6 +13,7 @@ export type NoteSkinSelections = Readonly<Record<string, string>>;
 export const note_skin_options: readonly NoteSkinOption[] = [
   { id: "osu-default", name: "osu! Default", mode: "osu", columnCount: null, url: "/skins/osu-default.osk" },
   { id: "osu-default", name: "osu! Default", mode: "mania", columnCount: null, url: "/skins/osu-default.osk" },
+  { id: "pivnoi_skoof", name: "~ Pivnoi Skoof 🍺~", mode: "osu", columnCount: null, url: "/skins/pivnoi_skoof.osk" },
 ];
 
 const STORAGE_KEY = "rizu.note-skins";
