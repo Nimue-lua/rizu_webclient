@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { OsuStandardJudgmentEvent } from "../src/gameplay/OsuStandardJudgmentEvent";
+import type { OsuStandardJudgmentEvent } from "../src/gameplay/osu/OsuStandardJudgmentEvent";
 import { ScoreEngine } from "../src/gameplay/scoring/ScoreEngine";
-import { calculateOsuStandardDifficultyMultiplier } from "../src/gameplay/scoring/OsuStandardDifficulty";
-import { OsuStandardScore } from "../src/gameplay/scoring/systems/OsuStandardScore";
-import { createOsuStandardTimingValues } from "../src/gameplay/timing/OsuStandardOdTimings";
+import { calculateOsuStandardDifficultyMultiplier } from "../src/gameplay/osu/scoring/OsuStandardDifficulty";
+import { OsuStandardScore } from "../src/gameplay/osu/scoring/OsuStandardScore";
+import { createOsuStandardTimingValues } from "../src/gameplay/osu/timing/OsuStandardOdTimings";
 
 function hit(delta_time: number, object_index = 0): OsuStandardJudgmentEvent {
   return { kind: "hit", object_index, time: 1 + delta_time, delta_time };

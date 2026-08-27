@@ -1,12 +1,12 @@
 import { useEffect, type CSSProperties } from "react";
 import { Gamepad2, Settings, Undo2, Volume2 } from "lucide-react";
-import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
+import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import {
   scrollSpeedToCanonical,
   scrollSpeedToDisplay,
   type ScrollSpeedType,
-} from "../gameplay/ScrollSpeed";
-import type { OsuSliderRendererMode } from "../gameplay/renderer/WebGlSliderGraphics";
+} from "../gameplay/mania/ScrollSpeed";
+import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 
 interface SettingsScreenProps {
   master_volume: number;

@@ -1,4 +1,4 @@
-import type { TimingValues, TimingWindow } from "./TimingValues";
+import type { TimingValues, TimingWindow } from "../../timing/TimingValues";
 
 export interface OsuManiaV2TimingValues {
   short_note: TimingWindow;

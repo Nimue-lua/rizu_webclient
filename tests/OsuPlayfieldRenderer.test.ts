@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { osuApproachPreempt, osuCircleDiameter } from "../src/gameplay/OsuCircleGeometry";
-import { OsuPlayfieldRenderer, stableShakeOffset } from "../src/gameplay/renderer/OsuPlayfieldRenderer";
+import { osuApproachPreempt, osuCircleDiameter } from "../src/gameplay/osu/OsuCircleGeometry";
+import { OsuPlayfieldRenderer, stableShakeOffset } from "../src/gameplay/osu/rendering/OsuPlayfieldRenderer";
 import type { OsuStandardSkin } from "../src/gameplay/renderer/OsuSkin";
-import { OsuViewport } from "../src/gameplay/OsuViewport";
-import { OsuCircleState } from "../src/gameplay/OsuCircleState";
-import { OsuSliderPath } from "../src/gameplay/OsuSliderPath";
+import { OsuViewport } from "../src/gameplay/osu/OsuViewport";
+import { OsuCircleState } from "../src/gameplay/osu/OsuCircleState";
+import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
 import type { OsuSlider } from "../src/chart/Chart";
 
 test("calculates osu approach preempt and circle size", () => {

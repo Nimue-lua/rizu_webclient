@@ -1,20 +1,20 @@
-import type { OsuGameplayData } from "../library/GameplayLoader";
-import type { OsuReplayBaseValues } from "../replay/ReplayBase";
-import { AudioGameplayClock } from "./AudioGameplayClock";
-import type { GameplaySession, OsuPointerInput } from "./GameplaySession";
-import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
-import { HudStateDeriver } from "./HudState";
+import type { OsuGameplayData } from "../../library/GameplayLoader";
+import type { OsuReplayBaseValues } from "../../replay/osu/OsuReplayBase";
+import { AudioGameplayClock } from "../AudioGameplayClock";
+import type { GameplaySession, OsuPointerInput } from "../GameplaySession";
+import { getAudioStartDelay, getGameplayEndTime } from "../GameplayTiming";
+import { HudStateDeriver } from "../HudState";
 import type { OsuAction, OsuCursorState, OsuInputEvent } from "./OsuInputEvent";
 import { OsuRulesEngine } from "./OsuRulesEngine";
 import { applyOsuHitObjectStacking } from "./OsuHitObjectStacking";
-import { WebAudioPlayback } from "./audio/WebAudioPlayback";
+import { WebAudioPlayback } from "../audio/WebAudioPlayback";
 import { OsuHitSoundPlayer } from "./audio/OsuHitSoundPlayer";
-import { OsuRenderer, type OsuGameplayRenderer } from "./renderer/OsuRenderer";
+import { OsuRenderer, type OsuGameplayRenderer } from "./rendering/OsuRenderer";
 import { calculateOsuStandardDifficultyMultiplier } from "./scoring/OsuStandardDifficulty";
-import type { ScoreResult } from "./scoring/ScoreResult";
-import type { OsuSliderRendererMode } from "./renderer/WebGlSliderGraphics";
-import { resolveOsuStandardTimingValues } from "./timing/TimingValuesFactory";
-import { Timings } from "./timing/Timings";
+import type { ScoreResult } from "../scoring/ScoreResult";
+import type { OsuSliderRendererMode } from "./rendering/WebGlSliderGraphics";
+import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
+import { Timings } from "../timing/Timings";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;

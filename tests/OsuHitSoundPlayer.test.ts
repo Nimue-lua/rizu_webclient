@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuChart, OsuHitObject } from "../src/chart/Chart";
-import { OsuHitSoundPlayer } from "../src/gameplay/audio/OsuHitSoundPlayer";
+import { OsuHitSoundPlayer } from "../src/gameplay/osu/audio/OsuHitSoundPlayer";
 import type { OsuStandardSkin } from "../src/gameplay/renderer/OsuSkin";
-import { createOsuStandardTimingValues } from "../src/gameplay/timing/OsuStandardOdTimings";
+import { createOsuStandardTimingValues } from "../src/gameplay/osu/timing/OsuStandardOdTimings";
 
 function chart(hit_objects: readonly OsuHitObject[]): OsuChart {
   return {

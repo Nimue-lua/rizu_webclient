@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuChart, OsuHitObject } from "../src/chart/Chart";
-import { applyOsuHitObjectStacking } from "../src/gameplay/OsuHitObjectStacking";
+import { applyOsuHitObjectStacking } from "../src/gameplay/osu/OsuHitObjectStacking";
 
 const hit_sample = { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" };
 

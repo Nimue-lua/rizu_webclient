@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { OsuViewport } from "../src/gameplay/OsuViewport";
+import { OsuViewport } from "../src/gameplay/osu/OsuViewport";
 import { resizeGameplayCanvas } from "../src/gameplay/renderer/GameplayFrame";
 
 function close(actual: number, expected: number): void {

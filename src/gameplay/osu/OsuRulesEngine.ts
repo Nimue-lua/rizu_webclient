@@ -1,4 +1,4 @@
-import type { OsuChart, OsuSlider, OsuSpinner } from "../chart/Chart";
+import type { OsuChart, OsuSlider, OsuSpinner } from "../../chart/Chart";
 import { osuApproachPreempt, osuCircleHitRadius } from "./OsuCircleGeometry";
 import type { OsuCircleTransient } from "./OsuCirclePresentation";
 import { OsuCircleState } from "./OsuCircleState";
@@ -6,9 +6,9 @@ import { OsuSliderPath } from "./OsuSliderPath";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "./OsuSliderPresentation";
 import type { OsuStandardJudgmentEvent } from "./OsuStandardJudgmentEvent";
 import type { Point } from "./OsuViewport";
-import { ScoreEngine } from "./scoring/ScoreEngine";
-import type { ScoreResult } from "./scoring/ScoreResult";
-import { classifyOsuStandardJudgment, OsuStandardScore } from "./scoring/systems/OsuStandardScore";
+import { ScoreEngine } from "../scoring/ScoreEngine";
+import type { ScoreResult } from "../scoring/ScoreResult";
+import { classifyOsuStandardJudgment, OsuStandardScore } from "./scoring/OsuStandardScore";
 import type { OsuStandardTimingValues } from "./timing/OsuStandardOdTimings";
 
 export type OsuClickOutcome = "hit" | "miss" | "locked" | "too-early" | "spatial-miss";

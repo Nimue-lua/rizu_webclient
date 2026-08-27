@@ -1,6 +1,6 @@
-import type { GameplayPresentationState } from "../HudState";
-import { drawBitmapText } from "./BitmapTextRenderer";
-import type { Sprite, SpriteQuadWriter } from "./Sprite";
+import type { GameplayPresentationState } from "../../HudState";
+import { drawBitmapText } from "../../renderer/BitmapTextRenderer";
+import type { Sprite, SpriteQuadWriter } from "../../renderer/Sprite";
 
 export interface ManiaOverlayAssets {
   readonly sprites: Readonly<Record<string, Sprite>>;

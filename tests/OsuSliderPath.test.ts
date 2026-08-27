@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuSlider, OsuSliderCurveType } from "../src/chart/Chart";
-import { OsuSliderPath } from "../src/gameplay/OsuSliderPath";
+import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
 
 function slider(curve_type: OsuSliderCurveType, control_points: readonly { x: number; y: number }[],
   pixel_length: number): OsuSlider {

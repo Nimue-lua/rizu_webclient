@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuPointerInput } from "../src/gameplay/GameplaySession";
-import { bindOsuPointerAim, osuPointerMovementEvent } from "../src/gameplay/OsuPointerAimBinding";
+import { bindOsuPointerAim, osuPointerMovementEvent } from "../src/gameplay/osu/OsuPointerAimBinding";
 
 class FakeEventTarget {
   readonly listeners = new Map<string, Set<EventListener>>();

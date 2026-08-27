@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ManiaOverlayRenderer } from "../src/gameplay/renderer/ManiaOverlayRenderer";
-import { OsuComboRenderer } from "../src/gameplay/renderer/OsuComboRenderer";
+import { ManiaOverlayRenderer } from "../src/gameplay/mania/rendering/ManiaOverlayRenderer";
+import { OsuComboRenderer } from "../src/gameplay/osu/rendering/OsuComboRenderer";
 import type { Sprite } from "../src/gameplay/renderer/Sprite";
 
 function sprite(name: string, width = 20, height = 30): Sprite & { name: string } {

@@ -1,4 +1,4 @@
-import type { OsuPointerInput } from "./GameplaySession";
+import type { OsuPointerInput } from "../GameplaySession";
 
 type PointerMovementEvent = "pointermove" | "pointerrawupdate";
 type PointerBounds = { left: number; top: number; width: number; height: number };

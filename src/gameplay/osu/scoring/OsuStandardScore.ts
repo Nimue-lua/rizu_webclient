@@ -1,7 +1,7 @@
-import type { OsuStandardJudgmentEvent } from "../../OsuStandardJudgmentEvent";
-import type { OsuStandardTimingValues } from "../../timing/OsuStandardOdTimings";
-import type { IAccuracySource, IComboSource, IGradeSource, IJudgesSource, IScoreSource } from "../ScoreSources";
-import type { ScoreSystem } from "../ScoreSystem";
+import type { OsuStandardJudgmentEvent } from "../OsuStandardJudgmentEvent";
+import type { OsuStandardTimingValues } from "../timing/OsuStandardOdTimings";
+import type { IAccuracySource, IComboSource, IGradeSource, IJudgesSource, IScoreSource } from "../../scoring/ScoreSources";
+import type { ScoreSystem } from "../../scoring/ScoreSystem";
 
 export const OSU_STANDARD_JUDGE_NAMES = ["300", "100", "50", "miss"] as const;
 export type OsuStandardJudge = typeof OSU_STANDARD_JUDGE_NAMES[number];

@@ -6,7 +6,7 @@ import {
   loadInputBindings,
   saveInputBindings,
 } from "../gameplay/InputBindings";
-import { getColumnColors } from "../gameplay/ColumnColors";
+import { getColumnColors } from "../gameplay/mania/ColumnColors";
 
 interface InputBindingsModalProps {
   chart: Chartview;

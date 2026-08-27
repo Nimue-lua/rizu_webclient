@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuGameplayData } from "../src/library/GameplayLoader";
-import { OsuGameplayRuntime, type OsuGameplayRuntimeDependencies } from "../src/gameplay/OsuGameplayRuntime";
-import { createOsuReplayBase } from "../src/replay/ReplayBase";
-import type { OsuCursorState } from "../src/gameplay/OsuInputEvent";
+import { OsuGameplayRuntime, type OsuGameplayRuntimeDependencies } from "../src/gameplay/osu/OsuGameplayRuntime";
+import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
+import type { OsuCursorState } from "../src/gameplay/osu/OsuInputEvent";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
 
 class FakeEventTarget {

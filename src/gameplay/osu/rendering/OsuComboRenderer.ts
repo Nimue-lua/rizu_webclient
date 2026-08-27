@@ -1,5 +1,5 @@
-import { drawBitmapText } from "./BitmapTextRenderer";
-import type { Sprite, SpriteQuadWriter } from "./Sprite";
+import { drawBitmapText } from "../../renderer/BitmapTextRenderer";
+import type { Sprite, SpriteQuadWriter } from "../../renderer/Sprite";
 
 export interface OsuComboAssets {
   readonly sprites: Readonly<Record<string, Sprite>>;

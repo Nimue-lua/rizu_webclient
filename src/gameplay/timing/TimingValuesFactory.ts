@@ -1,5 +1,5 @@
-import { createOsuManiaV2ReplayTimingValues } from "./OsuManiaV2Timings";
-import { createOsuStandardTimingValues, type OsuStandardTimingValues } from "./OsuStandardOdTimings";
+import { createOsuManiaV2ReplayTimingValues } from "../mania/timing/OsuManiaV2Timings";
+import { createOsuStandardTimingValues, type OsuStandardTimingValues } from "../osu/timing/OsuStandardOdTimings";
 import { Subtimings } from "./Subtimings";
 import { Timings } from "./Timings";
 import { createSimpleTimingValues, type TimingValues } from "./TimingValues";

@@ -1,4 +1,4 @@
-import type { OsuChart, OsuHitObject, OsuSlider } from "../chart/Chart";
+import type { OsuChart, OsuHitObject, OsuSlider } from "../../chart/Chart";
 import { osuApproachPreempt, osuCircleDiameter } from "./OsuCircleGeometry";
 import { OsuSliderPath } from "./OsuSliderPath";
 import type { Point } from "./OsuViewport";

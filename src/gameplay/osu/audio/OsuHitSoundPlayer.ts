@@ -1,7 +1,7 @@
-import type { OsuChart, OsuHitObject, OsuSliderEdgeSet } from "../../chart/Chart";
+import type { OsuChart, OsuHitObject, OsuSliderEdgeSet } from "../../../chart/Chart";
 import type { OsuStandardJudgmentEvent } from "../OsuStandardJudgmentEvent";
-import type { OsuStandardSkin } from "../renderer/OsuSkin";
-import { classifyOsuStandardJudgment } from "../scoring/systems/OsuStandardScore";
+import type { OsuStandardSkin } from "../../renderer/OsuSkin";
+import { classifyOsuStandardJudgment } from "../scoring/OsuStandardScore";
 import type { OsuStandardTimingValues } from "../timing/OsuStandardOdTimings";
 
 const SAMPLE_SETS: Readonly<Record<number, string>> = { 1: "normal", 2: "soft", 3: "drum" };

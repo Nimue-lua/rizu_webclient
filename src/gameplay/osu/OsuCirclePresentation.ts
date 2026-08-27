@@ -1,4 +1,4 @@
-import type { OsuStandardJudge } from "./scoring/systems/OsuStandardScore";
+import type { OsuStandardJudge } from "./scoring/OsuStandardScore";
 import type { Point } from "./OsuViewport";
 
 export type OsuCircleTransient = {

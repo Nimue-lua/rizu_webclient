@@ -1,12 +1,12 @@
 import type { ManiaVisualNote } from "../ManiaRulesEngine";
-import type { GameplayPresentationState } from "../HudState";
-import { getGameplayHudLayout, type GameplayHudRenderer } from "../GameplayHudRenderer";
-import { SpriteGameplayHudRenderer } from "./GameplayHudRenderer";
+import type { GameplayPresentationState } from "../../HudState";
+import { getGameplayHudLayout, type GameplayHudRenderer } from "../../GameplayHudRenderer";
+import { SpriteGameplayHudRenderer } from "../../renderer/GameplayHudRenderer";
 import { ManiaOverlayRenderer } from "./ManiaOverlayRenderer";
 import { ManiaPlayfieldRenderer } from "./ManiaPlayfieldRenderer";
-import type { NoteSkin } from "./NoteSkin";
-import type { SpriteDrawCommand } from "./Sprite";
-import { WebGlSpriteGraphics } from "./WebGlSpriteGraphics";
+import type { NoteSkin } from "../../renderer/NoteSkin";
+import type { SpriteDrawCommand } from "../../renderer/Sprite";
+import { WebGlSpriteGraphics } from "../../renderer/WebGlSpriteGraphics";
 
 export class ManiaRenderer {
   private readonly playfield: ManiaPlayfieldRenderer;

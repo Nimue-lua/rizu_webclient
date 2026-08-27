@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ManiaRulesEngine, NoteState } from "../src/gameplay/ManiaRulesEngine";
+import { ManiaRulesEngine, NoteState } from "../src/gameplay/mania/ManiaRulesEngine";
 
 function createChart(notes: readonly { column: number; absolute_time: number; weight: -1 | 0 | 1 }[], columns = 1) {
   return {

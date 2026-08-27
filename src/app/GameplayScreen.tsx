@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { GameplayData } from "../library/GameplayLoader";
-import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
+import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
-import type { ReplayBase } from "../replay/ReplayBase";
+import type { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../gameplay/GameplaySession";
 import { createGameplaySession } from "../gameplay/createGameplaySession";
-import { bindOsuPointerAim, osuPointerMovementEvent } from "../gameplay/OsuPointerAimBinding";
+import { bindOsuPointerAim, osuPointerMovementEvent } from "../gameplay/osu/OsuPointerAimBinding";
 import { ManiaTouchControls } from "./ManiaTouchControls";
-import type { OsuSliderRendererMode } from "../gameplay/renderer/WebGlSliderGraphics";
+import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -18,7 +18,7 @@ interface GameplayScreenProps {
   cursor_scale: number;
   osu_raw_input: boolean;
   osu_slider_renderer: OsuSliderRendererMode;
-  replay_base: ReplayBase;
+  replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
   onFinish: (score: ScoreResult) => void;

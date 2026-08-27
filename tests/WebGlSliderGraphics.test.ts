@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuSlider } from "../src/chart/Chart";
-import { OsuSliderPath } from "../src/gameplay/OsuSliderPath";
-import { OsuViewport } from "../src/gameplay/OsuViewport";
-import { osuSliderRendererMode, stableBodyTransform, WebGlSliderGraphics } from "../src/gameplay/renderer/WebGlSliderGraphics";
+import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
+import { OsuViewport } from "../src/gameplay/osu/OsuViewport";
+import { osuSliderRendererMode, stableBodyTransform, WebGlSliderGraphics } from "../src/gameplay/osu/rendering/WebGlSliderGraphics";
 
 function createSlider(): OsuSlider {
   return {

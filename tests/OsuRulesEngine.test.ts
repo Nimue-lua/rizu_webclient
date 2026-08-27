@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuChart, OsuHitObject, OsuSlider } from "../src/chart/Chart";
-import { osuCircleHitRadius } from "../src/gameplay/OsuCircleGeometry";
-import { OsuCircleState } from "../src/gameplay/OsuCircleState";
-import { OsuRulesEngine } from "../src/gameplay/OsuRulesEngine";
-import { createOsuStandardTimingValues } from "../src/gameplay/timing/OsuStandardOdTimings";
+import { osuCircleHitRadius } from "../src/gameplay/osu/OsuCircleGeometry";
+import { OsuCircleState } from "../src/gameplay/osu/OsuCircleState";
+import { OsuRulesEngine } from "../src/gameplay/osu/OsuRulesEngine";
+import { createOsuStandardTimingValues } from "../src/gameplay/osu/timing/OsuStandardOdTimings";
 
 function createChart(circles: readonly { x: number; y: number; absolute_time: number }[]): OsuChart {
   const hit_objects = circles.map((circle) => ({ kind: "circle" as const, ...circle, hit_sound: 0,

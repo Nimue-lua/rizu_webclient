@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuSlider } from "../src/chart/Chart";
-import { OsuSliderPath } from "../src/gameplay/OsuSliderPath";
-import { createOsuSliderMesh, createOsuStableLinearMesh } from "../src/gameplay/renderer/OsuSliderMesh";
+import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
+import { createOsuSliderMesh, createOsuStableLinearMesh } from "../src/gameplay/osu/rendering/OsuSliderMesh";
 
 function straightSlider(): OsuSlider {
   return {

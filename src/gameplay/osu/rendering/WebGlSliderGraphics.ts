@@ -1,7 +1,7 @@
-import type { OsuSlider } from "../../chart/Chart";
+import type { OsuSlider } from "../../../chart/Chart";
 import type { OsuSliderPath } from "../OsuSliderPath";
 import type { OsuViewport } from "../OsuViewport";
-import type { GameplayFrame } from "./GameplayFrame";
+import type { GameplayFrame } from "../../renderer/GameplayFrame";
 import { createOsuSliderMesh, createOsuStableLinearMesh } from "./OsuSliderMesh";
 
 const VERTEX_FLOATS = 3;

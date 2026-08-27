@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NoteState, type ManiaLogicEvent } from "../src/gameplay/ManiaLogicEvent";
-import { ManiaComboScore } from "../src/gameplay/scoring/systems/ManiaComboScore";
+import { NoteState, type ManiaLogicEvent } from "../src/gameplay/mania/ManiaLogicEvent";
+import { ManiaComboScore } from "../src/gameplay/mania/scoring/ManiaComboScore";
 
 function event(type: "tap" | "hold", old_state: NoteState, new_state: NoteState): ManiaLogicEvent {
   return { index: 0, type, time: 0, delta_time: 0, old_state, new_state };

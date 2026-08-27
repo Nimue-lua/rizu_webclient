@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ManiaPlayfieldRenderer } from "../src/gameplay/renderer/ManiaPlayfieldRenderer";
+import { ManiaPlayfieldRenderer } from "../src/gameplay/mania/rendering/ManiaPlayfieldRenderer";
 import type { NoteSkin } from "../src/gameplay/renderer/NoteSkin";
-import { NoteState } from "../src/gameplay/ManiaRulesEngine";
+import { NoteState } from "../src/gameplay/mania/ManiaRulesEngine";
 
 function renderer(with_frame = false, column_spacing: readonly number[] = [0, 0, 0], upside_down = false,
   column_line_widths: readonly number[] = [0, 0, 0, 0, 0]) {

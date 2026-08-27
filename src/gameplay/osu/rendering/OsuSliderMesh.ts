@@ -1,6 +1,6 @@
 import type { Point } from "../OsuViewport";
 import type { OsuSliderPath } from "../OsuSliderPath";
-import type { OsuSlider } from "../../chart/Chart";
+import type { OsuSlider } from "../../../chart/Chart";
 
 const CIRCLE_SEGMENTS = 24;
 const MAX_RENDER_POINTS = 2_048;

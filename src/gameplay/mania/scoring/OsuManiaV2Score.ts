@@ -1,7 +1,7 @@
-import { NoteState, type ManiaLogicEvent } from "../../ManiaLogicEvent";
-import { createOsuManiaV2TimingPreset, type OsuManiaV2TimingPreset } from "../../timing/OsuManiaV2Timings";
-import type { IAccuracySource, IGradeSource, IJudgesSource } from "../ScoreSources";
-import type { ScoreSystem } from "../ScoreSystem";
+import { NoteState, type ManiaLogicEvent } from "../ManiaLogicEvent";
+import { createOsuManiaV2TimingPreset, type OsuManiaV2TimingPreset } from "../timing/OsuManiaV2Timings";
+import type { IAccuracySource, IGradeSource, IJudgesSource } from "../../scoring/ScoreSources";
+import type { ScoreSystem } from "../../scoring/ScoreSystem";
 
 export const OSU_MANIA_V2_JUDGE_NAMES = ["perfect", "great", "good", "ok", "meh", "miss"] as const;
 export type OsuManiaV2Judge = typeof OSU_MANIA_V2_JUDGE_NAMES[number];

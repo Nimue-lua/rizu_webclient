@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameplayData, ManiaGameplayData } from "../src/library/GameplayLoader";
 import { getAudioStartDelay, getGameplayEndTime } from "../src/gameplay/GameplayTiming";
-import { ManiaGameplayRuntime, type ManiaGameplayRuntimeDependencies } from "../src/gameplay/ManiaGameplayRuntime";
-import { ReplayBase } from "../src/replay/ReplayBase";
+import { ManiaGameplayRuntime, type ManiaGameplayRuntimeDependencies } from "../src/gameplay/mania/ManiaGameplayRuntime";
+import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
 import type { ManiaNoteEvent } from "../src/chart/Chart";
 
@@ -163,7 +163,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: { rate?: numbe
     },
     note_skin: {} as ManiaGameplayData["note_skin"],
   };
-  const replay = new ReplayBase();
+  const replay = new ManiaReplayBase();
   replay.rate = options.rate ?? 1;
   const scores: ScoreResult[] = [];
   const dependencies: ManiaGameplayRuntimeDependencies = {

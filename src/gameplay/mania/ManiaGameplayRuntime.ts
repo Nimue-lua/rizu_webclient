@@ -1,13 +1,13 @@
-import type { ManiaGameplayData } from "../library/GameplayLoader";
+import type { ManiaGameplayData } from "../../library/GameplayLoader";
 import { ManiaRulesEngine, type ManiaHitRegistration, type ManiaVisualNote } from "./ManiaRulesEngine";
-import type { ScoreResult } from "./scoring/ScoreResult";
-import type { GameplaySession, ManiaPointerInput } from "./GameplaySession";
-import { ManiaRenderer as WebGlManiaRenderer } from "./renderer/ManiaRenderer";
-import { HudStateDeriver, type GameplayPresentationState } from "./HudState";
-import type { ReplayBase } from "../replay/ReplayBase";
-import { getAudioStartDelay, getGameplayEndTime } from "./GameplayTiming";
-import { AudioGameplayClock } from "./AudioGameplayClock";
-import { WebAudioPlayback } from "./audio/WebAudioPlayback";
+import type { ScoreResult } from "../scoring/ScoreResult";
+import type { GameplaySession, ManiaPointerInput } from "../GameplaySession";
+import { ManiaRenderer as WebGlManiaRenderer } from "./rendering/ManiaRenderer";
+import { HudStateDeriver, type GameplayPresentationState } from "../HudState";
+import type { ManiaReplayBase } from "../../replay/mania/ManiaReplayBase";
+import { getAudioStartDelay, getGameplayEndTime } from "../GameplayTiming";
+import { AudioGameplayClock } from "../AudioGameplayClock";
+import { WebAudioPlayback } from "../audio/WebAudioPlayback";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -57,7 +57,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly gameplay_end_time: number;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
-    scroll_speed: number, replay_base: ReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
+    scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
     finish: (score: ScoreResult) => void, dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies()) {
     this.data = data;
     this.scroll_speed = scroll_speed;

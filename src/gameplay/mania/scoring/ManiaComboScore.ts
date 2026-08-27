@@ -1,6 +1,6 @@
-import { NoteState, type ManiaLogicEvent } from "../../ManiaLogicEvent";
-import type { IComboSource } from "../ScoreSources";
-import type { ScoreSystem } from "../ScoreSystem";
+import { NoteState, type ManiaLogicEvent } from "../ManiaLogicEvent";
+import type { IComboSource } from "../../scoring/ScoreSources";
+import type { ScoreSystem } from "../../scoring/ScoreSystem";
 
 export class ManiaComboScore implements ScoreSystem<ManiaLogicEvent>, IComboSource {
   readonly key = "mania_combo";

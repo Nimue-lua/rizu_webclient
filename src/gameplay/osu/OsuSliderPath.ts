@@ -1,4 +1,4 @@
-import type { OsuSlider } from "../chart/Chart";
+import type { OsuSlider } from "../../chart/Chart";
 import type { Point } from "./OsuViewport";
 
 const MAX_PATH_POINTS = 16_384;

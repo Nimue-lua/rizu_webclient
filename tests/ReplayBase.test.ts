@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createOsuReplayBase, ReplayBase } from "../src/replay/ReplayBase";
+import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
+import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
 import { Subtimings } from "../src/gameplay/timing/Subtimings";
 import { Timings } from "../src/gameplay/timing/Timings";
 
 test("exports native-compatible strict mania timing identities", () => {
-  const replay = new ReplayBase();
+  const replay = new ManiaReplayBase();
   replay.setTimingIdentity(new Timings("osuod", 6.5), new Subtimings("scorev", 2));
   const values = replay.exportReplayBase();
   assert.deepEqual(values.timings, { name: "osuod", data: 6.5 });
@@ -14,15 +15,15 @@ test("exports native-compatible strict mania timing identities", () => {
 });
 
 test("imports through an explicit identity and concrete-value validation boundary", () => {
-  const source = new ReplayBase();
+  const source = new ManiaReplayBase();
   source.setTimingIdentity(new Timings("osuod", 5), new Subtimings("scorev", 2));
   const values = source.exportReplayBase();
   values.timing_values.ShortNote.hit[0] = -9;
-  assert.throws(() => new ReplayBase().importReplayBase(values), /do not match/);
+  assert.throws(() => new ManiaReplayBase().importReplayBase(values), /do not match/);
 });
 
 test("replay import and export do not alias mutable values", () => {
-  const source = new ReplayBase();
+  const source = new ManiaReplayBase();
   source.modifiers.push({ id: 1, version: 2, value: "test" });
   source.columns_order = [4, 3, 2, 1];
   const exported = source.exportReplayBase();
@@ -31,7 +32,7 @@ test("replay import and export do not alias mutable values", () => {
   assert.equal(source.modifiers[0]!.id, 1);
   assert.equal(source.columns_order[0], 4);
 
-  const imported = new ReplayBase();
+  const imported = new ManiaReplayBase();
   imported.importReplayBase(source.exportReplayBase());
   source.modifiers[0]!.id = 3;
   source.columns_order[0] = 2;

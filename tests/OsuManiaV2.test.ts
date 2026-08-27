@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NoteState } from "../src/gameplay/ManiaLogicEvent";
+import { NoteState } from "../src/gameplay/mania/ManiaLogicEvent";
 import { ScoreEngine } from "../src/gameplay/scoring/ScoreEngine";
-import { OsuManiaV2Score } from "../src/gameplay/scoring/systems/OsuManiaV2Score";
-import { createOsuManiaV2TimingValues } from "../src/gameplay/timing/OsuManiaV2Timings";
+import { OsuManiaV2Score } from "../src/gameplay/mania/scoring/OsuManiaV2Score";
+import { createOsuManiaV2TimingValues } from "../src/gameplay/mania/timing/OsuManiaV2Timings";
 import { classifyTiming } from "../src/gameplay/timing/TimingValues";
 
 test("creates rounded osu mania v2 logic windows", () => {

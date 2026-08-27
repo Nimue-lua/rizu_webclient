@@ -12,10 +12,10 @@ import { WelcomeScreen } from "./WelcomeScreen";
 import { UnlockingFpsScreen } from "./UnlockingFpsScreen";
 import { OszSelectScreen } from "./OszSelectScreen";
 import { readOszArchive, type OszArchive } from "../library/OszArchive";
-import type { ManiaHitRegistration } from "../gameplay/ManiaRulesEngine";
+import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
-import type { ScrollSpeedType } from "../gameplay/ScrollSpeed";
-import { ReplayBase } from "../replay/ReplayBase";
+import type { ScrollSpeedType } from "../gameplay/mania/ScrollSpeed";
+import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import {
   loadNoteSkinSelections,
   noteSkinMode,
@@ -34,7 +34,7 @@ import {
   saveLocalNoteSkin,
   shouldPersistLocalNoteSkin,
 } from "../gameplay/renderer/LocalNoteSkinStore";
-import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/renderer/WebGlSliderGraphics";
+import { osuSliderRendererMode, type OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const MASTER_VOLUME_KEY = "rizu.master-volume";
@@ -105,7 +105,7 @@ export function App() {
   const [hit_registration, setHitRegistration] = useState<ManiaHitRegistration>(() =>
     localStorage.getItem(HIT_REGISTRATION_KEY) === "nearest" ? "nearest" : "earliest");
   const [replay_base, setReplayBase] = useState(() => {
-    const replay_base = new ReplayBase();
+    const replay_base = new ManiaReplayBase();
     const stored_setting = localStorage.getItem(MUSIC_RATE_KEY);
     const stored_value = stored_setting === null ? Number.NaN : Number(stored_setting);
     if (Number.isFinite(stored_value) && stored_value >= 0.25 && stored_value <= 4) replay_base.rate = stored_value;
@@ -228,7 +228,7 @@ export function App() {
     const rate = Math.round(value * 1000) / 1000;
     localStorage.setItem(MUSIC_RATE_KEY, String(rate));
     setReplayBase((current) => {
-      const next = new ReplayBase();
+      const next = new ManiaReplayBase();
       next.importReplayBase(current.exportReplayBase());
       next.rate = rate;
       return next;
@@ -238,7 +238,7 @@ export function App() {
   const changeConstantScroll = (value: boolean) => {
     localStorage.setItem(CONSTANT_SCROLL_KEY, String(value));
     setReplayBase((current) => {
-      const next = new ReplayBase();
+      const next = new ManiaReplayBase();
       next.importReplayBase(current.exportReplayBase());
       next.const = value;
       return next;
@@ -248,7 +248,7 @@ export function App() {
   const changeTapOnly = (value: boolean) => {
     localStorage.setItem(TAP_ONLY_KEY, String(value));
     setReplayBase((current) => {
-      const next = new ReplayBase();
+      const next = new ManiaReplayBase();
       next.importReplayBase(current.exportReplayBase());
       next.tap_only = value;
       return next;

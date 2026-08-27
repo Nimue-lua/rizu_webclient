@@ -1,14 +1,15 @@
 import type { GameplayData, ManiaGameplayData, OsuGameplayData } from "../library/GameplayLoader";
-import { createOsuReplayBase, ReplayBase, type OsuReplayBaseValues } from "../replay/ReplayBase";
+import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
+import { createOsuReplayBase, type OsuReplayBaseValues } from "../replay/osu/OsuReplayBase";
 import { Subtimings } from "./timing/Subtimings";
 import { Timings } from "./timing/Timings";
-import { normalizeOsuOd } from "./timing/OsuManiaV2Timings";
-import type { ManiaHitRegistration } from "./ManiaRulesEngine";
-import { ManiaGameplayRuntime } from "./ManiaGameplayRuntime";
-import { OsuGameplayRuntime } from "./OsuGameplayRuntime";
+import { normalizeOsuOd } from "./mania/timing/OsuManiaV2Timings";
+import type { ManiaHitRegistration } from "./mania/ManiaRulesEngine";
+import { ManiaGameplayRuntime } from "./mania/ManiaGameplayRuntime";
+import { OsuGameplayRuntime } from "./osu/OsuGameplayRuntime";
 import type { GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPointerInput } from "./GameplaySession";
 import type { ScoreResult } from "./scoring/ScoreResult";
-import type { OsuSliderRendererMode } from "./renderer/WebGlSliderGraphics";
+import type { OsuSliderRendererMode } from "./osu/rendering/WebGlSliderGraphics";
 
 export interface GameplaySessionOptions {
   canvas: HTMLCanvasElement;
@@ -19,14 +20,14 @@ export interface GameplaySessionOptions {
   scroll_speed: number;
   cursor_scale: number;
   osu_slider_renderer: OsuSliderRendererMode;
-  replay_base: ReplayBase;
+  replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
   finish: (score: ScoreResult) => void;
 }
 
 export interface GameplaySessionFactoryDependencies {
-  create_mania(options: GameplaySessionOptions & { data: ManiaGameplayData; replay_base: ReplayBase }): GameplaySession & ManiaPointerInput;
+  create_mania(options: GameplaySessionOptions & { data: ManiaGameplayData; replay_base: ManiaReplayBase }): GameplaySession & ManiaPointerInput;
   create_osu(options: Omit<GameplaySessionOptions, "replay_base"> &
     { data: OsuGameplayData; replay_base: OsuReplayBaseValues }): GameplaySession & OsuPointerInput;
 }
@@ -43,7 +44,7 @@ const default_dependencies: GameplaySessionFactoryDependencies = {
 export function createGameplaySession(options: GameplaySessionOptions,
   dependencies: GameplaySessionFactoryDependencies = default_dependencies): GameplaySessionBinding {
   if (options.data.mode === "mania") {
-    const replay_base = new ReplayBase();
+    const replay_base = new ManiaReplayBase();
     replay_base.importReplayBase(options.replay_base.exportReplayBase());
     replay_base.nearest = options.hit_registration === "nearest";
     replay_base.setTimingIdentity(new Timings("osuod", normalizeOsuOd(options.data.chart.overall_difficulty ?? 5)),

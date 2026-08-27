@@ -1,13 +1,13 @@
-import type { OsuChart, OsuSlider } from "../../chart/Chart";
+import type { OsuChart, OsuSlider } from "../../../chart/Chart";
 import { osuApproachPreempt, osuCircleDiameter } from "../OsuCircleGeometry";
 import type { OsuCircleTransient } from "../OsuCirclePresentation";
 import { OsuCircleState } from "../OsuCircleState";
 import { OsuViewport } from "../OsuViewport";
-import type { OsuStandardSkin } from "./OsuSkin";
-import type { SpriteQuadWriter } from "./Sprite";
+import type { OsuStandardSkin } from "../../renderer/OsuSkin";
+import type { SpriteQuadWriter } from "../../renderer/Sprite";
 import type { OsuSliderPath } from "../OsuSliderPath";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
-import { drawBitmapText } from "./BitmapTextRenderer";
+import { drawBitmapText } from "../../renderer/BitmapTextRenderer";
 
 const CIRCLE_FADE_IN = 0.4;
 const APPROACH_FADE_IN = 0.8;

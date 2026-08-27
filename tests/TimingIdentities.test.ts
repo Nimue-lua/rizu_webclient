@@ -3,7 +3,7 @@ import test from "node:test";
 import { resolveOsuStandardTimingValues, resolveTimingValues } from "../src/gameplay/timing/TimingValuesFactory";
 import { Subtimings } from "../src/gameplay/timing/Subtimings";
 import { Timings } from "../src/gameplay/timing/Timings";
-import { createOsuStandardTimingValues } from "../src/gameplay/timing/OsuStandardOdTimings";
+import { createOsuStandardTimingValues } from "../src/gameplay/osu/timing/OsuStandardOdTimings";
 
 test("preserves native timing integer encodings", () => {
   assert.equal(new Timings("arbitrary").encode(), 0);

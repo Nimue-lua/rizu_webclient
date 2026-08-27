@@ -4,7 +4,7 @@ import type { ManiaGameplayData, OsuGameplayData } from "../src/library/Gameplay
 import { createGameplaySession, type GameplaySessionFactoryDependencies,
   type GameplaySessionOptions } from "../src/gameplay/createGameplaySession";
 import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../src/gameplay/GameplaySession";
-import { ReplayBase } from "../src/replay/ReplayBase";
+import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 
 function createManiaData(): ManiaGameplayData {
   return {
@@ -38,7 +38,7 @@ function createOptions(data: ManiaGameplayData | OsuGameplayData): GameplaySessi
     scroll_speed: 1.2,
     cursor_scale: 1.25,
     osu_slider_renderer: "stable",
-    replay_base: new ReplayBase(),
+    replay_base: new ManiaReplayBase(),
     input_bindings: ["KeyA"],
     hit_registration: "nearest",
     finish: () => {},

@@ -4,7 +4,7 @@ import {
   OSU_SCROLL_SPEED_FACTOR,
   scrollSpeedToCanonical,
   scrollSpeedToDisplay,
-} from "../src/gameplay/ScrollSpeed";
+} from "../src/gameplay/mania/ScrollSpeed";
 
 test("converts osu scroll speed to the canonical engine multiplier", () => {
   assert.equal(scrollSpeedToCanonical("osu", 24), 24 * OSU_SCROLL_SPEED_FACTOR);

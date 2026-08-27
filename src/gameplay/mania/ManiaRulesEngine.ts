@@ -1,15 +1,15 @@
-import type { ManiaChart, ManiaNoteEvent } from "../chart/Chart";
-import { interpolateVisualPoint } from "../chart/VisualTimeline";
+import type { ManiaChart, ManiaNoteEvent } from "../../chart/Chart";
+import { interpolateVisualPoint } from "../../chart/VisualTimeline";
 import { NoteState, type ManiaLogicEvent } from "./ManiaLogicEvent";
-import { ScoreEngine } from "./scoring/ScoreEngine";
-import type { ScoreResult } from "./scoring/ScoreResult";
-import { ManiaComboScore } from "./scoring/systems/ManiaComboScore";
-import { OsuManiaV2Score } from "./scoring/systems/OsuManiaV2Score";
+import { ScoreEngine } from "../scoring/ScoreEngine";
+import type { ScoreResult } from "../scoring/ScoreResult";
+import { ManiaComboScore } from "./scoring/ManiaComboScore";
+import { OsuManiaV2Score } from "./scoring/OsuManiaV2Score";
 import { createOsuManiaV2TimingPreset } from "./timing/OsuManiaV2Timings";
-import type { Subtimings } from "./timing/Subtimings";
-import type { Timings } from "./timing/Timings";
-import { resolveTimingValues } from "./timing/TimingValuesFactory";
-import { classifyTiming, type TimingResult, type TimingWindow } from "./timing/TimingValues";
+import type { Subtimings } from "../timing/Subtimings";
+import type { Timings } from "../timing/Timings";
+import { resolveTimingValues } from "../timing/TimingValuesFactory";
+import { classifyTiming, type TimingResult, type TimingWindow } from "../timing/TimingValues";
 
 export { NoteState } from "./ManiaLogicEvent";
 

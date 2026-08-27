@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getColumnColorNames } from "../src/gameplay/ColumnColors";
+import { getColumnColorNames } from "../src/gameplay/mania/ColumnColors";
 
 test("uses predefined patterns for common key modes", () => {
   assert.deepEqual(getColumnColorNames(1), ["yellow"]);
