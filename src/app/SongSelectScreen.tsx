@@ -14,7 +14,7 @@ import { SongSelectFooter } from "./song-select/SongSelectFooter";
 import { SongSelectHeader } from "./song-select/SongSelectHeader";
 import { completedGameplayFromStoredPlay, listPlaysByChart, type StoredPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
-import { GlobalLeaderboardModal } from "./GlobalLeaderboardModal";
+import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
 
 const ROW_HEIGHT = 82;
 const OVERSCAN = 5;
@@ -114,12 +114,17 @@ export function SongSelectScreen({
   useEffect(() => {
     const viewport = viewport_ref.current;
     if (!viewport) return;
+    setViewportHeight(viewport.clientHeight);
     const observer = new ResizeObserver(([entry]) => {
       if (entry) setViewportHeight(entry.contentRect.height);
     });
     observer.observe(viewport);
     return () => observer.disconnect();
-  }, []);
+  }, [global_leaderboard_open]);
+
+  useLayoutEffect(() => {
+    if (!global_leaderboard_open && viewport_ref.current) viewport_ref.current.scrollTop = scroll_top;
+  }, [global_leaderboard_open]);
 
   const selection_entries = chart_selector.getSelectionEntries();
   const selected_song = chart_selector.getSelectedSong();
@@ -292,33 +297,34 @@ export function SongSelectScreen({
       <audio ref={audio_ref} preload="auto" />
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
         onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings} />
-      <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
-        onQueryChange={(query) => { chart_selector.setQuery(query); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
-        onSortChange={selectSortMode} />
+      {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> : <>
+        <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
+          onQueryChange={(query) => { chart_selector.setQuery(query); setScrollTop(0); if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
+          onSortChange={selectSortMode} />
 
-      <section className="song-select-content">
-        <SelectedSongPanel background_url={background_url} background_loaded={hero_loaded} selected_chart={selected_chart}
-          selected_song={selected_song} stored_plays={stored_plays} nickname={nickname}
-          onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
-        <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
-          first_index={first_index} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
-          selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}
-          visible_entries={visible_entries} onChartSelect={(chart_id) => chart_selector.selectChart(chart_id)}
-          onEntryPlay={(entry) => { const chart = entry.chart ?? entry.song.charts.at(-1); if (chart) playChart(chart, entry.song); }}
-          onEntrySelect={selectEntry} onKeyDown={(event) => {
-            if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
-            if (event.key === "Enter" && selected_chart) playChart(selected_chart);
-          }} onMoveDifficulty={selectDifficulty} onScroll={setScrollTop} isEntrySelected={(entry) => chart_selector.isEntrySelected(entry)} />
-      </section>
+        <section className="song-select-content">
+          <SelectedSongPanel background_url={background_url} background_loaded={hero_loaded} selected_chart={selected_chart}
+            selected_song={selected_song} stored_plays={stored_plays} nickname={nickname}
+            onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
+          <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
+            first_index={first_index} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
+            selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}
+            visible_entries={visible_entries} onChartSelect={(chart_id) => chart_selector.selectChart(chart_id)}
+            onEntryPlay={(entry) => { const chart = entry.chart ?? entry.song.charts.at(-1); if (chart) playChart(chart, entry.song); }}
+            onEntrySelect={selectEntry} onKeyDown={(event) => {
+              if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveSelection(event.key === "ArrowUp" ? -1 : 1); }
+              if (event.key === "Enter" && selected_chart) playChart(selected_chart);
+            }} onMoveDifficulty={selectDifficulty} onScroll={setScrollTop} isEntrySelected={(entry) => chart_selector.isEntrySelected(entry)} />
+        </section>
 
-      <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
-        onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
-        onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)} />
+        <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
+          onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
+          onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)} />
+      </>}
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
       {skins_open && <NoteSkinsModal selections={note_skin_selections} options={available_note_skins} selected_mode={selected_chart ? noteSkinMode(selected_chart.mode) : null} selected_column_count={selected_chart?.mode === 3 ? selected_chart.keys : null} onSelectionChange={onNoteSkinSelectionChange} onImport={onNoteSkinImport} onExit={() => setSkinsOpen(false)} />}
-      {global_leaderboard_open && <GlobalLeaderboardModal onExit={() => setGlobalLeaderboardOpen(false)} />}
     </main>
   );
 }
