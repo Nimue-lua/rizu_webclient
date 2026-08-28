@@ -53,7 +53,7 @@ export function RangeInput({ max, min, step, value, onValueChange, ...props }: R
     const drag = drag_ref.current;
     if (!drag || drag.pointer_id !== event.pointerId) return;
 
-    const raw_value = drag.start_value + (event.clientX - drag.start_x) / (drag.width * 8) * (max - min);
+    const raw_value = drag.start_value + (event.clientX - drag.start_x) / drag.width * (max - min);
     const stepped_value = min + Math.round((raw_value - min) / step) * step;
     onValueChange(Math.min(max, Math.max(min, Number(stepped_value.toFixed(10)))));
   };

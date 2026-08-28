@@ -28,7 +28,7 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
   const moveRateDrag = (client_x: number) => {
     const drag = rate_drag_ref.current;
     if (!drag) return;
-    const value = drag.start_rate + (client_x - drag.start_x) / 1440 * 3.75;
+    const value = drag.start_rate + (client_x - drag.start_x) / 360 * 3.75;
     onMusicRateChange(Math.min(4, Math.max(0.25, Math.round(value / 0.05) * 0.05)));
   };
 
