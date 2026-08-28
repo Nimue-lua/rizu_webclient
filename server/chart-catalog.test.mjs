@@ -143,6 +143,7 @@ test("caches chart collections as locations", async () => {
 
   try {
     await mkdir(chart_directory, { recursive: true });
+    await mkdir(path.join(charts_directory, "chart-previews"));
     await writeFile(ffmpeg_path, "#!/bin/sh\nfor output; do :; done\n: > \"$output\"\n");
     await chmod(ffmpeg_path, 0o700);
     await writeFile(path.join(chart_directory, "song.ogg"), "audio");
@@ -172,15 +173,16 @@ CircleSize:4
       client_database,
       schema_directory: path.dirname(fileURLToPath(import.meta.url)),
       ffmpeg_path,
+      asset_prefix: "assets",
     });
 
     assert.deepEqual(result.locations, [{
       id: 1,
       name: "Collection One",
-      path: "charts/Collection One",
+      path: "assets/Collection One",
     }]);
     assert.equal(result.charts[0]?.location_id, 1);
-    assert.equal(result.charts[0]?.chart_path, "charts/Collection One/Chart One/chart.osu");
+    assert.equal(result.charts[0]?.chart_path, "assets/Collection One/Chart One/chart.osu");
     assert.equal(result.charts[0]?.chart_id, "456");
     assert.match(result.charts[1]?.chart_id ?? "", /^chart-[a-f0-9]{24}$/);
     assert.equal(result.charts[1]?.beatmap_id, 456);
@@ -190,12 +192,12 @@ CircleSize:4
       assert.deepEqual({ ...client.prepare("SELECT * FROM locations").get() }, {
         id: 1,
         name: "Collection One",
-        path: "charts/Collection One",
+        path: "assets/Collection One",
       });
       assert.deepEqual({ ...client.prepare("SELECT location_id, chart_path, audio_path FROM charts").get() }, {
         location_id: 1,
-        chart_path: "charts/Collection One/Chart One/chart.osu",
-        audio_path: "charts/Collection One/Chart One/song.ogg",
+        chart_path: "assets/Collection One/Chart One/chart.osu",
+        audio_path: "assets/Collection One/Chart One/song.ogg",
       });
       assert.equal(client.prepare("SELECT COUNT(*) AS count FROM charts").get().count, 2);
     } finally {
@@ -256,8 +258,8 @@ CircleSize:4
 
     const client = new DatabaseSync(client_database, { readOnly: true });
     try {
-      const media = client.prepare("SELECT id, audio_path, chart_path, preview_seconds, audio_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
-      assert.deepEqual(media.map(({ audio_preview_path: _, ...row }) => row), [{
+      const media = client.prepare("SELECT id, audio_path, chart_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row }));
+      assert.deepEqual(media, [{
         id: "101",
         audio_path: "charts/Collection/Song/Easy.ogg",
         chart_path: "charts/Collection/Song/Easy.osu",
@@ -273,10 +275,6 @@ CircleSize:4
         chart_path: "charts/Collection/Song/Normal.osu",
         preview_seconds: 10.3,
       }]);
-      assert.match(media[0]?.audio_preview_path, /^audio-previews\/[a-f0-9]{24}\.webm$/);
-      assert.match(media[1]?.audio_preview_path, /^audio-previews\/[a-f0-9]{24}\.webm$/);
-      assert.match(media[2]?.audio_preview_path, /^audio-previews\/[a-f0-9]{24}\.webm$/);
-      assert.notEqual(media[0]?.audio_preview_path, media[2]?.audio_preview_path);
       const previews = client.prepare("SELECT id, background_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
       assert.equal(previews.length, 3);
       assert.match(previews[0]?.background_preview_path, /^chart-previews\/[a-f0-9]{24}\.webp$/);
@@ -297,17 +295,16 @@ test("updates the database without creating previews", async () => {
   const chart_directory = path.join(charts_directory, "Collection", "Song");
   const client_database = path.join(temporary_directory, "catalog.sqlite");
   const background_previews_directory = path.join(temporary_directory, "chart-previews");
-  const audio_previews_directory = path.join(temporary_directory, "audio-previews");
 
   try {
     await mkdir(chart_directory, { recursive: true });
     await writeFile(path.join(chart_directory, "song.ogg"), "audio");
-    await writeFile(path.join(chart_directory, "background.png"), "background");
+    await writeFile(path.join(chart_directory, "background%20.png"), "background");
     await writeFile(path.join(chart_directory, "chart.osu"), `Mode:0
 [General]
 AudioFilename:song.ogg
 [Events]
-0,0,"background.png",0,0
+0,0,"background%20.png",0,0
 [HitObjects]
 256,192,1000,1,0,0:0:0:0:
 `);
@@ -317,17 +314,14 @@ AudioFilename:song.ogg
       client_database,
       schema_directory: path.dirname(fileURLToPath(import.meta.url)),
       background_previews_directory,
-      audio_previews_directory,
       ffmpeg_path: path.join(temporary_directory, "missing-ffmpeg"),
       generate_previews: false,
     });
 
     assert.equal(result.charts.length, 1);
-    assert.match(result.charts[0]?.audio_preview_path ?? "", /^audio-previews\/[a-f0-9]{24}\.webm$/);
     assert.match(result.charts[0]?.background_preview_path ?? "", /^chart-previews\/[a-f0-9]{24}\.webp$/);
     await access(client_database);
     await assert.rejects(access(background_previews_directory));
-    await assert.rejects(access(audio_previews_directory));
   } finally {
     await rm(temporary_directory, { recursive: true, force: true });
   }
@@ -339,7 +333,6 @@ test("creates previews without writing a database", async () => {
   const chart_directory = path.join(charts_directory, "Collection", "Song");
   const client_database = path.join(temporary_directory, "catalog.sqlite");
   const background_previews_directory = path.join(temporary_directory, "chart-previews");
-  const audio_previews_directory = path.join(temporary_directory, "audio-previews");
   const ffmpeg_path = path.join(temporary_directory, "ffmpeg");
 
   try {
@@ -355,6 +348,10 @@ AudioFilename:song.ogg
 256,192,1000,1,0,0:0:0:0:
 `);
     await writeFile(ffmpeg_path, `#!/bin/sh
+test "$3" = "-i"
+test "$4" = "pipe:0"
+input="$(cat)"
+test "$input" = "background"
 output=""
 for argument do output="$argument"; done
 printf preview > "$output"
@@ -366,13 +363,11 @@ printf preview > "$output"
       client_database,
       schema_directory: path.dirname(fileURLToPath(import.meta.url)),
       background_previews_directory,
-      audio_previews_directory,
       ffmpeg_path,
       write_database: false,
     });
 
     assert.equal(result.version, null);
-    await access(path.join(audio_previews_directory, path.basename(result.charts[0].audio_preview_path)));
     await access(path.join(background_previews_directory, path.basename(result.charts[0].background_preview_path)));
     await assert.rejects(access(client_database));
   } finally {

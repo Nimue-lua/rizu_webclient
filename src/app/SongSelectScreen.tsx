@@ -145,7 +145,7 @@ export function SongSelectScreen({
   const chart_level_sort = selection.sort_mode === "difficulty" || selection.sort_mode === "duration";
   const selected_local_media = local_preview_media?.chart_id === selected_chart?.id ? local_preview_media : null;
   const selected_background_url = selected_local_media?.background_url ?? selected_chart?.background_url ?? null;
-  const selected_audio_preview_url = selected_local_media?.audio_url ?? selected_chart?.audio_preview_url ?? "";
+  const selected_preview_audio_url = selected_local_media?.audio_url ?? selected_chart?.audio_url ?? "";
 
   useEffect(() => {
     setLocalPreviewMedia(null);
@@ -253,14 +253,14 @@ export function SongSelectScreen({
     const previous_change = last_preview_change_ref.current;
     last_preview_change_ref.current = now;
     const switchPreview = () => {
-      const preview_url = selected_audio_preview_url;
+      const preview_url = selected_preview_audio_url;
       audio.pause();
       audio.src = preview_url;
       audio.defaultPlaybackRate = music_rate;
       audio.playbackRate = music_rate;
       if (!preview_url) return;
       const startPlayback = () => {
-        if (selected_chart?.source_type === "local") audio.currentTime = selected_chart.preview_time ?? 0;
+        audio.currentTime = selected_chart?.preview_time ?? 0;
         if (preview_unlocked_ref.current) void audio.play().catch(() => undefined);
       };
       if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
@@ -272,7 +272,7 @@ export function SongSelectScreen({
     }
     const timer = window.setTimeout(switchPreview, AUDIO_PREVIEW_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [selected_audio_preview_url, selected_chart?.preview_time, selected_chart?.source_id]);
+  }, [selected_preview_audio_url, selected_chart?.preview_time, selected_chart?.source_id]);
 
   const selectEntry = (entry: ChartSelectionEntry) => {
     chart_selector.selectEntry(entry);
@@ -338,12 +338,12 @@ export function SongSelectScreen({
     if (preview_unlocked_ref.current) return;
     preview_unlocked_ref.current = true;
     const audio = audio_ref.current;
-    if (!audio || !selected_audio_preview_url) return;
-    audio.src = selected_audio_preview_url;
+    if (!audio || !selected_preview_audio_url) return;
+    audio.src = selected_preview_audio_url;
     audio.defaultPlaybackRate = music_rate;
     audio.playbackRate = music_rate;
     const startPlayback = () => {
-      if (selected_chart?.source_type === "local") audio.currentTime = selected_chart.preview_time ?? 0;
+      audio.currentTime = selected_chart?.preview_time ?? 0;
       void audio.play().catch(() => undefined);
     };
     if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();

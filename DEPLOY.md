@@ -35,7 +35,7 @@ Song and catalog uploads are deliberately separate:
 ./rizu upload-catalog
 ```
 
-Song upload sends referenced `.osu` and audio files plus generated previews to the chart library root. Catalog upload sends the existing `public/catalog.sqlite` there. Neither operation rebuilds the application.
+Song upload sends referenced `.osu` and audio files plus generated background previews to the chart library root. Catalog upload sends the existing `library/catalog.sqlite` there. Neither operation rebuilds the application.
 
 The defaults can be overridden without editing the script:
 
@@ -44,7 +44,7 @@ DEPLOY_HOST=root@example.com DEPLOY_ROOT=/srv/rizu DEPLOY_URL=https://rizu.examp
   LIBRARY_ROOT=/srv/charts.example.com LIBRARY_URL=https://charts.example.com ./rizu
 ```
 
-Catalogs and previews are generated from local `public/charts`. Deployment uploads only `.osu` files and audio referenced by the generated catalog. Original background images, videos, storyboards, and unrelated files are excluded because song select uses generated WebP thumbnails. `CHARTS_DIR` can override the chart source, `STAGE_DIR` can override the local staging path, and `MIN_FREE_BYTES` can change the default 512 MiB post-upload safety margin.
+Catalogs and previews are generated under `/media/SSD/s3`. Deployment uploads only `.osu` files and audio referenced by the generated catalog. Original background images, videos, storyboards, and unrelated files are excluded because song select uses generated WebP thumbnails. `STAGE_DIR` can override staging, and `MIN_FREE_BYTES` can change the default 512 MiB post-upload safety margin.
 
 Unchanged gameplay assets are hard-linked from the active library with `rsync --link-dest`, so they are not uploaded again or duplicated on disk. Song upload removes full backgrounds left by older releases from the active chart tree. No rollback copy is retained because VPS storage is limited.
 
@@ -57,8 +57,7 @@ Browser -- HTTPS :443 --> Nginx
                            |-- /               -> /srv/rizu/dist
                            |-- charts.kuudere.fun/catalog.sqlite
                            |-- charts.kuudere.fun/charts/
-                           |-- charts.kuudere.fun/chart-previews/
-                           `-- charts.kuudere.fun/audio-previews/
+                           `-- charts.kuudere.fun/chart-previews/
 ```
 
 No application service or non-HTTP media port is required.
@@ -69,7 +68,7 @@ Local machine:
 
 - Node.js 22 or newer
 - `ffmpeg`, `rsync`, and SSH access to the VPS
-- Chart folders available under `public/charts`
+- Chart folders available under `/media/SSD/s3/charts`
 
 VPS:
 
@@ -112,7 +111,7 @@ The Nginx configuration is managed separately. Application deployment only repla
 ```bash
 curl -fsSI https://rizu.nimue.mom/
 curl -fsSI https://charts.kuudere.fun/catalog.sqlite
-curl -fsSI 'https://charts.kuudere.fun/charts/<collection>/<song>/<audio-file>'
+curl -fsSI 'https://charts.kuudere.fun/charts/<location>/<song>/<audio-file>'
 ```
 
-If gameplay assets return 404, regenerate the catalog from the same chart tree that exists under `/srv/charts.kuudere.fun/public/charts` and avoid renaming files after catalog generation.
+If gameplay assets return 404, regenerate the catalog from the same chart tree that exists under `/srv/charts.kuudere.fun/public` and avoid renaming files after catalog generation.

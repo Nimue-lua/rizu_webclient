@@ -6,7 +6,6 @@ import { ChartSelector } from "../src/select/ChartSelector";
 
 function chart(id: string, difficulty: number, duration_seconds: number, location_id = 1, mode = 3, keys = 4): Chartview {
   return {
-    audio_preview_url: "",
     audio_url: "",
     background_url: null,
     bpm_avg: 120,

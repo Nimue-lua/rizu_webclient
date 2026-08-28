@@ -243,7 +243,6 @@ function librarySnapshot(): LibraryView {
       chart_path,
       preview_time: Math.max(0, Number(row.preview_time) || 0),
       audio_url: "",
-      audio_preview_url: "",
       background_url: null,
       bpm_avg: Number(row.tempo_avg), bpm_max: Number(row.tempo_max), bpm_min: Number(row.tempo_min),
       creator: String(row.creator || "Unknown creator"), difficulty: Number(row.level), duration_seconds: Number(row.duration),

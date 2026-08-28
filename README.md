@@ -16,17 +16,17 @@ cd rizu_webclient
 npm install
 
 # Add songs before generating previews and the catalog:
-# public/charts/<collection>/<song>/{chart.osu,audio.ogg,background.jpg}
+# /media/SSD/s3/charts/<location>/<set>/{chart.osu,audio.ogg,background.jpg}
 ./rizu
 npm run dev
 ```
 
-Each song goes in its own directory inside a collection under `public/charts`. A song directory must contain at least one `.osu` chart and the audio file named by its `AudioFilename`; a background image is optional. Multiple difficulties can be placed in the same song directory.
+Each song goes in its own directory inside a location under `/media/SSD/s3/charts`. A song directory must contain at least one `.osu` chart and the audio file named by its `AudioFilename`; a background image is optional. Multiple difficulties can be placed in the same song directory.
 
 `./rizu` provides one menu for maintaining and deploying Rizu:
 
-- Generate missing chart and audio previews.
-- Create or update `public/catalog.sqlite`, including calculated difficulty.
+- Generate missing chart background previews.
+- Create or update `library/catalog.sqlite`, including calculated difficulty.
 - Upload songs and previews.
 - Upload the catalog.
 - Build and deploy the application.

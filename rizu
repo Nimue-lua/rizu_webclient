@@ -9,8 +9,8 @@ readonly DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/rizu}"
 readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.nimue.mom}"
 readonly LIBRARY_ROOT="${LIBRARY_ROOT:-/srv/charts.kuudere.fun}"
 readonly LIBRARY_URL="${LIBRARY_URL:-https://charts.kuudere.fun}"
-readonly LIBRARY_DIR="${LIBRARY_DIR:-$ROOT_DIR/library}"
-readonly CHARTS_DIR="${CHARTS_DIR:-$LIBRARY_DIR/charts}"
+readonly LIBRARY_DIR="/media/SSD/s3"
+readonly CHARTS_DIR="$LIBRARY_DIR/charts"
 readonly MIN_FREE_BYTES="${MIN_FREE_BYTES:-536870912}"
 readonly SSH_OPTIONS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=6)
 
@@ -19,10 +19,10 @@ usage() {
 Usage: ./rizu [command]
 
 Commands:
-  previews        Generate missing chart and audio previews
-  catalog         Create or replace library/catalog.sqlite
+  previews        Generate missing chart background previews
+  catalog         Create or replace /media/SSD/s3/catalog.sqlite
   upload-songs    Upload chart, audio, and preview files
-  upload-catalog  Upload library/catalog.sqlite
+  upload-catalog  Upload /media/SSD/s3/catalog.sqlite
   deploy          Check, build, and deploy the application
 
 Run without a command to open the interactive menu.
@@ -49,11 +49,10 @@ require_charts() {
 generate_previews() {
   require_commands node ffmpeg
   require_charts
-  mkdir -p -- "$LIBRARY_DIR/chart-previews" "$LIBRARY_DIR/audio-previews"
+  mkdir -p -- "$LIBRARY_DIR/chart-previews"
   node "$ROOT_DIR/server/cache-charts.mjs" \
     --charts "$CHARTS_DIR" \
     --background-previews "$LIBRARY_DIR/chart-previews" \
-    --audio-previews "$LIBRARY_DIR/audio-previews" \
     --skip-database
 }
 
@@ -110,7 +109,7 @@ upload_songs() {
   require_commands node rsync ssh curl
   require_charts
   local stage_dir="${STAGE_DIR:-/tmp/rizu-song-upload}"
-  if [[ ! -d "$LIBRARY_DIR/chart-previews" || ! -d "$LIBRARY_DIR/audio-previews" ]]; then
+  if [[ ! -d "$LIBRARY_DIR/chart-previews" ]]; then
     printf 'Preview directories are missing (run previews first).\n' >&2
     exit 1
   fi
@@ -127,7 +126,7 @@ upload_songs() {
   printf 'Preparing remote song upload...\n'
   prepare_remote_library_copy
   ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" \
-    "rm -rf -- '$LIBRARY_ROOT.new/public/charts' '$LIBRARY_ROOT.new/public/chart-previews' '$LIBRARY_ROOT.new/public/audio-previews'; mkdir -p -- '$LIBRARY_ROOT.new/public/charts' '$LIBRARY_ROOT.new/public/chart-previews' '$LIBRARY_ROOT.new/public/audio-previews'"
+    "rm -rf -- '$LIBRARY_ROOT.new/public/charts' '$LIBRARY_ROOT.new/public/chart-previews' '$LIBRARY_ROOT.new/public/audio-previews'; mkdir -p -- '$LIBRARY_ROOT.new/public/charts' '$LIBRARY_ROOT.new/public/chart-previews'"
 
   rsync -a --partial --info=progress2 \
     --from0 --files-from="$stage_dir/chart-assets.list" \
@@ -138,11 +137,6 @@ upload_songs() {
     --link-dest="$LIBRARY_ROOT/public/chart-previews" \
     -e "ssh ${SSH_OPTIONS[*]}" \
     "$LIBRARY_DIR/chart-previews/" "$DEPLOY_HOST:$LIBRARY_ROOT.new/public/chart-previews/"
-  rsync -a --delete --partial --info=progress2 \
-    --link-dest="$LIBRARY_ROOT/public/audio-previews" \
-    -e "ssh ${SSH_OPTIONS[*]}" \
-    "$LIBRARY_DIR/audio-previews/" "$DEPLOY_HOST:$LIBRARY_ROOT.new/public/audio-previews/"
-
   activate_remote_library_copy
   curl -fsS "$LIBRARY_URL/" >/dev/null
   printf 'Songs uploaded: %s\n' "$LIBRARY_URL"
@@ -204,7 +198,7 @@ deploy_application() {
 choose_command() {
   printf '%s\n' \
     'Rizu maintenance' \
-    '1) Generate previews for new charts' \
+    '1) Generate background previews for new charts' \
     '2) Create/Update catalog.sqlite' \
     '3) Upload songs' \
     '4) Upload catalog.sqlite' \

@@ -6,9 +6,10 @@ This guide explains how to make Rizu find your songs and charts.
 
 The cache command scans your chart folders and creates:
 
-- `public/catalog.sqlite`: the song list used by the web client.
-- `public/chart-previews/`: small background images used on song select.
-- `public/audio-previews/`: compact audio clips streamed on song select.
+- `library/catalog.sqlite`: the remote provider catalog.
+- `library/chart-previews/`: small background images used on song select.
+
+Song select streams the original audio file and seeks to the `.osu` file's `PreviewTime`.
 
 Run `./rizu` again whenever you add, remove, rename, or move charts.
 
@@ -46,12 +47,12 @@ You normally only need to do this once.
 
 ## 3. Add Charts
 
-Put chart collections inside `public/charts`.
+Put chart locations inside `/media/SSD/s3/charts`.
 
 The expected layout is:
 
 ```text
-public/charts/
+/media/SSD/s3/charts/
 └── My Collection/
     └── My Song/
         ├── chart.osu
@@ -68,7 +69,7 @@ Important:
 If your charts are stored elsewhere, you may use a symbolic link:
 
 ```bash
-ln -s "/path/to/my/charts" "public/charts/My Charts"
+ln -s "/path/to/my/charts" "/media/SSD/s3/charts/My Charts"
 ```
 
 Make sure the link target exists and can be read.
@@ -90,36 +91,16 @@ Catalog version: c9394375...
 
 `skipped` means some chart files were invalid, unsupported, or missing their audio. A small number does not stop valid charts from being cached.
 
-Audio previews use each `.osu` file's `PreviewTime`. They are 10-second mono Opus/WebM clips encoded at 32 kbps, normally around 40 KB each. Charts that use the same audio and preview time share one generated file.
+Existing background previews are reused.
 
-Existing previews are reused. Files no longer referenced by any chart are removed after a successful rebuild.
+## 5. Upload The Library
 
-## 5. Start The Client
+Use `./rizu upload-songs` and `./rizu upload-catalog` to publish the generated files to `charts.kuudere.fun`. Vite does not serve this workspace.
 
-```bash
-npm run dev
-```
-
-Open the address printed by Vite, usually:
+The directory must contain location folders, followed by song folders:
 
 ```text
-http://localhost:5173
-```
-
-Refresh the page after rebuilding the cache. If the old song list remains, perform a hard refresh with `Ctrl+Shift+R`.
-
-## Use A Different Chart Directory
-
-You do not need to copy charts into the project. Pass their directory directly:
-
-```bash
-CHARTS_DIR="/path/to/charts" ./rizu
-```
-
-That directory must still contain collection folders, followed by song folders:
-
-```text
-/path/to/charts/
+/media/SSD/s3/charts/
 └── Collection/
     └── Song/
         ├── chart.osu
@@ -177,10 +158,9 @@ The generated catalog contains paths relative to the chart directory. The web se
 
 ## Quick Version
 
-If everything is already installed and charts are under `public/charts`, these are the only commands you need:
+If everything is already installed and charts are under `/media/SSD/s3/charts`, these are the only commands you need:
 
 ```bash
 npm install
 ./rizu
-npm run dev
 ```
