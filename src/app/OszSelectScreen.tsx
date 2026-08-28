@@ -12,6 +12,7 @@ interface OszSelectScreenProps {
   onBack: () => void;
   onImport: (file: File) => void;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
+  onAutoplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -19,7 +20,7 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(rounded_seconds / 60)}:${String(rounded_seconds % 60).padStart(2, "0")}`;
 }
 
-export function OszSelectScreen({ archive, importing, import_error, onBack, onImport, onPlay }: OszSelectScreenProps) {
+export function OszSelectScreen({ archive, importing, import_error, onBack, onImport, onPlay, onAutoplay }: OszSelectScreenProps) {
   const [selected_id, setSelectedId] = useState(archive?.song.charts[0]?.id ?? "");
   const [dragging, setDragging] = useState(false);
   const selected_chart = archive?.song.charts.find((chart) => chart.id === selected_id) ?? archive?.song.charts[0];
@@ -40,6 +41,9 @@ export function OszSelectScreen({ archive, importing, import_error, onBack, onIm
   };
   const play = () => {
     if (archive && selected_chart) onPlay(selected_chart, loadInputBindings(inputLayout(selected_chart)), archive.song);
+  };
+  const autoplay = () => {
+    if (archive && selected_chart) onAutoplay(selected_chart, loadInputBindings(inputLayout(selected_chart)), archive.song);
   };
 
   return (
@@ -73,6 +77,7 @@ export function OszSelectScreen({ archive, importing, import_error, onBack, onIm
       </section>
       <footer className="osz-footer">
         <div><span>SELECTED DIFFICULTY</span><strong>{selected_chart?.name ?? (importing ? "Importing..." : "No chart available")}</strong></div>
+        <button type="button" disabled={!selected_chart || importing} onClick={autoplay}><Play /> Autoplay</button>
         <button type="button" disabled={!selected_chart || importing} onClick={play}><Play fill="currentColor" /> Play chart</button>
       </footer>
       {dragging && <div className="osz-drop-overlay">DROP .OSZ TO OPEN</div>}

@@ -25,6 +25,7 @@ interface SongSelectScreenProps {
   chart_selector: ChartSelector;
   nickname: string;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
+  onAutoplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onReplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }, playback: CompletedGameplay) => void;
   onSettings: () => void;
   master_volume: number;
@@ -54,6 +55,7 @@ export function SongSelectScreen({
   chart_selector,
   nickname,
   onPlay,
+  onAutoplay,
   onReplay,
   onSettings,
   master_volume,
@@ -264,6 +266,13 @@ export function SongSelectScreen({
       artist: song?.artist ?? "Unknown artist",
     });
   };
+  const autoplayChart = (chart: Chartview, song = selected_song) => {
+    audio_ref.current?.pause();
+    onAutoplay(chart, loadInputBindings(inputLayout(chart)), {
+      title: song?.title ?? "Unknown title",
+      artist: song?.artist ?? "Unknown artist",
+    });
+  };
   const editNoteSkin = () => {
     if (!selected_chart) return;
     audio_ref.current?.pause();
@@ -314,7 +323,8 @@ export function SongSelectScreen({
 
         <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
           onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
-          onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)} />
+          onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)}
+          onAutoplay={() => selected_chart && autoplayChart(selected_chart)} />
       </>}
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}

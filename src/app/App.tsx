@@ -55,6 +55,7 @@ export function App() {
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [completed_gameplay, setCompletedGameplay] = useState<CompletedGameplay | null>(null);
   const [playback, setPlayback] = useState<CompletedGameplay | null>(null);
+  const [autoplay, setAutoplay] = useState(false);
   const [note_skin_editor, setNoteSkinEditor] = useState(false);
   const [note_skin_selections, setNoteSkinSelections] = useState<NoteSkinSelections>(
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
@@ -147,7 +148,7 @@ export function App() {
     appSettings.set(settings.tap_only, value);
   };
 
-  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null, edit_note_skin = false) => {
+  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null, edit_note_skin = false, requested_autoplay = false) => {
     const skin_mode = noteSkinMode(chart.mode);
     const note_skin = skin_mode === null ? undefined : selectedNoteSkin(skin_mode, chart.mode === 3 ? chart.keys : null,
       note_skin_selections, available_note_skins);
@@ -171,6 +172,7 @@ export function App() {
     setScore(requested_playback?.score ?? null);
     setCompletedGameplay(requested_playback);
     setPlayback(requested_playback);
+    setAutoplay(requested_autoplay);
     setNoteSkinEditor(edit_note_skin);
     setLoadingReturnScreen(screen === "osz-select" ? "osz-select" : "song-select");
     setScreen("loading");
@@ -227,6 +229,7 @@ export function App() {
     setScore(null);
     setCompletedGameplay(null);
     setPlayback(null);
+    setAutoplay(false);
     setNoteSkinEditor(false);
     setAudioContext(null);
     setLoadingLocation(null);
@@ -269,12 +272,17 @@ export function App() {
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
+            autoplay={autoplay}
             playback={playback ?? undefined}
             note_skin_editor={note_skin_editor}
             onFinish={(completed, reached_chart_end) => {
               if (playback) {
                 setPlayback(null);
                 setScreen("result");
+                return;
+              }
+              if (autoplay) {
+                leaveResults();
                 return;
               }
               if (!reached_chart_end) {
@@ -354,6 +362,7 @@ export function App() {
             available_note_skins={available_note_skins}
             score_storage_revision={score_storage_revision}
             onPlay={beginLoading}
+            onAutoplay={(chart, bindings, song) => beginLoading(chart, bindings, song, null, false, true)}
             onReplay={(chart, bindings, song, requested_playback) => beginLoading(chart, bindings, song, requested_playback)}
             onSettings={() => setSettingsOpen(true)}
             onMusicRateChange={changeMusicRate}
@@ -362,7 +371,7 @@ export function App() {
             onNoteSkinSelectionChange={changeNoteSkinSelection}
             onNoteSkinImport={importNoteSkin}
             onNoteSkinDelete={deleteNoteSkin}
-            onNoteSkinEdit={(chart, bindings, song) => beginLoading(chart, bindings, song, null, true)}
+            onNoteSkinEdit={(chart, bindings, song) => beginLoading(chart, bindings, song, null, true, true)}
           />
           {settings_open && (
             <SettingsScreen
@@ -379,7 +388,8 @@ export function App() {
       return (
         <ScreenTransition key="osz-select">
           <OszSelectScreen archive={osz_archive} importing={osz_importing} import_error={osz_import_error}
-            onImport={(file) => void importOsz(file)} onPlay={beginLoading} onBack={() => {
+            onImport={(file) => void importOsz(file)} onPlay={beginLoading}
+            onAutoplay={(chart, bindings, song) => beginLoading(chart, bindings, song, null, false, true)} onBack={() => {
               osz_archive_ref.current?.dispose();
               osz_archive_ref.current = null;
               setOszArchive(null);

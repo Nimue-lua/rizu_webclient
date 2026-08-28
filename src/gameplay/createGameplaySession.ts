@@ -25,6 +25,7 @@ export interface GameplaySessionOptions {
   replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
+  autoplay?: boolean;
   playback?: CompletedGameplay;
   finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
 }
@@ -40,10 +41,11 @@ export interface GameplaySessionFactoryDependencies {
 const default_dependencies: GameplaySessionFactoryDependencies = {
   create_mania: (options) => new ManiaGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.music_offset, options.scroll_speed, options.replay_base, options.input_bindings,
-    options.hit_registration, options.finish, undefined, options.playback_replay),
+    options.hit_registration, options.finish, undefined, options.playback_replay, options.autoplay),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.osu_cursor_renderer, options.replay_base,
-    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay),
+    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay,
+    options.autoplay),
 };
 
 export function createGameplaySession(options: GameplaySessionOptions,

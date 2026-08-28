@@ -60,12 +60,15 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly gameplay_end_time: number;
   private readonly last_note_time: number;
   private replay_event_index = 0;
+  private autoplay_event_index = 0;
+  private readonly autoplay_catches: number[][];
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
     finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
-    private readonly playback_replay?: ManiaRecordedReplay) {
+    private readonly playback_replay?: ManiaRecordedReplay,
+    private readonly autoplay = false) {
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
@@ -95,11 +98,12 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     });
     this.key_columns = new Map(input_bindings.flatMap((code, column) => code === null ? [] : [[code, column] as const]));
     this.pressed_columns = new Uint16Array(data.chart.column_count);
+    this.autoplay_catches = Array.from({ length: data.chart.column_count }, () => []);
   }
 
   start(): void {
     this.dependencies.event_target.addEventListener("keydown", this.handleKeyDown as EventListener);
-    if (!this.playback_replay) {
+    if (!this.playback_replay && !this.autoplay) {
       this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
     }
     const lead_in = getAudioStartDelay(this.data, this.music_rate);
@@ -119,7 +123,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   }
 
   pressPointer(pointer_id: number, column: number, performance_time: number): void {
-    if (this.playback_replay) return;
+    if (this.playback_replay || this.autoplay) return;
     if (this.pointer_columns.has(pointer_id)) return;
     this.pointer_columns.set(pointer_id, column);
     this.pressed_columns[column]! += 1;
@@ -131,7 +135,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   }
 
   releasePointer(pointer_id: number, performance_time: number): void {
-    if (this.playback_replay) return;
+    if (this.playback_replay || this.autoplay) return;
     const column = this.pointer_columns.get(pointer_id);
     if (column === undefined) return;
     this.pointer_columns.delete(pointer_id);
@@ -149,7 +153,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
       this.abortGameplay(this.clock.timeAt(event.timeStamp).corrected);
       return;
     }
-    if (this.playback_replay) return;
+    if (this.playback_replay || this.autoplay) return;
     const column = this.key_columns.get(event.code);
     if (column === undefined) return;
     event.preventDefault();
@@ -227,6 +231,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     const range = this.renderer.getTimeRange(this.data.chart.column_count, visual_scroll_speed);
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.applyReplayEvents(song_time);
+    this.applyAutoplayEvents(song_time);
     this.rules_engine.update(song_time, range.past, range.future);
     const score = this.rules_engine.score;
     this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed,
@@ -253,6 +258,30 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
         if (event.note_index !== null) this.rules_engine.release(event.note_index, event_time);
       }
       this.replay_event_index += 1;
+    }
+  }
+
+  private applyAutoplayEvents(song_time: number): void {
+    if (!this.autoplay) return;
+    const notes = this.data.chart.notes;
+    while (this.autoplay_event_index < notes.length) {
+      const note = notes[this.autoplay_event_index]!;
+      if (note.absolute_time > song_time) break;
+      const column = note.column - 1;
+      if (note.weight >= 0) {
+        this.pressed_columns[column]! += 1;
+        const note_index = this.rules_engine.press(column, note.absolute_time);
+        if (note.weight === 0 || this.replay_base.tap_only) {
+          this.pressed_columns[column] = Math.max(0, this.pressed_columns[column]! - 1);
+        } else if (note_index !== undefined) {
+          this.autoplay_catches[column]!.push(note_index);
+        }
+      } else if (!this.replay_base.tap_only) {
+        this.pressed_columns[column] = Math.max(0, this.pressed_columns[column]! - 1);
+        const note_index = this.autoplay_catches[column]!.pop();
+        if (note_index !== undefined) this.rules_engine.release(note_index, note.absolute_time);
+      }
+      this.autoplay_event_index += 1;
     }
   }
 }

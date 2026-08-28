@@ -142,6 +142,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
   rate?: number;
   offset?: number;
   playback?: ManiaRecordedReplay;
+  autoplay?: boolean;
 } = {}): RuntimeHarness {
   const events = new FakeEventTarget();
   const frames = new FakeAnimationFrames();
@@ -192,7 +193,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       scores.push(completed.score);
-    }, dependencies, options.playback);
+    }, dependencies, options.playback, options.autoplay);
   return { runtime, events, frames, source, gain, renderer, scores, completions, reached_chart_end };
 }
 
@@ -274,6 +275,22 @@ test("plays quantized mania press and release events without live input listener
 
   assert.equal(harness.scores[0]?.judges?.perfect, 2);
   assert.equal(harness.scores[0]?.accuracy, 1);
+});
+
+test("autoplay hits mania taps and holds at exact chart times", () => {
+  const harness = createRuntime([
+    { column: 1, absolute_time: 0.5, weight: 0 },
+    { column: 1, absolute_time: 1, weight: 1 },
+    { column: 1, absolute_time: 1.5, weight: -1 },
+  ], { autoplay: true });
+
+  harness.runtime.start();
+  assert.equal(harness.events.count("keyup"), 0);
+  harness.frames.run(4400);
+
+  assert.equal(harness.scores[0]?.judges?.perfect, 3);
+  assert.equal(harness.scores[0]?.accuracy, 1);
+  assert.deepEqual(harness.completions[0]?.replay.input_events, []);
 });
 
 test("Escape exits mania replay playback", () => {

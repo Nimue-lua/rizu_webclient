@@ -172,7 +172,7 @@ svg { width: 22px; height: 22px; }
   .osz-chart-stats small { display: none; }
   .osz-footer { padding: 12px 18px; }
   .osz-footer > div { display: none; }
-  .osz-footer button { width: 100%; }
+  .osz-footer button { width: calc(50% - 6px); min-width: 0; }
 }
 
 .song-select-screen {
@@ -366,9 +366,10 @@ svg { width: 22px; height: 22px; }
 .song-library-error { margin: 0; padding: 1.5rem; }
 
 .song-select-footer { z-index: 2; display: grid; grid-template-columns: auto 1fr auto; background: var(--panel); box-shadow: 0 -8px 30px color-mix(in srgb, var(--shadow) 47%, transparent); }
-.back-control, .play-control { display: flex; align-items: center; justify-content: center; gap: 10px; width: 154px; padding: 0 18px; color: var(--text); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 47%, transparent); }
+.back-control, .play-control, .autoplay-control { display: flex; align-items: center; justify-content: center; gap: 10px; width: 154px; padding: 0 18px; color: var(--text); font-size: 16px; font-weight: 700; letter-spacing: .06em; text-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 47%, transparent); }
 .back-control { background: linear-gradient(135deg, color-mix(in srgb, var(--danger) 55%, var(--text)) -30%, var(--danger) 42%, color-mix(in srgb, var(--danger) 45%, var(--background))); }
 .play-control { background: linear-gradient(225deg, color-mix(in srgb, var(--success) 55%, var(--text)) -30%, var(--success) 42%, color-mix(in srgb, var(--success) 45%, var(--background))); }
+.autoplay-control { background: color-mix(in srgb, var(--panel) 72%, var(--accent)); }
 .loadout-controls { display: flex; align-items: center; gap: 6px; min-width: 0; padding-left: 14px; }
 .loadout-controls button { --control-color: var(--success); display: flex; align-items: center; gap: 9px; height: 46px; padding: 0 17px; background: linear-gradient(to bottom, color-mix(in srgb, var(--control-color) 34%, var(--surface)), color-mix(in srgb, var(--control-color) 16%, var(--surface))); box-shadow: inset 0 3px color-mix(in srgb, var(--control-color) 55%, var(--text)); font-size: 12px; font-weight: 700; }
 .loadout-controls svg { width: 19px; color: color-mix(in srgb, var(--control-color) 76%, var(--text)); }
