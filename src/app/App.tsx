@@ -254,7 +254,9 @@ export function App() {
       return (
         <ScreenTransition key="welcome">
           <WelcomeScreen
-            onPlay={() => setScreen("song-select")}
+            onPlay={() => {
+              void local_library.reconnectSources().finally(() => setScreen("song-select"));
+            }}
             onUnlockingFps={() => setScreen("unlocking-fps")}
           />
         </ScreenTransition>

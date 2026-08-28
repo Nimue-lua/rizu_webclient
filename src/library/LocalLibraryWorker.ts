@@ -57,19 +57,6 @@ async function storedCatalog(): Promise<Uint8Array | null> {
   }
 }
 
-async function storedSources(): Promise<LocalLibrarySource[]> {
-  const storage = await openStorage();
-  try {
-    return await new Promise((resolve, reject) => {
-      const request = storage.transaction(SOURCE_STORE).objectStore(SOURCE_STORE).getAll();
-      request.onsuccess = () => resolve(request.result as LocalLibrarySource[]);
-      request.onerror = () => reject(request.error ?? new Error("Could not load local library sources"));
-    });
-  } finally {
-    storage.close();
-  }
-}
-
 async function persistCatalog(): Promise<void> {
   const bytes = database.export();
   const storage = await openStorage();
@@ -289,11 +276,6 @@ async function initialize(): Promise<void> {
   if (!bytes) {
     createSchema();
     await persistCatalog();
-  }
-  queued_sources.push(...await storedSources());
-  if (queued_sources.length > 0) {
-    pending_scan = true;
-    void processQueue();
   }
 }
 

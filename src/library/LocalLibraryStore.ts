@@ -28,6 +28,12 @@ interface PermissionDirectoryHandle extends FileSystemDirectoryHandle {
 
 type StatusListener = () => void;
 
+interface LocalLibraryStatus {
+  readonly scanning: boolean;
+  readonly error: string | null;
+  readonly reconnect_required: number;
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
@@ -109,13 +115,17 @@ export class LocalLibraryCatalog implements Library {
   private readonly pending = new Map<number, { resolve: (library: LibraryView) => void; reject: (reason: unknown) => void }>();
   private readonly listeners = new Set<StatusListener>();
   private request_id = 0;
-  private status = { scanning: false, error: null as string | null };
+  private status: LocalLibraryStatus = { scanning: false, error: null, reconnect_required: 0 };
+  private sources: LocalLibrarySource[] = [];
+  private readonly available_source_ids = new Set<string>();
+  private readonly sources_ready: Promise<void>;
 
   constructor() {
+    this.sources_ready = this.loadSources();
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const response = event.data;
       if (response.type === "scan-status") {
-        this.status = { scanning: Boolean(response.scanning), error: response.message ?? null };
+        this.updateStatus({ scanning: Boolean(response.scanning), error: response.message ?? null });
         for (const listener of this.listeners) listener();
         return;
       }
@@ -123,11 +133,11 @@ export class LocalLibraryCatalog implements Library {
       const request = this.pending.get(response.id);
       if (!request) return;
       this.pending.delete(response.id);
-      if (response.type === "snapshot" && response.library) request.resolve(response.library);
+      if (response.type === "snapshot" && response.library) request.resolve(this.availableLibrary(response.library));
       else request.reject(new Error(response.message ?? "Local library worker failed"));
     };
     this.worker.onerror = (event) => {
-      this.status = { scanning: false, error: event.message || "Local library worker failed" };
+      this.updateStatus({ scanning: false, error: event.message || "Local library worker failed" });
       for (const request of this.pending.values()) request.reject(new Error(this.status.error ?? "Local library worker failed"));
       this.pending.clear();
       for (const listener of this.listeners) listener();
@@ -140,6 +150,39 @@ export class LocalLibraryCatalog implements Library {
   };
 
   getStatus = () => this.status;
+
+  private updateStatus(change: Partial<LocalLibraryStatus>): void {
+    this.status = { ...this.status, ...change };
+  }
+
+  private async loadSources(): Promise<void> {
+    this.sources = await allSources();
+    for (const source of this.sources) {
+      const handle = source.handle as PermissionDirectoryHandle;
+      if (typeof handle.queryPermission !== "function" || await handle.queryPermission({ mode: "read" }) === "granted") {
+        this.available_source_ids.add(source.id);
+        this.worker.postMessage({ type: "scan", source });
+      }
+    }
+    this.updateStatus({ reconnect_required: this.sources.length - this.available_source_ids.size });
+    for (const listener of this.listeners) listener();
+  }
+
+  async reconnectSources(): Promise<void> {
+    await this.sources_ready;
+    for (const source of this.sources) {
+      if (this.available_source_ids.has(source.id)) continue;
+      try {
+        await ensureReadPermission(source.handle);
+        this.available_source_ids.add(source.id);
+        this.worker.postMessage({ type: "scan", source });
+      } catch {
+        // Denied sources remain configured and can be reconnected in a later session.
+      }
+    }
+    this.updateStatus({ reconnect_required: this.sources.length - this.available_source_ids.size });
+    for (const listener of this.listeners) listener();
+  }
 
   async addSource(handle: FileSystemDirectoryHandle): Promise<void> {
     await ensureReadPermission(handle);
@@ -167,6 +210,10 @@ export class LocalLibraryCatalog implements Library {
     } finally {
       database.close();
     }
+    this.sources = [...this.sources.filter((candidate) => candidate.id !== source.id), source];
+    this.available_source_ids.add(source.id);
+    this.updateStatus({ reconnect_required: this.sources.length - this.available_source_ids.size });
+    for (const listener of this.listeners) listener();
     this.worker.postMessage({ type: "scan", source });
   }
 
@@ -180,6 +227,15 @@ export class LocalLibraryCatalog implements Library {
 
   load(_signal: AbortSignal): Promise<LibraryView> {
     return this.snapshot();
+  }
+
+  private availableLibrary(library: LibraryView): LibraryView {
+    const songs = library.songs.flatMap((song) => {
+      const charts = song.charts.filter((chart) => chart.source_id && this.available_source_ids.has(chart.source_id));
+      return charts.length > 0 ? [{ ...song, charts }] : [];
+    });
+    const location_ids = new Set(songs.flatMap((song) => song.charts.map((chart) => chart.location_id)));
+    return { locations: library.locations.filter((location) => location_ids.has(location.id)), songs };
   }
 
   pause(): void {
