@@ -204,7 +204,9 @@ async function scanSource(source: LocalLibrarySource): Promise<void> {
 
 function librarySnapshot(): LibraryView {
   const locations_result = database.exec("SELECT id, name FROM locations ORDER BY name COLLATE NOCASE, id");
-  const locations = (locations_result[0]?.values ?? []).map(([id, name]) => ({ id: Number(id), name: String(name) }));
+  const locations = (locations_result[0]?.values ?? []).map(([id, name]) => ({
+    id: Number(id), name: String(name), source_type: "local" as const,
+  }));
   const result = database.exec(`SELECT locations.source_id, locations.id AS location_id, chartfile_sets.dir, chartfiles.name AS chartfile_name,
     chartmetas.hash, chartmetas.\`index\`, chartmetas.inputmode, chartmetas.title, chartmetas.title_unicode,
     chartmetas.artist, chartmetas.artist_unicode, chartmetas.name, chartmetas.creator, chartmetas.level, chartmetas.audio_path,
@@ -235,6 +237,7 @@ function librarySnapshot(): LibraryView {
     const chart: Chartview = {
       id: `${source_id}:${String(row.hash)}:${Number(row.index)}`,
       source_id,
+      source_type: "local",
       audio_path: String(row.audio_path),
       background_path: row.background_path ? String(row.background_path) : undefined,
       chart_path,

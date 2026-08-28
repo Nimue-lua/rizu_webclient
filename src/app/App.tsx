@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react";
 import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
-import { CombinedLibrary, SqliteLibrary } from "../library/Library";
+import { CombinedLibrary } from "../library/Library";
 import type { Chartview } from "../library/views";
 import { ChartSelector } from "../select/ChartSelector";
 import { GameplayScreen } from "./GameplayScreen";
@@ -31,11 +31,13 @@ import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { submitPlay } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
+import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
-const chart_selector = new ChartSelector(new CombinedLibrary(new SqliteLibrary(), local_library));
+const remote_libraries = new RemoteLibraryStore();
+const chart_selector = new ChartSelector(new CombinedLibrary([remote_libraries, local_library]));
 
 interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -68,6 +70,7 @@ export function App() {
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const local_library_status = useSyncExternalStore(local_library.subscribe, local_library.getStatus);
+  const remote_providers = useSyncExternalStore(remote_libraries.subscribe, remote_libraries.getSnapshot);
   const note_skin_catalog = useRef(new NoteSkinCatalog());
   const nickname = useSetting(settings.nickname);
   const master_volume = useSetting(settings.master_volume);
@@ -175,6 +178,7 @@ export function App() {
       note_skin_id: note_skin?.id ?? "osu-default",
       title: song.title,
       source_id: chart.source_id,
+      source_type: chart.source_type,
       audio_path: chart.audio_path,
       chart_path: chart.chart_path,
     });
@@ -376,17 +380,16 @@ export function App() {
             note_skin_selections={note_skin_selections}
             available_note_skins={available_note_skins}
             score_storage_revision={score_storage_revision}
-            library_scanning={local_library_status.scanning}
-            onAddLocalLibrary={() => {
+            local_library_status={local_library_status}
+            remote_providers={remote_providers}
+            onAddLocalLibrary={async () => {
               const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
               if (!picker) {
-                window.alert("This browser does not support selecting persistent local folders.");
-                return;
+                throw new Error("This browser does not support selecting persistent local folders.");
               }
-              void picker().then((handle) => local_library.addSource(handle)).catch((reason: unknown) => {
-                if (!(reason instanceof DOMException && reason.name === "AbortError")) console.error("Could not add local library", reason);
-              });
+              await local_library.addSource(await picker());
             }}
+            onAddRemoteLibrary={(url) => remote_libraries.add(url)}
             onRefreshLibrary={() => {
               const abort_controller = new AbortController();
               void chart_selector.load(abort_controller.signal, true);

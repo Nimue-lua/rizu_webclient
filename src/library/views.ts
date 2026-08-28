@@ -18,6 +18,7 @@ export interface Chartview extends ChartInput {
   name: string;
   note_count: number;
   source_id?: string;
+  source_type?: "local" | "remote";
   audio_path?: string;
   background_path?: string;
   chart_path?: string;
@@ -34,6 +35,8 @@ export interface ChartfileSetView {
 export interface Location {
   id: number;
   name: string;
+  source_id?: string;
+  source_type?: "local" | "remote";
 }
 
 export interface LibraryView {

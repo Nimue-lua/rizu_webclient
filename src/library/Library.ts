@@ -1,6 +1,7 @@
 import initSqlJs from "sql.js";
 import sql_wasm_url from "sql.js/dist/sql-wasm.wasm?url";
 import type { ChartfileSetView, Chartview, LibraryView } from "./views";
+import { remoteAssetUrl } from "./ProviderUrl";
 
 const CATALOG_SCHEMA_VERSION = 7;
 
@@ -9,38 +10,46 @@ export interface Library {
 }
 
 export class CombinedLibrary implements Library {
-  constructor(private readonly remote: Library, private readonly local: Library) {}
+  constructor(private readonly libraries: readonly Library[]) {}
 
   async load(signal: AbortSignal): Promise<LibraryView> {
-    const [remote, local] = await Promise.all([this.remote.load(signal), this.local.load(signal)]);
-    const local_location_ids = new Map(local.locations.map((location) => [location.id, -location.id]));
-    return {
-      locations: [...remote.locations, ...local.locations.map((location) => ({ ...location, id: local_location_ids.get(location.id)! }))],
-      songs: [...remote.songs, ...local.songs.map((song) => ({
-        ...song,
-        charts: song.charts.map((chart) => ({ ...chart, location_id: local_location_ids.get(chart.location_id)! })),
-      }))],
-    };
+    const libraries = await Promise.all(this.libraries.map((library) => library.load(signal)));
+    const locations: LibraryView["locations"] = [];
+    const songs: LibraryView["songs"] = [];
+    let next_location_id = 1;
+    for (const library of libraries) {
+      const location_ids = new Map<number, number>();
+      for (const location of library.locations) {
+        location_ids.set(location.id, next_location_id);
+        locations.push({ ...location, id: next_location_id++ });
+      }
+      songs.push(...library.songs.map((song) => ({ ...song, charts: song.charts.map((chart) => ({
+        ...chart,
+        location_id: location_ids.get(chart.location_id) ?? chart.location_id,
+      })) })));
+    }
+    return { locations, songs };
   }
 }
 
-function assetUrl(asset_path: unknown): string | null {
-  if (typeof asset_path !== "string") return null;
-  return `/${asset_path.split("/").map(encodeURIComponent).join("/")}`;
-}
-
 export class SqliteLibrary implements Library {
+  constructor(private readonly catalog_url = new URL("/catalog.sqlite", location.href).href,
+    private readonly source_id = "builtin") {}
+
   async load(signal: AbortSignal): Promise<LibraryView> {
-    const [sql, response] = await Promise.all([
-      initSqlJs({ locateFile: () => sql_wasm_url }),
-      fetch("/catalog.sqlite", { cache: "no-cache", signal }),
-    ]);
+    const response = await fetch(this.catalog_url, { cache: "no-cache", signal });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch song catalog: ${response.status} ${response.statusText}`);
     }
 
-    const database = new sql.Database(new Uint8Array(await response.arrayBuffer()));
+    return loadSqliteCatalog(new Uint8Array(await response.arrayBuffer()), this.catalog_url, this.source_id);
+  }
+}
+
+export async function loadSqliteCatalog(bytes: Uint8Array, catalog_url: string, source_id: string): Promise<LibraryView> {
+    const sql = await initSqlJs({ locateFile: () => sql_wasm_url });
+    const database = new sql.Database(bytes);
 
     try {
       const version_result = database.exec("PRAGMA user_version");
@@ -53,6 +62,8 @@ export class SqliteLibrary implements Library {
       const locations = (locations_result[0]?.values ?? []).map(([id, name]) => ({
         id: Number(id),
         name: String(name),
+        source_id,
+        source_type: "remote" as const,
       }));
       const statement = database.prepare(`
         SELECT songs.id AS song_id, songs.title, songs.artist,
@@ -71,7 +82,7 @@ export class SqliteLibrary implements Library {
       try {
         while (statement.step()) {
           const row = statement.getAsObject();
-          const song_id = String(row.song_id);
+          const song_id = `${source_id}:${String(row.song_id)}`;
           let song = songs_by_id.get(song_id);
           if (!song) {
             song = {
@@ -84,24 +95,26 @@ export class SqliteLibrary implements Library {
             songs_by_id.set(song_id, song);
           }
           const chart: Chartview = {
-            audio_url: assetUrl(row.audio_path) ?? "",
-            audio_preview_url: assetUrl(row.audio_preview_path) ?? "",
-            background_url: assetUrl(row.background_preview_path),
+            audio_url: remoteAssetUrl(catalog_url, row.audio_path) ?? "",
+            audio_preview_url: remoteAssetUrl(catalog_url, row.audio_preview_path) ?? "",
+            background_url: remoteAssetUrl(catalog_url, row.background_preview_path),
             bpm_avg: Number(row.bpm_avg),
             bpm_max: Number(row.bpm_max),
             bpm_min: Number(row.bpm_min),
             creator: String(row.creator),
-            chart_url: assetUrl(row.chart_path) ?? "",
+            chart_url: remoteAssetUrl(catalog_url, row.chart_path) ?? "",
             difficulty: Number(row.difficulty),
             duration_seconds: Number(row.duration_seconds),
             format: String(row.format),
-            id: String(row.id),
+            id: `${source_id}:${String(row.id)}`,
             keys: row.keys === null ? null : Number(row.keys),
             long_note_ratio: Number(row.long_note_ratio),
             location_id: Number(row.location_id),
             mode: Number(row.mode),
             name: String(row.name),
             note_count: Number(row.note_count),
+            source_id,
+            source_type: "remote",
           };
           song.charts.push(chart);
         }
@@ -113,5 +126,4 @@ export class SqliteLibrary implements Library {
     } finally {
       database.close();
     }
-  }
 }

@@ -16,6 +16,9 @@ import { completedGameplayFromStoredPlay, listPlaysByChart, type StoredPlay } fr
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
 import { readLocalFile } from "../library/LocalLibraryStore";
+import { LibrarySourcesScreen } from "./LibrarySourcesScreen";
+import type { LocalLibraryStatus } from "../library/LocalLibraryStore";
+import type { RemoteProviderView } from "../library/RemoteLibraryStore";
 
 const ROW_HEIGHT = 82;
 const BACKGROUND_DEBOUNCE_MS = 200;
@@ -49,9 +52,11 @@ interface SongSelectScreenProps {
   onNoteSkinImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
   onNoteSkinDelete: (skin_id: string) => Promise<void>;
   onNoteSkinEdit: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
-  onAddLocalLibrary: () => void;
+  onAddLocalLibrary: () => Promise<void>;
+  onAddRemoteLibrary: (url: string) => Promise<void>;
   onRefreshLibrary: () => void;
-  library_scanning: boolean;
+  local_library_status: LocalLibraryStatus;
+  remote_providers: readonly RemoteProviderView[];
 }
 
 function formatSessionDuration(duration_seconds: number): string {
@@ -83,8 +88,10 @@ export function SongSelectScreen({
   onNoteSkinDelete,
   onNoteSkinEdit,
   onAddLocalLibrary,
+  onAddRemoteLibrary,
   onRefreshLibrary,
-  library_scanning,
+  local_library_status,
+  remote_providers,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
@@ -103,6 +110,7 @@ export function SongSelectScreen({
   const [filters_open, setFiltersOpen] = useState(false);
   const [skins_open, setSkinsOpen] = useState(false);
   const [global_leaderboard_open, setGlobalLeaderboardOpen] = useState(false);
+  const [library_sources_open, setLibrarySourcesOpen] = useState(false);
   const [stored_plays, setStoredPlays] = useState<readonly StoredPlay[]>([]);
   const [local_preview_media, setLocalPreviewMedia] = useState<LocalPreviewMedia | null>(null);
 
@@ -143,7 +151,7 @@ export function SongSelectScreen({
     setLocalPreviewMedia(null);
     const source_id = selected_chart?.source_id;
     const audio_path = selected_chart?.audio_path;
-    if (!source_id || !audio_path || !selected_chart) return;
+    if (selected_chart?.source_type !== "local" || !source_id || !audio_path) return;
 
     let active = true;
     const urls: string[] = [];
@@ -169,7 +177,7 @@ export function SongSelectScreen({
       active = false;
       for (const url of urls) URL.revokeObjectURL(url);
     };
-  }, [selected_chart?.id]);
+  }, [selected_chart?.audio_path, selected_chart?.background_path, selected_chart?.id, selected_chart?.source_id, selected_chart?.source_type]);
 
   useEffect(() => {
     let active = true;
@@ -243,7 +251,7 @@ export function SongSelectScreen({
       audio.src = preview_url;
       if (!preview_url) return;
       const startPlayback = () => {
-        if (selected_chart?.source_id) audio.currentTime = selected_chart.preview_time ?? 0;
+        if (selected_chart?.source_type === "local") audio.currentTime = selected_chart.preview_time ?? 0;
         if (preview_unlocked_ref.current) void audio.play().catch(() => undefined);
       };
       if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
@@ -311,7 +319,7 @@ export function SongSelectScreen({
     if (!audio || !selected_audio_preview_url) return;
     audio.src = selected_audio_preview_url;
     const startPlayback = () => {
-      if (selected_chart?.source_id) audio.currentTime = selected_chart.preview_time ?? 0;
+      if (selected_chart?.source_type === "local") audio.currentTime = selected_chart.preview_time ?? 0;
       void audio.play().catch(() => undefined);
     };
     if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
@@ -358,8 +366,10 @@ export function SongSelectScreen({
       <audio ref={audio_ref} preload="auto" />
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
         onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings}
-        onAddLocalLibrary={onAddLocalLibrary} onRefreshLibrary={onRefreshLibrary} library_scanning={library_scanning} />
-      {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> : <>
+        onOpenLibrarySources={() => setLibrarySourcesOpen(true)} onRefreshLibrary={onRefreshLibrary} library_scanning={local_library_status.scanning} />
+      {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> :
+        library_sources_open ? <LibrarySourcesScreen local_status={local_library_status} remote_providers={remote_providers}
+          onAddLocal={onAddLocalLibrary} onAddRemote={onAddRemoteLibrary} onExit={() => setLibrarySourcesOpen(false)} /> : <>
         <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
           onQueryChange={(query) => { chart_selector.setQuery(query); scroll_top_ref.current = 0; if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
           onSortChange={selectSortMode} />

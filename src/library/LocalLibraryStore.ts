@@ -28,10 +28,11 @@ interface PermissionDirectoryHandle extends FileSystemDirectoryHandle {
 
 type StatusListener = () => void;
 
-interface LocalLibraryStatus {
+export interface LocalLibraryStatus {
   readonly scanning: boolean;
   readonly error: string | null;
   readonly reconnect_required: number;
+  readonly sources: readonly { id: string; name: string; available: boolean }[];
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -115,7 +116,7 @@ export class LocalLibraryCatalog implements Library {
   private readonly pending = new Map<number, { resolve: (library: LibraryView) => void; reject: (reason: unknown) => void }>();
   private readonly listeners = new Set<StatusListener>();
   private request_id = 0;
-  private status: LocalLibraryStatus = { scanning: false, error: null, reconnect_required: 0 };
+  private status: LocalLibraryStatus = { scanning: false, error: null, reconnect_required: 0, sources: [] };
   private sources: LocalLibrarySource[] = [];
   private readonly available_source_ids = new Set<string>();
   private readonly sources_ready: Promise<void>;
@@ -155,6 +156,13 @@ export class LocalLibraryCatalog implements Library {
     this.status = { ...this.status, ...change };
   }
 
+  private updateSourceStatus(): void {
+    this.updateStatus({
+      reconnect_required: this.sources.length - this.available_source_ids.size,
+      sources: this.sources.map((source) => ({ id: source.id, name: source.name, available: this.available_source_ids.has(source.id) })),
+    });
+  }
+
   private async loadSources(): Promise<void> {
     this.sources = await allSources();
     for (const source of this.sources) {
@@ -164,7 +172,7 @@ export class LocalLibraryCatalog implements Library {
         this.worker.postMessage({ type: "scan", source });
       }
     }
-    this.updateStatus({ reconnect_required: this.sources.length - this.available_source_ids.size });
+    this.updateSourceStatus();
     for (const listener of this.listeners) listener();
   }
 
@@ -180,7 +188,7 @@ export class LocalLibraryCatalog implements Library {
         // Denied sources remain configured and can be reconnected in a later session.
       }
     }
-    this.updateStatus({ reconnect_required: this.sources.length - this.available_source_ids.size });
+    this.updateSourceStatus();
     for (const listener of this.listeners) listener();
   }
 
@@ -212,7 +220,7 @@ export class LocalLibraryCatalog implements Library {
     }
     this.sources = [...this.sources.filter((candidate) => candidate.id !== source.id), source];
     this.available_source_ids.add(source.id);
-    this.updateStatus({ reconnect_required: this.sources.length - this.available_source_ids.size });
+    this.updateSourceStatus();
     for (const listener of this.listeners) listener();
     this.worker.postMessage({ type: "scan", source });
   }

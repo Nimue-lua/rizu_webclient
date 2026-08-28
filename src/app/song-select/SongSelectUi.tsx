@@ -7,6 +7,7 @@ import {
   Clock3,
   Download,
   File,
+  FolderOpen,
   Globe2,
   Keyboard,
   ListFilter,
@@ -29,7 +30,7 @@ import type { Chartview } from "../../library/views";
 import type { ChartSortMode } from "../../select/ChartSelector";
 
 type IconName = "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
-  "chevron-right" | "clock" | "download" | "file" | "filter" | "globe" | "keyboard" |
+  "chevron-right" | "clock" | "download" | "file" | "filter" | "folder" | "globe" | "keyboard" |
   "metronome" | "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" |
   "refresh" | "settings" | "terminal" | "trophy" | "undo" | "zap";
 
@@ -43,6 +44,7 @@ const icons: Record<IconName, LucideIcon> = {
   download: Download,
   file: File,
   filter: ListFilter,
+  folder: FolderOpen,
   globe: Globe2,
   keyboard: Keyboard,
   metronome: Metronome,

@@ -20,6 +20,7 @@ export interface GameplayLocation {
   note_skin_id: string;
   title: string;
   source_id?: string;
+  source_type?: "local" | "remote";
   audio_path?: string;
   chart_path?: string;
 }
