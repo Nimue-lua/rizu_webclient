@@ -182,6 +182,10 @@ export class WebGlSpriteGraphics {
     const vertices: number[] = [];
     for (const command of commands) {
       if (command.width <= 0 || command.height <= 0) continue;
+      if (command.circularProgress !== undefined) {
+        this.addCircularProgressVertices(vertices, command);
+        continue;
+      }
       let top_left = [0, command.flipY ? 1 : 0];
       let top_right = [1, command.flipY ? 1 : 0];
       let bottom_left = [0, command.flipY ? 0 : 1];
@@ -213,5 +217,28 @@ export class WebGlSpriteGraphics {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
+  }
+
+  private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand): void {
+    const progress = Math.max(-1, Math.min(1, command.circularProgress ?? 0));
+    if (progress === 0) return;
+    const center_x = command.x + command.width / 2;
+    const center_y = command.y + command.height / 2;
+    const radius = Math.min(command.width, command.height) / 2;
+    const start_angle = -Math.PI / 2;
+    const end_angle = start_angle + progress * Math.PI * 2;
+    const angle_min = Math.min(start_angle, end_angle);
+    const angle_max = Math.max(start_angle, end_angle);
+    const segments = 40;
+    const step = Math.PI * 2 / segments;
+    const color = command.color;
+    const vertex = (x: number, y: number) => vertices.push(x, y, 0.5, 0.5, ...color);
+    for (let angle = angle_min; angle < angle_max;) {
+      const next = Math.min(angle + step, angle_max);
+      vertex(center_x, center_y);
+      vertex(center_x + Math.cos(angle) * radius, center_y + Math.sin(angle) * radius);
+      vertex(center_x + Math.cos(next) * radius, center_y + Math.sin(next) * radius);
+      angle = next;
+    }
   }
 }

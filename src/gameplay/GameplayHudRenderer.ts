@@ -8,6 +8,7 @@ export interface HudLayout {
 export interface GameplayHudRenderer {
   drawHpBar(): void;
   drawScore(state: HudState, layout: HudLayout): void;
+  drawProgress(progress: number | null, layout: HudLayout): void;
 }
 
 export function getGameplayHudLayout(logical_width: number): HudLayout {

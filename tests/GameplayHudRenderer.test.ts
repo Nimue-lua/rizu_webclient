@@ -50,3 +50,17 @@ test("draws the osu HP background and full HP fill at native HUD positions", () 
 test("anchors the global HUD to the viewport instead of a letterboxed playfield", () => {
   assert.deepEqual(getGameplayHudLayout(1280), { scoreRight: 1274, scoreTop: 0 });
 });
+
+test("draws green intro progress beneath the circular metre overlay", () => {
+  const { sprites, glyphs } = createHud();
+  const fill = sprite("white", 1, 1);
+  const overlay = sprite("circularmetre", 42, 42);
+  const draws: Array<{ name: string; color: readonly number[]; progress?: number }> = [];
+  new SpriteGameplayHudRenderer({ sprites, scoreGlyphs: glyphs, progressFill: fill, progressOverlay: overlay },
+    (_x, _y, _width, _height, color, drawn, _flip, _batch, _rotate, _radians, progress) => draws.push({
+      name: (drawn as Sprite & { name: string }).name, color, progress,
+    })).drawProgress(-0.5, { scoreRight: 848, scoreTop: 0 });
+  assert.deepEqual(draws.map((draw) => draw.name), ["white", "circularmetre"]);
+  assert.deepEqual(draws[0]?.color, [199 / 255, 1, 47 / 255, 0.6]);
+  assert.equal(draws[0]?.progress, -0.5);
+});

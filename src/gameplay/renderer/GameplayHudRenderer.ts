@@ -11,6 +11,8 @@ export interface HudAssets {
   readonly hpFill?: Sprite;
   readonly scoreGlyphs?: Readonly<Record<string, string>>;
   readonly scoreOverlap?: number;
+  readonly progressOverlay?: Sprite;
+  readonly progressFill?: Sprite;
 }
 
 export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
@@ -37,7 +39,35 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
       [1, 1, 1, 1], fill);
   }
 
+  drawProgress(progress: number | null, layout: HudLayout): void {
+    const overlay = this.assets.progressOverlay;
+    const fill = this.assets.progressFill;
+    if (progress === null || !overlay || !fill) return;
+    const score_height = this.assets.scoreGlyphs ? this.bitmapTextHeight(this.assets.scoreGlyphs) * OSU_NATIVE_SCALE * 0.96 : 0;
+    const accuracy_height = score_height * 0.6;
+    const center_x = layout.scoreRight - this.accuracyWidth() - 24;
+    const center_y = layout.scoreTop + score_height + 3 + accuracy_height / 2;
+    this.write(center_x - 10, center_y - 10, 20, 20,
+      progress < 0 ? [199 / 255, 1, 47 / 255, 0.6] : [1, 1, 1, 0.6], fill,
+      false, undefined, false, 0, progress);
+    const width = overlay.sourceSize.w * OSU_NATIVE_SCALE;
+    const height = overlay.sourceSize.h * OSU_NATIVE_SCALE;
+    this.write(center_x - width / 2, center_y - height / 2, width, height, [1, 1, 1, 1], overlay);
+  }
+
   private bitmapTextHeight(glyphs: Readonly<Record<string, string>>): number {
     return this.assets.sprites[glyphs["0"] ?? ""]?.sourceSize.h ?? 0;
+  }
+
+  private accuracyWidth(): number {
+    if (!this.assets.scoreGlyphs) return 0;
+    const glyphs = this.assets.scoreGlyphs;
+    const overlap = this.assets.scoreOverlap ?? 0;
+    const text = "00.00%";
+    const native_width = [...text].reduce((width, character, index) => {
+      const sprite = this.assets.sprites[glyphs[character] ?? ""];
+      return width + (sprite?.sourceSize.w ?? 0) + (index === text.length - 1 ? 0 : overlap);
+    }, 0);
+    return native_width * OSU_NATIVE_SCALE * 0.576;
   }
 }

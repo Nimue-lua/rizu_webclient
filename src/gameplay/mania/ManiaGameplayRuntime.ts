@@ -4,7 +4,7 @@ import type { GameplaySession, ManiaPointerInput } from "../GameplaySession";
 import { ManiaRenderer as WebGlManiaRenderer } from "./rendering/ManiaRenderer";
 import { HudStateDeriver, type GameplayPresentationState } from "../HudState";
 import type { ManiaReplayBase } from "../../replay/mania/ManiaReplayBase";
-import { getAudioStartDelay, getGameplayEndTime } from "../GameplayTiming";
+import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange } from "../GameplayTiming";
 import { AudioGameplayClock } from "../AudioGameplayClock";
 import { WebAudioPlayback } from "../audio/WebAudioPlayback";
 import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInputEvent,
@@ -13,7 +13,7 @@ import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInpu
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
   draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number>, state: GameplayPresentationState): void;
+    pressed_columns: ArrayLike<number>, state: GameplayPresentationState, progress?: number | null): void;
   destroy(): void;
 }
 
@@ -60,6 +60,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly gameplay_end_time: number;
   private readonly last_note_time: number;
   private replay_event_index = 0;
+  private readonly progress_range;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
@@ -71,6 +72,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.music_rate = replay_base.rate;
     this.replay_base = replay_base;
     this.gameplay_end_time = getGameplayEndTime(data, this.music_rate);
+    this.progress_range = getGameplayProgressRange(data, this.music_rate);
     this.last_note_time = data.chart.notes.reduce((last, note) => Math.max(last, note.absolute_time), -Infinity);
     this.finish = finish;
     this.dependencies = dependencies;
@@ -230,7 +232,8 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.rules_engine.update(song_time, range.past, range.future);
     const score = this.rules_engine.score;
     this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed,
-      this.pressed_columns, this.hud_state.update(score, timestamp / 1000));
+      this.pressed_columns, this.hud_state.update(score, timestamp / 1000),
+      getGameplayProgress(song_time, this.progress_range));
     if (song_time >= this.gameplay_end_time) {
       this.finishGameplay();
       return;

@@ -21,7 +21,8 @@ export class ManiaRenderer {
       comboGlyphs: skin.config.comboGlyphs, comboOverlap: skin.config.comboOverlap });
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
     this.hud = hud ?? new SpriteGameplayHudRenderer({ sprites: skin.sprites,
-      scoreGlyphs: skin.config.scoreGlyphs, scoreOverlap: skin.config.scoreOverlap }, this.writeHudCommand);
+      scoreGlyphs: skin.config.scoreGlyphs, scoreOverlap: skin.config.scoreOverlap,
+      progressOverlay: skin.sprites.circularmetre, progressFill: skin.sprites.__white }, this.writeHudCommand);
   }
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
@@ -31,7 +32,7 @@ export class ManiaRenderer {
   }
 
   draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number> = [], state: GameplayPresentationState): void {
+    pressed_columns: ArrayLike<number> = [], state: GameplayPresentationState, progress: number | null = null): void {
     this.validateColumnCount(column_count);
     const frame = this.graphics.getFrame();
     const layout = this.playfield.getLayout(frame.logical_width);
@@ -53,6 +54,7 @@ export class ManiaRenderer {
       judgmentCenterY: this.skin.config.upsideDown ? layout.height - this.skin.config.judgePosition : this.skin.config.judgePosition,
     }, state, write);
     this.hud.drawScore(state.hud, getGameplayHudLayout(layout.width));
+    this.hud.drawProgress(progress, getGameplayHudLayout(layout.width));
     this.active_commands = null;
     this.graphics.submit(commands);
   }
@@ -67,8 +69,9 @@ export class ManiaRenderer {
 
   private readonly writeHudCommand = (x: number, y: number, width: number, height: number,
     color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
-    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number) => {
+    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number) => {
     this.active_commands?.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
-      rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
+      rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0,
+      circularProgress: circular_progress, batch });
   };
 }

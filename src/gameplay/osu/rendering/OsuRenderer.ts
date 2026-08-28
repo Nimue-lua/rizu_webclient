@@ -23,7 +23,8 @@ export interface OsuGameplayRenderer {
   draw(chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
     circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState,
-    slider_states?: readonly OsuSliderPresentationState[], spinner_state?: OsuSpinnerPresentationState | null): void;
+    slider_states?: readonly OsuSliderPresentationState[], spinner_state?: OsuSpinnerPresentationState | null,
+    progress?: number | null): void;
   destroy(): void;
 }
 
@@ -67,7 +68,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState,
     slider_states: readonly OsuSliderPresentationState[] | undefined = undefined,
-    spinner_state: OsuSpinnerPresentationState | null = null): void {
+    spinner_state: OsuSpinnerPresentationState | null = null, progress: number | null = null): void {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
     const commands: SpriteDrawCommand[] = [];
@@ -105,6 +106,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.combo.draw(state.combo, state.comboAnimationAge, state.comboAnimationFrom,
       8, frame.logical_height - 8, write);
     this.hud.drawScore(state.hud, getGameplayHudLayout(frame.logical_width));
+    this.hud.drawProgress(progress, getGameplayHudLayout(frame.logical_width));
     if (this.draw_cursor) {
       const cursor_center = viewport.playfieldToScreen(cursor.position);
       const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
@@ -127,8 +129,10 @@ export class OsuRenderer implements OsuGameplayRenderer {
   }
 
   private readonly writeHudCommand = (x: number, y: number, width: number, height: number,
-    color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"]) => {
-    this.active_commands?.push({ x, y, width, height, color, sprite, flipY: false,
-      rotateCounterClockwise: false, rotationRadians: 0 });
+    color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
+    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number) => {
+    this.active_commands?.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
+      rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0,
+      circularProgress: circular_progress, batch });
   };
 }

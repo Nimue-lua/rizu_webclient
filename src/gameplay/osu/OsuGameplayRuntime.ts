@@ -2,7 +2,7 @@ import type { OsuGameplayData } from "../../library/GameplayLoader";
 import type { OsuReplayBaseValues } from "../../replay/osu/OsuReplayBase";
 import { AudioGameplayClock } from "../AudioGameplayClock";
 import type { GameplaySession, OsuPointerInput } from "../GameplaySession";
-import { getAudioStartDelay, getGameplayEndTime } from "../GameplayTiming";
+import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange } from "../GameplayTiming";
 import { HudStateDeriver } from "../HudState";
 import type { OsuAction, OsuCursorState, OsuInputEvent } from "./OsuInputEvent";
 import { OsuRulesEngine } from "./OsuRulesEngine";
@@ -65,6 +65,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private replay_event_index = 0;
   private replay_aim_index = 0;
   private readonly replay_aim_events: Array<{ time: number; x: number; y: number }>;
+  private readonly progress_range;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
@@ -76,6 +77,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
     this.replay_base = replay_base;
+    this.progress_range = getGameplayProgressRange(data, this.music_rate);
     this.replay_aim_events = (playback_replay?.input_events ?? []).flatMap((event) => event.type === "aim"
       ? [{ time: replayValue(event.time), x: replayValue(event.x), y: replayValue(event.y) }]
       : []);
@@ -255,7 +257,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       this.renderer.draw(this.chart, this.rules_engine.circle_states,
       this.rules_engine.first_active_circle_index, this.rules_engine.circle_transients, song_time,
       this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
-      this.rules_engine.slider_states, this.rules_engine.spinner_state);
+      this.rules_engine.slider_states, this.rules_engine.spinner_state,
+      getGameplayProgress(song_time, this.progress_range));
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

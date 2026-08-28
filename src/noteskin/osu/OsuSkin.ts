@@ -35,6 +35,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly judgments: Readonly<Record<string, readonly string[]>>;
   readonly hpBackground: Sprite;
   readonly hpFill: Sprite;
+  readonly progressOverlay: Sprite;
+  readonly progressFill: Sprite;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
   readonly comboGlyphs: Readonly<Record<string, string>>;
   readonly scoreOverlap: number;
@@ -262,7 +264,7 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     "spinner-rpm", "spinner-top", "spinner-bottom", "spinner-middle"]
     .filter((name) => available.has(name) || defaults.has(name));
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", "sliderfollowcircle",
-    "sliderscorepoint", "scorebar-bg", "scorebar-colour", cursor_name, slider_end_names.circle,
+    "sliderscorepoint", "scorebar-bg", "scorebar-colour", "circularmetre", cursor_name, slider_end_names.circle,
     ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
     ...slider_ball_names, ...spinner_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
     ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
@@ -280,6 +282,11 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     }] as const;
   }));
   const sprites = Object.fromEntries(decoded) as Record<string, Sprite>;
+  sprites.__white = {
+    image: await createImageBitmap(new ImageData(new Uint8ClampedArray([255, 255, 255, 255]), 1, 1)),
+    sourceSize: { w: 1, h: 1 },
+    pixelSize: { w: 1, h: 1 },
+  };
   const sound_names = ["normal", "soft", "drum"].flatMap((set) =>
     ["hitnormal", "hitwhistle", "hitfinish", "hitclap", "slidertick"].map((sound) => `${set}-${sound}`));
   const decoded_sounds = await Promise.all(sound_names.flatMap((name) => {
@@ -325,6 +332,8 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     judgments,
     hpBackground: sprites["scorebar-bg"]!,
     hpFill: sprites["scorebar-colour"]!,
+    progressOverlay: sprites.circularmetre!,
+    progressFill: sprites.__white!,
     scoreGlyphs,
     comboGlyphs,
     scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
@@ -410,6 +419,7 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     ...Object.values(resolved_config.judgments).flat(),
     ...Object.values(resolved_config.scoreGlyphs), ...Object.values(resolved_config.comboGlyphs),
     ...[resolved_config.hpBackground, resolved_config.hpFill].filter((name): name is string => name !== undefined),
+    "circularmetre",
   ])];
   const decoded = await Promise.all(names.map(async (name) => {
     const normalized = name.replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
