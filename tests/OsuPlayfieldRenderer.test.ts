@@ -342,7 +342,7 @@ test("animates the slider ball along repeat-aware path progress", () => {
   assert.equal(ball[5], ball0);
 });
 
-test("draws slider balls and follow circles only from rules presentation state", () => {
+test("draws slider balls from start time and follow circles only while tracking", () => {
   const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
   const ball = { sourceSize: { w: 20, h: 20 } } as OsuStandardSkin["hitCircle"];
   const follow = { sourceSize: { w: 128, h: 128 } } as OsuStandardSkin["hitCircle"];
@@ -370,7 +370,8 @@ test("draws slider balls and follow circles only from rules presentation state",
   const inactive: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
   new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 1.5,
     (...quad) => inactive.push(quad), () => path, () => undefined, []);
-  assert.equal(inactive.some((quad) => quad[5] === ball || quad[5] === follow), false);
+  assert.equal(inactive.filter((quad) => quad[5] === ball).length, 1);
+  assert.equal(inactive.some((quad) => quad[5] === follow), false);
 });
 
 test("matches stable slider head, ball, and follow-circle activation animations", () => {
