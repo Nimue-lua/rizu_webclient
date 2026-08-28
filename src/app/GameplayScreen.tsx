@@ -23,6 +23,7 @@ const mania_hit_position = numberSetting("noteskin.mania.hit_position", 402, 0, 
 const mania_column_start = numberSetting("noteskin.mania.column_start", 136, 0, 854, 1);
 const mania_judge_position = numberSetting("noteskin.mania.judge_position", 325, 0, 480, 1);
 const mania_combo_position = numberSetting("noteskin.mania.combo_position", 111, 0, 480, 1);
+const RESTART_HOLD_MS = 300;
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -158,6 +159,50 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
   const osu_input_ref = useRef<OsuPointerInput | null>(null);
+  const restart_timeout_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [restart_revision, setRestartRevision] = useState(0);
+  const [restart_holding, setRestartHolding] = useState(false);
+
+  const cancelRestartHold = () => {
+    if (restart_timeout_ref.current !== null) clearTimeout(restart_timeout_ref.current);
+    restart_timeout_ref.current = null;
+    setRestartHolding(false);
+  };
+
+  const beginRestartHold = () => {
+    if (restart_timeout_ref.current !== null) return;
+    setRestartHolding(true);
+    restart_timeout_ref.current = setTimeout(() => {
+      restart_timeout_ref.current = null;
+      setRestartHolding(false);
+      setRestartRevision((revision) => revision + 1);
+    }, RESTART_HOLD_MS);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Backquote") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!event.repeat) beginRestartHold();
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code !== "Backquote") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancelRestartHold();
+    };
+    const handleBlur = () => cancelRestartHold();
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    window.addEventListener("keyup", handleKeyUp, { capture: true });
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("keyup", handleKeyUp, { capture: true });
+      window.removeEventListener("blur", handleBlur);
+      if (restart_timeout_ref.current !== null) clearTimeout(restart_timeout_ref.current);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = canvas_ref.current;
@@ -197,10 +242,10 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       binding.session.destroy();
     };
   }, [assets, autoplay, cursor_scale, hit_registration, input_bindings, master_volume, music_offset, onFinish, osu_cursor_renderer,
-    osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, playback, replay_base, scroll_speed]);
+    osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, playback, replay_base, restart_revision, scroll_speed]);
 
   return (
-    <main className={`gameplay-screen${note_skin_editor ? " note-skin-editor-open" : ""}`}>
+    <main className={`gameplay-screen${note_skin_editor ? " note-skin-editor-open" : ""}${restart_holding ? " restart-holding" : ""}`}>
       <canvas ref={canvas_ref}
         onPointerDown={(event) => {
           const input = osu_input_ref.current;
