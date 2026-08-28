@@ -11,6 +11,7 @@ const FETCH_TIMEOUT_MS = 5_000;
 export interface RemoteProvider {
   readonly id: string;
   readonly name: string;
+  readonly description?: string;
   readonly catalog_url: string;
 }
 
@@ -95,12 +96,18 @@ export class RemoteLibraryStore implements Library {
 
   getSnapshot = (): readonly RemoteProviderView[] => this.providers;
 
-  async add(value: string): Promise<void> {
+  async add(value: string, description?: string): Promise<void> {
     await this.ready;
     const catalog_url = catalogUrl(value);
     if (this.providers.some((provider) => provider.catalog_url === catalog_url)) throw new Error("This provider is already configured");
     const id = crypto.randomUUID();
-    const provider: RemoteProvider = { id, catalog_url, name: providerName(catalog_url) };
+    const trimmed_description = description?.trim();
+    const provider: RemoteProvider = {
+      id,
+      catalog_url,
+      name: providerName(catalog_url),
+      ...(trimmed_description ? { description: trimmed_description } : {}),
+    };
     this.providers = [...this.providers, { ...provider, status: "checking", error: null }];
     this.emit();
     try {

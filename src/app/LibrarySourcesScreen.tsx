@@ -7,12 +7,13 @@ interface LibrarySourcesScreenProps {
   local_status: LocalLibraryStatus;
   remote_providers: readonly RemoteProviderView[];
   onAddLocal: () => Promise<void>;
-  onAddRemote: (url: string) => Promise<void>;
+  onAddRemote: (url: string, description?: string) => Promise<void>;
   onExit: () => void;
 }
 
 export function LibrarySourcesScreen({ local_status, remote_providers, onAddLocal, onAddRemote, onExit }: LibrarySourcesScreenProps) {
   const [url, setUrl] = useState("");
+  const [description, setDescription] = useState("");
   const [adding_local, setAddingLocal] = useState(false);
   const [adding_remote, setAddingRemote] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +31,9 @@ export function LibrarySourcesScreen({ local_status, remote_providers, onAddLoca
     setAddingRemote(true);
     setError(null);
     try {
-      await onAddRemote(url);
+      await onAddRemote(url, description);
       setUrl("");
+      setDescription("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not add remote provider");
     } finally {
@@ -67,7 +69,9 @@ export function LibrarySourcesScreen({ local_status, remote_providers, onAddLoca
             <div><Globe2 aria-hidden="true" /><span><h2>Remote catalogs</h2><p>Connect to a hosted Rizu library over HTTPS.</p></span></div>
             <form className="library-source-remote-form" onSubmit={(event) => { event.preventDefault(); void addRemote(); }}>
               <input autoFocus type="text" value={url} onChange={(event) => setUrl(event.target.value)}
-                placeholder="charts.kuudere.fun" aria-label="Remote chart provider URL" />
+                placeholder="s3.kuudere.fun" aria-label="Remote chart provider URL" />
+              <input type="text" value={description} onChange={(event) => setDescription(event.target.value)}
+                placeholder="Description (optional)" aria-label="Remote chart provider description" />
               <button type="submit" disabled={adding_remote || !url.trim()}>{adding_remote ? "CHECKING..." : "ADD REMOTE"}</button>
             </form>
           </div>
@@ -75,7 +79,7 @@ export function LibrarySourcesScreen({ local_status, remote_providers, onAddLoca
             {remote_providers.length === 0 && <p>No custom remote providers configured.</p>}
             {remote_providers.map((provider) => <div className="library-source-row" key={provider.id}>
               <Link2 aria-hidden="true" />
-              <span><strong>{provider.name}</strong></span>
+              <span><strong>{provider.name}</strong>{provider.description && <small>{provider.description}</small>}</span>
               <b className={provider.status}>{provider.status.toUpperCase()}</b>
             </div>)}
           </div>

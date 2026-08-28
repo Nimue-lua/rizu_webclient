@@ -1,7 +1,8 @@
 export const DEFAULT_REMOTE_PROVIDER = {
   id: "builtin",
-  name: "charts.kuudere.fun",
-  catalog_url: "https://charts.kuudere.fun/catalog.sqlite",
+  name: "s3.kuudere.fun",
+  description: "Europe Russia Saint Petersburg",
+  catalog_url: "https://s3.kuudere.fun/catalog.sqlite",
 } as const;
 
 export function catalogUrl(value: string): string {
