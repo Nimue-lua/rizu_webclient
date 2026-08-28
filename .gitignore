@@ -7,3 +7,5 @@ server/catalog.sqlite
 server/catalog.sqlite-*
 public/charts
 public/chart-previews
+public/audio-previews
+server/__pycache__

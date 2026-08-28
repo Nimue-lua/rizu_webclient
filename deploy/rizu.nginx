@@ -15,22 +15,22 @@ server {
 	}
 
 	location = /catalog.sqlite {
-		alias /srv/rizu/public/catalog.sqlite;
+		alias /srv/charts.kuudere.fun/public/catalog.sqlite;
 		add_header Cache-Control "no-cache" always;
 	}
 
 	location /charts/ {
-		alias /srv/rizu/public/charts/;
+		alias /srv/charts.kuudere.fun/public/charts/;
 		add_header Cache-Control "public, max-age=31536000, immutable" always;
 	}
 
 	location /chart-previews/ {
-		alias /srv/rizu/public/chart-previews/;
+		alias /srv/charts.kuudere.fun/public/chart-previews/;
 		add_header Cache-Control "public, max-age=31536000, immutable" always;
 	}
 
 	location /audio-previews/ {
-		alias /srv/rizu/public/audio-previews/;
+		alias /srv/charts.kuudere.fun/public/audio-previews/;
 		add_header Cache-Control "public, max-age=31536000, immutable" always;
 	}
 }
