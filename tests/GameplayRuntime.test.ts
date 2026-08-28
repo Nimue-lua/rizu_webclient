@@ -38,6 +38,10 @@ test("keeps the audio scheduling margin when the chart already has enough lead-i
   assert.equal(getAudioStartDelay(createData([]), 1), 0.1);
 });
 
+test("adds a loading transition to the initial lead-in", () => {
+  assert.ok(Math.abs(getAudioStartDelay(createData([0.5]), 1, 1.15) - 1.85) < 1e-9);
+});
+
 test("ends 1.2 real seconds after the last note", () => {
   assert.equal(getGameplayEndTime(createData([1, 5, 3]), 1), 6.2);
   assert.equal(getGameplayEndTime(createData([1, 5, 3]), 2), 7.4);

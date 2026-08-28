@@ -76,7 +76,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     slider_renderer: OsuSliderRendererMode, input_bindings: readonly (string | null)[],
     private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
-    private readonly playback_replay?: OsuRecordedReplay) {
+    private readonly playback_replay?: OsuRecordedReplay,
+    private readonly initial_lead_in = 0) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
     this.music_offset_time = music_offset / 1000 * this.music_rate;
@@ -132,7 +133,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     if (!this.playback_replay) {
       this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
     }
-    const lead_in = getAudioStartDelay(this.data, this.music_rate);
+    const lead_in = getAudioStartDelay(this.data, this.music_rate, this.initial_lead_in);
     this.playback.start(lead_in);
     this.clock.start(lead_in);
     this.animation_frame = this.dependencies.request_animation_frame(this.render);

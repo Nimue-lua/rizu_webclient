@@ -17,10 +17,10 @@ function firstPlayableTime(data: GameplayData): number {
     : data.chart.hit_objects[0]?.absolute_time ?? Infinity;
 }
 
-export function getAudioStartDelay(data: GameplayData, music_rate: number): number {
+export function getAudioStartDelay(data: GameplayData, music_rate: number, extra_lead_in = 0): number {
   const first_note_time = firstPlayableTime(data);
   if (!Number.isFinite(first_note_time)) return AUDIO_SCHEDULE_MARGIN;
-  return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN - first_note_time / music_rate);
+  return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN + extra_lead_in - first_note_time / music_rate);
 }
 
 export function getIntroSkipTime(data: GameplayData, music_rate: number): number | null {

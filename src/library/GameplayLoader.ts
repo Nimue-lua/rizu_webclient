@@ -15,13 +15,16 @@ export interface GameplayLocation {
   chart_url: string;
   difficulty: number;
   duration_seconds: number;
+  keys: number | null;
   long_note_ratio: number;
+  mode: number;
   note_skin_url: string | null;
   note_skin_id: string;
   title: string;
   source_id?: string;
   source_type?: "local" | "remote";
   audio_path?: string;
+  background_path?: string;
   chart_path?: string;
 }
 

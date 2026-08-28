@@ -69,7 +69,8 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
     finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
-    private readonly playback_replay?: ManiaRecordedReplay) {
+    private readonly playback_replay?: ManiaRecordedReplay,
+    private readonly initial_lead_in = 0) {
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
@@ -109,7 +110,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     if (!this.playback_replay) {
       this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
     }
-    const lead_in = getAudioStartDelay(this.data, this.music_rate);
+    const lead_in = getAudioStartDelay(this.data, this.music_rate, this.initial_lead_in);
     this.playback.start(lead_in);
     this.clock.start(lead_in);
     this.animation_frame = this.dependencies.request_animation_frame(this.render);

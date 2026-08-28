@@ -37,6 +37,7 @@ interface SongSelectScreenProps {
   chart_selector: ChartSelector;
   nickname: string;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
+  preview_audio: readonly [HTMLAudioElement, HTMLAudioElement];
   onAutoplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onReplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }, playback: CompletedGameplay) => void;
   onSettings: () => void;
@@ -72,6 +73,7 @@ export function SongSelectScreen({
   chart_selector,
   nickname,
   onPlay,
+  preview_audio,
   onAutoplay,
   onReplay,
   onSettings,
@@ -99,7 +101,7 @@ export function SongSelectScreen({
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
   const selected_difficulty_ref = useRef<HTMLButtonElement>(null);
   const restored_song_scroll_ref = useRef(false);
-  const audio_refs = useRef<(HTMLAudioElement | null)[]>([null, null]);
+  const audio_refs = useRef(preview_audio);
   const active_audio_ref = useRef(0);
   const audio_gains_ref = useRef([1, 0]);
   const audio_fade_frame_ref = useRef<number | null>(null);
@@ -420,14 +422,12 @@ export function SongSelectScreen({
     pending_preview_start_ref.current?.();
   };
   const playChart = (chart: Chartview, song = selected_song) => {
-    for (const audio of audio_refs.current) audio?.pause();
     onPlay(chart, loadInputBindings(inputLayout(chart)), {
       title: song?.title ?? "Unknown title",
       artist: song?.artist ?? "Unknown artist",
     });
   };
   const autoplayChart = (chart: Chartview, song = selected_song) => {
-    for (const audio of audio_refs.current) audio?.pause();
     onAutoplay(chart, loadInputBindings(inputLayout(chart)), {
       title: song?.title ?? "Unknown title",
       artist: song?.artist ?? "Unknown artist",
@@ -435,7 +435,6 @@ export function SongSelectScreen({
   };
   const editNoteSkin = () => {
     if (!selected_chart) return;
-    for (const audio of audio_refs.current) audio?.pause();
     setSkinsOpen(false);
     onNoteSkinEdit(selected_chart, loadInputBindings(inputLayout(selected_chart)), {
       title: selected_song?.title ?? "Unknown title",
@@ -446,7 +445,6 @@ export function SongSelectScreen({
     if (!selected_chart || play.chart_id !== selected_chart.id) return;
     try {
       const playback = completedGameplayFromStoredPlay(play);
-      for (const audio of audio_refs.current) audio?.pause();
       onReplay(selected_chart, loadInputBindings(inputLayout(selected_chart)), {
         title: selected_song?.title ?? "Unknown title",
         artist: selected_song?.artist ?? "Unknown artist",
@@ -460,8 +458,6 @@ export function SongSelectScreen({
       unlockPreview();
       changeMusicRateFromKeyboard(event);
     }}>
-      <audio ref={(audio) => { audio_refs.current[0] = audio; }} preload="auto" />
-      <audio ref={(audio) => { audio_refs.current[1] = audio; }} preload="auto" />
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
         onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings}
         onOpenLibrarySources={() => setLibrarySourcesOpen(true)} onRefreshLibrary={onRefreshLibrary} library_scanning={local_library_status.scanning} />

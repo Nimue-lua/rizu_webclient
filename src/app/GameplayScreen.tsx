@@ -41,6 +41,7 @@ interface GameplayScreenProps {
   autoplay?: boolean;
   playback?: CompletedGameplay;
   note_skin_editor?: boolean;
+  initial_lead_in?: number;
   onFinish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
 }
 
@@ -154,7 +155,7 @@ function NoteSkinEditorPanel({ assets }: { assets: GameplayData }) {
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
   osu_cursor_renderer, osu_raw_input, osu_slider_renderer, replay_base, input_bindings, hit_registration,
-  autoplay = false, playback, note_skin_editor = false, onFinish }: GameplayScreenProps) {
+  autoplay = false, playback, note_skin_editor = false, initial_lead_in = 0, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
@@ -211,7 +212,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
     const effective_cursor_renderer = playback?.replay.mode === "osu" ? "webgl" : osu_cursor_renderer;
     const binding = createGameplaySession({ canvas, data: assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed,
       cursor_scale, osu_cursor_renderer: effective_cursor_renderer, osu_slider_renderer, replay_base, input_bindings,
-      hit_registration, autoplay, playback, finish: onFinish });
+      hit_registration, autoplay, playback, initial_lead_in, finish: onFinish });
     session_ref.current = binding.session;
     mania_input_ref.current = !playback && !autoplay && binding.mode === "mania" ? binding.pointer_input : null;
     osu_input_ref.current = !playback && !autoplay && binding.mode === "osu" ? binding.pointer_input : null;
@@ -241,7 +242,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       osu_input_ref.current = null;
       binding.session.destroy();
     };
-  }, [assets, autoplay, cursor_scale, hit_registration, input_bindings, master_volume, music_offset, onFinish, osu_cursor_renderer,
+  }, [assets, autoplay, cursor_scale, hit_registration, initial_lead_in, input_bindings, master_volume, music_offset, onFinish, osu_cursor_renderer,
     osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, playback, replay_base, restart_revision, scroll_speed]);
 
   return (

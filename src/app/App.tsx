@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react";
+import { flushSync } from "react-dom";
 import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
 import { CombinedLibrary } from "../library/Library";
 import type { Chartview } from "../library/views";
@@ -32,6 +33,7 @@ import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "loading" | "gameplay" | "result";
+type ScreenTransitionKind = "song-loading" | "loading-gameplay";
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
 const remote_libraries = new RemoteLibraryStore();
@@ -41,8 +43,8 @@ interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
 }
 
-function ScreenTransition({ children }: PropsWithChildren) {
-  return <div className="screen-transition">{children}</div>;
+function ScreenTransition({ children, dedicated = false }: PropsWithChildren<{ dedicated?: boolean }>) {
+  return <div className={`screen-transition${dedicated ? " dedicated-transition" : ""}`}>{children}</div>;
 }
 
 export function App() {
@@ -62,6 +64,7 @@ export function App() {
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
+  const [preview_audio] = useState<readonly [HTMLAudioElement, HTMLAudioElement]>(() => [new Audio(), new Audio()]);
   const local_library_status = useSyncExternalStore(local_library.subscribe, local_library.getStatus);
   const remote_providers = useSyncExternalStore(remote_libraries.subscribe, remote_libraries.getSnapshot);
   const note_skin_catalog = useRef(new NoteSkinCatalog());
@@ -83,6 +86,21 @@ export function App() {
   replay_base.const = constant_scroll;
   replay_base.tap_only = tap_only;
 
+  const transitionTo = (next_screen: Screen, kind: ScreenTransitionKind) => {
+    if (!document.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setScreen(next_screen);
+      return;
+    }
+
+    document.documentElement.dataset.screenTransition = kind;
+    const transition = document.startViewTransition(() => {
+      flushSync(() => setScreen(next_screen));
+    });
+    void transition.finished.catch(() => undefined).finally(() => {
+      delete document.documentElement.dataset.screenTransition;
+    });
+  };
+
   useEffect(() => {
     let cancelled = false;
     void note_skin_catalog.current.load().then((options) => {
@@ -93,6 +111,10 @@ export function App() {
       note_skin_catalog.current.dispose();
     };
   }, []);
+
+  useEffect(() => () => {
+    for (const audio of preview_audio) audio.pause();
+  }, [preview_audio]);
 
   const changeMusicRate = (value: number) => {
     const rate = Math.round(value * 1000) / 1000;
@@ -122,13 +144,16 @@ export function App() {
       chart_url: chart.chart_url,
       difficulty: chart.difficulty,
       duration_seconds: chart.duration_seconds,
+      keys: chart.keys,
       long_note_ratio: chart.long_note_ratio,
+      mode: chart.mode,
       note_skin_url: note_skin?.url ?? null,
       note_skin_id: note_skin?.id ?? "osu-default",
       title: song.title,
       source_id: chart.source_id,
       source_type: chart.source_type,
       audio_path: chart.audio_path,
+      background_path: chart.background_path,
       chart_path: chart.chart_path,
     });
     setInputBindings(chart_input_bindings);
@@ -138,7 +163,7 @@ export function App() {
     setPlayback(requested_playback);
     setAutoplay(requested_autoplay);
     setNoteSkinEditor(edit_note_skin);
-    setScreen("loading");
+    transitionTo("loading", "song-loading");
   };
 
   const changeNoteSkinSelection = (key: string, skin_id: string | undefined) => {
@@ -179,8 +204,9 @@ export function App() {
   };
 
   const finishLoading = (loaded_assets: GameplayData) => {
+    for (const audio of preview_audio) audio.pause();
     setAssets(loaded_assets);
-    setScreen("gameplay");
+    transitionTo("gameplay", "loading-gameplay");
   };
 
   const leaveResults = () => {
@@ -225,7 +251,7 @@ export function App() {
       }
 
       return (
-        <ScreenTransition key="gameplay">
+        <ScreenTransition dedicated key="gameplay">
           <GameplayScreen
             assets={assets}
             master_volume={master_volume}
@@ -242,6 +268,7 @@ export function App() {
             autoplay={autoplay}
             playback={playback ?? undefined}
             note_skin_editor={note_skin_editor}
+            initial_lead_in={1.15}
             onFinish={(completed, reached_chart_end) => {
               if (playback) {
                 setPlayback(null);
@@ -280,7 +307,7 @@ export function App() {
       }
 
       return (
-        <ScreenTransition key="loading">
+        <ScreenTransition dedicated key="loading">
           <LoadingScreen
             gameplay_loader={gameplay_loader}
             location={loading_location}
@@ -320,6 +347,7 @@ export function App() {
         <ScreenTransition key="song-select">
           <SongSelectScreen
             chart_selector={chart_selector}
+            preview_audio={preview_audio}
             nickname={nickname.trim() || "Anonymous"}
             master_volume={master_volume}
             music_rate={replay_base.rate}
