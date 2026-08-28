@@ -3,6 +3,7 @@ import { parseOsuChart } from "../chart/format/osu/OsuParser";
 import type { NoteSkin } from "../noteskin/NoteSkin";
 import { loadOsuManiaSkinUrl, loadOsuStandardSkinUrl, type OsuStandardSkin } from "../noteskin/osu/OsuSkin";
 import { loadNoteSkinOverrides, noteSkinOverrideKey } from "../noteskin/NoteSkinOverrides";
+import { readLocalAsset, readLocalChart } from "./LocalLibraryStore";
 
 export interface GameplayLocation {
   chart_id: string;
@@ -18,6 +19,9 @@ export interface GameplayLocation {
   note_skin_url: string | null;
   note_skin_id: string;
   title: string;
+  source_id?: string;
+  audio_path?: string;
+  chart_path?: string;
 }
 
 interface GameplayDataBase {
@@ -71,10 +75,16 @@ export class HttpGameplayLoader implements GameplayLoader {
   async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData> {
     const skin_url = location.note_skin_url;
     if (!skin_url) throw new Error("No note skin is selected for this key mode");
-    const [audio_data, chart_source] = await Promise.all([
-      fetchAsset(location.audio_url, signal),
-      fetchChart(location.chart_url, signal),
-    ]);
+    const local = location.source_id && location.audio_path && location.chart_path;
+    const [audio_data, chart_source] = local
+      ? await Promise.all([
+        readLocalAsset(location.source_id!, location.audio_path!),
+        readLocalChart(location.source_id!, location.chart_path!),
+      ])
+      : await Promise.all([
+        fetchAsset(location.audio_url, signal),
+        fetchChart(location.chart_url, signal),
+      ]);
     const [audio_buffer, chart] = await Promise.all([
       audio_context.decodeAudioData(audio_data),
       Promise.resolve(parseOsuChart(chart_source)),

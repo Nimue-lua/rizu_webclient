@@ -15,11 +15,18 @@ import { SongSelectHeader } from "./song-select/SongSelectHeader";
 import { completedGameplayFromStoredPlay, listPlaysByChart, type StoredPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
+import { readLocalFile } from "../library/LocalLibraryStore";
 
 const ROW_HEIGHT = 82;
 const BACKGROUND_DEBOUNCE_MS = 200;
 const AUDIO_PREVIEW_DEBOUNCE_MS = 200;
 const SESSION_STARTED_AT = Date.now();
+
+interface LocalPreviewMedia {
+  readonly chart_id: string;
+  readonly audio_url: string;
+  readonly background_url: string | null;
+}
 
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
@@ -42,6 +49,9 @@ interface SongSelectScreenProps {
   onNoteSkinImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
   onNoteSkinDelete: (skin_id: string) => Promise<void>;
   onNoteSkinEdit: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
+  onAddLocalLibrary: () => void;
+  onRefreshLibrary: () => void;
+  library_scanning: boolean;
 }
 
 function formatSessionDuration(duration_seconds: number): string {
@@ -72,6 +82,9 @@ export function SongSelectScreen({
   onNoteSkinImport,
   onNoteSkinDelete,
   onNoteSkinEdit,
+  onAddLocalLibrary,
+  onRefreshLibrary,
+  library_scanning,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
@@ -91,6 +104,7 @@ export function SongSelectScreen({
   const [skins_open, setSkinsOpen] = useState(false);
   const [global_leaderboard_open, setGlobalLeaderboardOpen] = useState(false);
   const [stored_plays, setStoredPlays] = useState<readonly StoredPlay[]>([]);
+  const [local_preview_media, setLocalPreviewMedia] = useState<LocalPreviewMedia | null>(null);
 
   useEffect(() => {
     const resizeUi = () => {
@@ -121,6 +135,41 @@ export function SongSelectScreen({
     selected_chart: chart_selector.getSelectedChart(),
   }), [selection]);
   const chart_level_sort = selection.sort_mode === "difficulty" || selection.sort_mode === "duration";
+  const selected_local_media = local_preview_media?.chart_id === selected_chart?.id ? local_preview_media : null;
+  const selected_background_url = selected_local_media?.background_url ?? selected_chart?.background_url ?? null;
+  const selected_audio_preview_url = selected_local_media?.audio_url ?? selected_chart?.audio_preview_url ?? "";
+
+  useEffect(() => {
+    setLocalPreviewMedia(null);
+    const source_id = selected_chart?.source_id;
+    const audio_path = selected_chart?.audio_path;
+    if (!source_id || !audio_path || !selected_chart) return;
+
+    let active = true;
+    const urls: string[] = [];
+    void Promise.all([
+      readLocalFile(source_id, audio_path).then((file) => {
+        const url = URL.createObjectURL(file);
+        urls.push(url);
+        return url;
+      }),
+      selected_chart.background_path
+        ? readLocalFile(source_id, selected_chart.background_path).then((file) => {
+          const url = URL.createObjectURL(file);
+          urls.push(url);
+          return url;
+        }).catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([audio_url, background_url]) => {
+      if (active) setLocalPreviewMedia({ chart_id: selected_chart.id, audio_url, background_url });
+    }).catch((reason: unknown) => {
+      if (active) console.warn("Could not load local song-select media", reason);
+    });
+    return () => {
+      active = false;
+      for (const url of urls) URL.revokeObjectURL(url);
+    };
+  }, [selected_chart?.id]);
 
   useEffect(() => {
     let active = true;
@@ -172,10 +221,10 @@ export function SongSelectScreen({
   useLayoutEffect(() => {
     setLoadedBackgroundUrl(null);
     const timer = window.setTimeout(() => {
-      setBackgroundUrl(selected_chart?.background_url ?? null);
+      setBackgroundUrl(selected_background_url);
     }, BACKGROUND_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [selected_chart?.background_url]);
+  }, [selected_background_url]);
 
   useEffect(() => {
     const audio = audio_ref.current;
@@ -189,12 +238,16 @@ export function SongSelectScreen({
     const previous_change = last_preview_change_ref.current;
     last_preview_change_ref.current = now;
     const switchPreview = () => {
-      const preview_url = selected_chart?.audio_preview_url ?? "";
+      const preview_url = selected_audio_preview_url;
       audio.pause();
       audio.src = preview_url;
-      if (preview_unlocked_ref.current && preview_url) {
-        void audio.play().catch(() => undefined);
-      }
+      if (!preview_url) return;
+      const startPlayback = () => {
+        if (selected_chart?.source_id) audio.currentTime = selected_chart.preview_time ?? 0;
+        if (preview_unlocked_ref.current) void audio.play().catch(() => undefined);
+      };
+      if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
+      else audio.addEventListener("loadedmetadata", startPlayback, { once: true });
     };
     if (previous_change === null || now - previous_change >= AUDIO_PREVIEW_DEBOUNCE_MS) {
       switchPreview();
@@ -202,7 +255,7 @@ export function SongSelectScreen({
     }
     const timer = window.setTimeout(switchPreview, AUDIO_PREVIEW_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [selected_chart?.audio_preview_url]);
+  }, [selected_audio_preview_url, selected_chart?.preview_time, selected_chart?.source_id]);
 
   const selectEntry = (entry: ChartSelectionEntry) => {
     chart_selector.selectEntry(entry);
@@ -255,9 +308,14 @@ export function SongSelectScreen({
     if (preview_unlocked_ref.current) return;
     preview_unlocked_ref.current = true;
     const audio = audio_ref.current;
-    if (!audio || !selected_chart?.audio_preview_url) return;
-    audio.src = selected_chart.audio_preview_url;
-    void audio.play().catch(() => undefined);
+    if (!audio || !selected_audio_preview_url) return;
+    audio.src = selected_audio_preview_url;
+    const startPlayback = () => {
+      if (selected_chart?.source_id) audio.currentTime = selected_chart.preview_time ?? 0;
+      void audio.play().catch(() => undefined);
+    };
+    if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
+    else audio.addEventListener("loadedmetadata", startPlayback, { once: true });
   };
   const playChart = (chart: Chartview, song = selected_song) => {
     audio_ref.current?.pause();
@@ -299,7 +357,8 @@ export function SongSelectScreen({
     <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
       <audio ref={audio_ref} preload="auto" />
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
-        onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings} />
+        onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings}
+        onAddLocalLibrary={onAddLocalLibrary} onRefreshLibrary={onRefreshLibrary} library_scanning={library_scanning} />
       {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> : <>
         <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
           onQueryChange={(query) => { chart_selector.setQuery(query); scroll_top_ref.current = 0; if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}

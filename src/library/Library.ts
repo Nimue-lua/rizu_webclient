@@ -8,6 +8,22 @@ export interface Library {
   load(signal: AbortSignal): Promise<LibraryView>;
 }
 
+export class CombinedLibrary implements Library {
+  constructor(private readonly remote: Library, private readonly local: Library) {}
+
+  async load(signal: AbortSignal): Promise<LibraryView> {
+    const [remote, local] = await Promise.all([this.remote.load(signal), this.local.load(signal)]);
+    const local_location_ids = new Map(local.locations.map((location) => [location.id, -location.id]));
+    return {
+      locations: [...remote.locations, ...local.locations.map((location) => ({ ...location, id: local_location_ids.get(location.id)! }))],
+      songs: [...remote.songs, ...local.songs.map((song) => ({
+        ...song,
+        charts: song.charts.map((chart) => ({ ...chart, location_id: local_location_ids.get(chart.location_id)! })),
+      }))],
+    };
+  }
+}
+
 function assetUrl(asset_path: unknown): string | null {
   if (typeof asset_path !== "string") return null;
   return `/${asset_path.split("/").map(encodeURIComponent).join("/")}`;

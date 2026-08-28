@@ -17,6 +17,11 @@ export interface Chartview extends ChartInput {
   location_id: number;
   name: string;
   note_count: number;
+  source_id?: string;
+  audio_path?: string;
+  background_path?: string;
+  chart_path?: string;
+  preview_time?: number;
 }
 
 export interface ChartfileSetView {

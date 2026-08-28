@@ -26,6 +26,7 @@ type Listener = () => void;
 export class ChartSelector {
   private readonly library: Library;
   private readonly listeners = new Set<Listener>();
+  private loaded = false;
   private snapshot: ChartSelectorSnapshot = {
     locations: [],
     songs: [],
@@ -49,11 +50,13 @@ export class ChartSelector {
     return () => this.listeners.delete(listener);
   };
 
-  async load(signal: AbortSignal): Promise<void> {
+  async load(signal: AbortSignal, force = false): Promise<void> {
+    if (this.loaded && !force) return;
     try {
       const library = await this.library.load(signal);
       if (signal.aborted) return;
       this.applyLibrary(library);
+      this.loaded = true;
     } catch (reason) {
       if (!signal.aborted) this.update({ error: reason instanceof Error ? reason.message : "Failed to load song catalog" });
     }

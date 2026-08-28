@@ -218,6 +218,8 @@ svg { width: 22px; height: 22px; }
 .header-icon-dock button { position: relative; display: grid; width: 42px; height: 100%; padding: 0; place-items: center; color: var(--muted); background: transparent; }
 .header-icon-dock button:hover { color: var(--text); background: var(--hover); }
 .header-icon-dock svg { width: 20px; height: 20px; }
+.header-icon-dock button.scanning svg { animation: library-scan-spin 1.2s linear infinite; }
+@keyframes library-scan-spin { to { transform: rotate(360deg); } }
 
 .library-toolbar { display: grid; grid-template-columns: 240px 150px 225px minmax(260px, 1fr); gap: 8px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--outline); box-shadow: 0 10px 26px color-mix(in srgb, var(--shadow) 27%, transparent); }
 .library-toolbar button { border-radius: 5px; }

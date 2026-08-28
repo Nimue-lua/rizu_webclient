@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react";
 import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
-import { SqliteLibrary } from "../library/Library";
+import { CombinedLibrary, SqliteLibrary } from "../library/Library";
 import type { Chartview } from "../library/views";
 import { ChartSelector } from "../select/ChartSelector";
 import { GameplayScreen } from "./GameplayScreen";
@@ -30,10 +30,16 @@ import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { submitPlay } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
+import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
 
 type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
 const gameplay_loader = new HttpGameplayLoader();
-const chart_selector = new ChartSelector(new SqliteLibrary());
+const local_library = new LocalLibraryCatalog();
+const chart_selector = new ChartSelector(new CombinedLibrary(new SqliteLibrary(), local_library));
+
+interface DirectoryPickerWindow extends Window {
+  showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+}
 
 function ScreenTransition({ children }: PropsWithChildren) {
   return <div className="screen-transition">{children}</div>;
@@ -61,6 +67,7 @@ export function App() {
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
+  const local_library_status = useSyncExternalStore(local_library.subscribe, local_library.getStatus);
   const note_skin_catalog = useRef(new NoteSkinCatalog());
   const nickname = useSetting(settings.nickname);
   const master_volume = useSetting(settings.master_volume);
@@ -149,6 +156,7 @@ export function App() {
   };
 
   const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null, edit_note_skin = false, requested_autoplay = false) => {
+    local_library.pause();
     const skin_mode = noteSkinMode(chart.mode);
     const note_skin = skin_mode === null ? undefined : selectedNoteSkin(skin_mode, chart.mode === 3 ? chart.keys : null,
       note_skin_selections, available_note_skins);
@@ -166,6 +174,9 @@ export function App() {
       note_skin_url: note_skin?.url ?? null,
       note_skin_id: note_skin?.id ?? "osu-default",
       title: song.title,
+      source_id: chart.source_id,
+      audio_path: chart.audio_path,
+      chart_path: chart.chart_path,
     });
     setInputBindings(chart_input_bindings);
     setAudioContext(new AudioContext());
@@ -211,6 +222,7 @@ export function App() {
     setAudioContext(null);
     setLoadingLocation(null);
     setNoteSkinEditor(false);
+    local_library.resume();
     setScreen(loading_return_screen);
   };
 
@@ -233,6 +245,7 @@ export function App() {
     setNoteSkinEditor(false);
     setAudioContext(null);
     setLoadingLocation(null);
+    local_library.resume();
     setScreen(return_screen);
   };
 
@@ -361,6 +374,21 @@ export function App() {
             note_skin_selections={note_skin_selections}
             available_note_skins={available_note_skins}
             score_storage_revision={score_storage_revision}
+            library_scanning={local_library_status.scanning}
+            onAddLocalLibrary={() => {
+              const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
+              if (!picker) {
+                window.alert("This browser does not support selecting persistent local folders.");
+                return;
+              }
+              void picker().then((handle) => local_library.addSource(handle)).catch((reason: unknown) => {
+                if (!(reason instanceof DOMException && reason.name === "AbortError")) console.error("Could not add local library", reason);
+              });
+            }}
+            onRefreshLibrary={() => {
+              const abort_controller = new AbortController();
+              void chart_selector.load(abort_controller.signal, true);
+            }}
             onPlay={beginLoading}
             onAutoplay={(chart, bindings, song) => beginLoading(chart, bindings, song, null, false, true)}
             onReplay={(chart, bindings, song, requested_playback) => beginLoading(chart, bindings, song, requested_playback)}
