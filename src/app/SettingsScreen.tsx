@@ -16,6 +16,7 @@ import {
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import { appSettings, settings, useSetting } from "../config/Settings";
+import { ConfigResetButton } from "./ConfigResetButton";
 
 interface SettingsScreenProps {
   onDeleteScores: () => Promise<void>;
@@ -130,13 +131,17 @@ export function SettingsScreen({
                 <h1>Audio Volume</h1>
               </header>
               <div className="settings-control settings-slider-control">
-                <label htmlFor="master-volume">Master volume&nbsp;&nbsp;<output>{master_volume_percent}%</output></label>
+                <div className="config-control-label"><ConfigResetButton label="Reset Master volume to default"
+                  onReset={() => appSettings.set(settings.master_volume, settings.master_volume.default)} />
+                  <label htmlFor="master-volume">Master volume&nbsp;&nbsp;<output>{master_volume_percent}%</output></label></div>
                 <input id="master-volume" type="range" min="0" max="100" step="1"
                   value={master_volume_percent} style={sliderStyle(master_volume_percent, 0, 100)}
                   onChange={(event) => appSettings.set(settings.master_volume, Number(event.target.value) / 100)} />
               </div>
               <div className="settings-control settings-slider-control">
-                <label htmlFor="osu-hit-sound-volume">osu! hit sound volume&nbsp;&nbsp;<output>{osu_hit_sound_volume_percent}%</output></label>
+                <div className="config-control-label"><ConfigResetButton label="Reset osu! hit sound volume to default"
+                  onReset={() => appSettings.set(settings.osu_hit_sound_volume, settings.osu_hit_sound_volume.default)} />
+                  <label htmlFor="osu-hit-sound-volume">osu! hit sound volume&nbsp;&nbsp;<output>{osu_hit_sound_volume_percent}%</output></label></div>
                 <input id="osu-hit-sound-volume" type="range" min="0" max="100" step="1"
                   value={osu_hit_sound_volume_percent} style={sliderStyle(osu_hit_sound_volume_percent, 0, 100)}
                   onChange={(event) => appSettings.set(settings.osu_hit_sound_volume, Number(event.target.value) / 100)} />
@@ -158,9 +163,11 @@ export function SettingsScreen({
                 </div>
               </div>
               <div className="settings-control settings-slider-control">
-                <label htmlFor="settings-scroll-speed">Scroll speed&nbsp;&nbsp;<output>
+                <div className="config-control-label"><ConfigResetButton label="Reset Scroll speed to default"
+                  onReset={() => appSettings.set(settings.scroll_speed, settings.scroll_speed.default)} />
+                  <label htmlFor="settings-scroll-speed">Scroll speed&nbsp;&nbsp;<output>
                   {scroll_speed_type === "osu" ? displayed_scroll_speed : displayed_scroll_speed.toFixed(2)}
-                </output></label>
+                </output></label></div>
                 <input id="settings-scroll-speed" type="range" min={scroll_speed_range.minimum}
                   max={scroll_speed_range.maximum} step={scroll_speed_range.step} value={displayed_scroll_speed}
                   style={sliderStyle(displayed_scroll_speed, scroll_speed_range.minimum, scroll_speed_range.maximum)}
@@ -189,7 +196,9 @@ export function SettingsScreen({
                 <h2>Offset</h2>
               </header>
               <div className="settings-control settings-slider-control">
-                <label htmlFor="music-offset">Music offset&nbsp;&nbsp;<output>{music_offset} ms</output></label>
+                <div className="config-control-label"><ConfigResetButton label="Reset Music offset to default"
+                  onReset={() => appSettings.set(settings.music_offset, settings.music_offset.default)} />
+                  <label htmlFor="music-offset">Music offset&nbsp;&nbsp;<output>{music_offset} ms</output></label></div>
                 <input id="music-offset" type="range" min="-200" max="200" step="1" value={music_offset}
                   style={sliderStyle(music_offset, -200, 200)}
                   onChange={(event) => appSettings.set(settings.music_offset, Number(event.target.value))} />
@@ -202,7 +211,9 @@ export function SettingsScreen({
                 <h2>Renderer</h2>
               </header>
               <div className="settings-control settings-slider-control">
-                <label htmlFor="settings-cursor-scale">osu! cursor scale&nbsp;&nbsp;<output>{Math.round(cursor_scale * 100)}%</output></label>
+                <div className="config-control-label"><ConfigResetButton label="Reset osu! cursor scale to default"
+                  onReset={() => appSettings.set(settings.cursor_scale, settings.cursor_scale.default)} />
+                  <label htmlFor="settings-cursor-scale">osu! cursor scale&nbsp;&nbsp;<output>{Math.round(cursor_scale * 100)}%</output></label></div>
                 <input id="settings-cursor-scale" type="range" min="25" max="200" step="5"
                   value={Math.round(cursor_scale * 100)} style={sliderStyle(cursor_scale * 100, 25, 200)}
                   onChange={(event) => appSettings.set(settings.cursor_scale, Number(event.target.value) / 100)} />

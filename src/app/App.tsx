@@ -25,6 +25,7 @@ import {
 } from "../noteskin/NoteSkinSelection";
 import { destroyNoteSkin } from "../noteskin/NoteSkin";
 import { NoteSkinCatalog } from "../noteskin/NoteSkinCatalog";
+import { deleteNoteSkinOverrides } from "../noteskin/NoteSkinOverrides";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { submitPlay } from "../replay/ReplayServer";
@@ -162,6 +163,7 @@ export function App() {
       duration_seconds: chart.duration_seconds,
       long_note_ratio: chart.long_note_ratio,
       note_skin_url: note_skin?.url ?? null,
+      note_skin_id: note_skin?.id ?? "osu-default",
       title: song.title,
     });
     setInputBindings(chart_input_bindings);
@@ -190,6 +192,7 @@ export function App() {
 
   const deleteNoteSkin = async (skin_id: string) => {
     const options = await note_skin_catalog.current.delete(skin_id);
+    deleteNoteSkinOverrides(skin_id);
     setAvailableNoteSkins(options);
     setNoteSkinSelections((current) => {
       const next = Object.fromEntries(Object.entries(current).filter(([, id]) => id !== skin_id));

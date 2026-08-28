@@ -9,14 +9,20 @@ import { ManiaTouchControls } from "./ManiaTouchControls";
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { bindOsuHardwareCursor, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
-import { booleanSetting, numberSetting } from "../config/Config";
+import { numberSetting } from "../config/Config";
 import { ConfigNumberControl } from "./ConfigNumberControl";
-import { ConfigBooleanControl } from "./ConfigBooleanControl";
+import {
+  noteSkinOverrideKey,
+  saveManiaColumnStartOverride,
+  saveManiaComboPositionOverride,
+  saveManiaHitPositionOverride,
+  saveManiaJudgePositionOverride,
+} from "../noteskin/NoteSkinOverrides";
 
-const editor_test_settings = Array.from({ length: 32 }, (_, index) =>
-  numberSetting(`noteskin.editor.todo.${index}`, (index * 37) % 101, 0, 100, 1));
-const editor_test_toggles = Array.from({ length: 12 }, (_, index) =>
-  booleanSetting(`noteskin.editor.toggle.${index}`, index % 3 === 0));
+const mania_hit_position = numberSetting("noteskin.mania.hit_position", 402, 0, 480, 1);
+const mania_column_start = numberSetting("noteskin.mania.column_start", 136, 0, 854, 1);
+const mania_judge_position = numberSetting("noteskin.mania.judge_position", 325, 0, 480, 1);
+const mania_combo_position = numberSetting("noteskin.mania.combo_position", 111, 0, 480, 1);
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -36,7 +42,7 @@ interface GameplayScreenProps {
   onFinish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
 }
 
-function NoteSkinEditorPanel() {
+function NoteSkinEditorPanel({ assets }: { assets: GameplayData }) {
   const panel_ref = useRef<HTMLElement>(null);
   const drag_ref = useRef<{
     pointerId: number;
@@ -50,8 +56,10 @@ function NoteSkinEditorPanel() {
     maxY: number;
   } | null>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [values, setValues] = useState(() => editor_test_settings.map((definition) => definition.default));
-  const [toggles, setToggles] = useState(() => editor_test_toggles.map((definition) => definition.default));
+  const [hit_position, setHitPosition] = useState(() => assets.mode === "mania" ? assets.note_skin.config.hitPosition : 0);
+  const [column_start, setColumnStart] = useState(() => assets.mode === "mania" ? assets.note_skin.config.columnStart : 0);
+  const [judge_position, setJudgePosition] = useState(() => assets.mode === "mania" ? assets.note_skin.config.judgePosition : 0);
+  const [combo_position, setComboPosition] = useState(() => assets.mode === "mania" ? assets.note_skin.config.comboPosition : 0);
 
   const startDrag = (event: PointerEvent<HTMLElement>) => {
     const panel = panel_ref.current;
@@ -91,12 +99,52 @@ function NoteSkinEditorPanel() {
         <h1>Note Skin Editor</h1>
       </header>
       <div className="note-skin-editor-content">
-        {editor_test_settings.map((definition, index) => <ConfigNumberControl key={definition.key}
-          definition={definition} label={`TODO slider ${index + 1}`} value={values[index]!}
-          onChange={(value) => setValues((current) => current.map((item, item_index) => item_index === index ? value : item))} />)}
-        {editor_test_toggles.map((definition, index) => <ConfigBooleanControl key={definition.key}
-          definition={definition} label={`TODO checkbox ${index + 1}`} value={toggles[index]!}
-          onChange={(value) => setToggles((current) => current.map((item, item_index) => item_index === index ? value : item))} />)}
+        {assets.mode === "mania" ? <>
+          <ConfigNumberControl definition={mania_hit_position} label="Hit position" value={hit_position}
+            onChange={(value) => {
+              assets.note_skin.config.hitPosition = value;
+              setHitPosition(value);
+              saveManiaHitPositionOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), value);
+            }} onReset={() => {
+              const value = assets.note_skin_source.hitPosition;
+              assets.note_skin.config.hitPosition = value;
+              setHitPosition(value);
+              saveManiaHitPositionOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), undefined);
+            }} />
+          <ConfigNumberControl definition={mania_judge_position} label="Judge Y" value={judge_position}
+            onChange={(value) => {
+              assets.note_skin.config.judgePosition = value;
+              setJudgePosition(value);
+              saveManiaJudgePositionOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), value);
+            }} onReset={() => {
+              const value = assets.note_skin_source.judgePosition;
+              assets.note_skin.config.judgePosition = value;
+              setJudgePosition(value);
+              saveManiaJudgePositionOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), undefined);
+            }} />
+          <ConfigNumberControl definition={mania_combo_position} label="Combo Y" value={combo_position}
+            onChange={(value) => {
+              assets.note_skin.config.comboPosition = value;
+              setComboPosition(value);
+              saveManiaComboPositionOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), value);
+            }} onReset={() => {
+              const value = assets.note_skin_source.comboPosition;
+              assets.note_skin.config.comboPosition = value;
+              setComboPosition(value);
+              saveManiaComboPositionOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), undefined);
+            }} />
+          <ConfigNumberControl definition={mania_column_start} label="Column start" value={column_start}
+            onChange={(value) => {
+              assets.note_skin.config.columnStart = value;
+              setColumnStart(value);
+              saveManiaColumnStartOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), value);
+            }} onReset={() => {
+              const value = assets.note_skin_source.columnStart;
+              assets.note_skin.config.columnStart = value;
+              setColumnStart(value);
+              saveManiaColumnStartOverride(noteSkinOverrideKey(assets.note_skin_id, "mania", assets.chart.column_count), undefined);
+            }} />
+        </> : <p>TODO</p>}
       </div>
     </aside>
   );
@@ -174,7 +222,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       />
       {!playback && assets.mode === "mania" &&
         <ManiaTouchControls column_count={assets.chart.column_count} input_ref={mania_input_ref} />}
-      {note_skin_editor && <NoteSkinEditorPanel />}
+      {note_skin_editor && <NoteSkinEditorPanel assets={assets} />}
     </main>
   );
 }
