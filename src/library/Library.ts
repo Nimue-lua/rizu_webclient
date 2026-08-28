@@ -32,21 +32,6 @@ export class CombinedLibrary implements Library {
   }
 }
 
-export class SqliteLibrary implements Library {
-  constructor(private readonly catalog_url = new URL("/catalog.sqlite", location.href).href,
-    private readonly source_id = "builtin") {}
-
-  async load(signal: AbortSignal): Promise<LibraryView> {
-    const response = await fetch(this.catalog_url, { cache: "no-cache", signal });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch song catalog: ${response.status} ${response.statusText}`);
-    }
-
-    return loadSqliteCatalog(new Uint8Array(await response.arrayBuffer()), this.catalog_url, this.source_id);
-  }
-}
-
 export async function loadSqliteCatalog(bytes: Uint8Array, catalog_url: string, source_id: string): Promise<LibraryView> {
     const sql = await initSqlJs({ locateFile: () => sql_wasm_url });
     const database = new sql.Database(bytes);
