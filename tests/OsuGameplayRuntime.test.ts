@@ -7,6 +7,7 @@ import type { OsuCursorState } from "../src/gameplay/osu/OsuInputEvent";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
 import { replayTick, type CompletedGameplay, type OsuRecordedReplay } from "../src/replay/RecordedReplay";
 import type { OsuHitObject } from "../src/chart/Chart";
+import { createOsuAutoplayReplay } from "../src/gameplay/AutoplayReplay";
 
 class FakeEventTarget {
   private readonly listeners = new Map<string, Set<EventListener>>();
@@ -86,12 +87,13 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
       };
     },
   };
+  const runtime_playback = playback ?? (autoplay ? createOsuAutoplayReplay(data.chart) : undefined);
   const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 1, 0,
     1, "webgl", createOsuReplayBase(1, 5), "direct", ["KeyZ", "KeyX"], (completed, reached_end) => {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       results.push(completed.score);
-    }, dependencies, playback, autoplay);
+    }, dependencies, runtime_playback);
   return { runtime, events, frames, cursor_states, cursor_renderers, results, completions, reached_chart_end,
     get destroy_calls() { return destroy_calls; } };
 }

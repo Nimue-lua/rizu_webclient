@@ -16,8 +16,6 @@ import type { OsuCursorRendererMode } from "./OsuHardwareCursor";
 import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
 import { Timings } from "../timing/Timings";
 import { replayTick, replayValue, type CompletedGameplay, type OsuRecordedReplay } from "../../replay/RecordedReplay";
-import { OsuSliderPath } from "./OsuSliderPath";
-import type { OsuHitObject, OsuSlider } from "../../chart/Chart";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;
@@ -67,10 +65,6 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private replay_event_index = 0;
   private replay_aim_index = 0;
   private readonly replay_aim_events: Array<{ time: number; x: number; y: number }>;
-  private autoplay_object_index = 0;
-  private autoplay_time = Number.NEGATIVE_INFINITY;
-  private autoplay_pressed = false;
-  private readonly autoplay_slider_paths = new Map<OsuSlider, OsuSliderPath>();
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
@@ -78,8 +72,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     slider_renderer: OsuSliderRendererMode, input_bindings: readonly (string | null)[],
     private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
-    private readonly playback_replay?: OsuRecordedReplay,
-    private readonly autoplay = false) {
+    private readonly playback_replay?: OsuRecordedReplay) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
     this.replay_base = replay_base;
@@ -91,7 +84,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       replay_base.circle_size ?? data.chart.circle_size);
     this.chart = chart;
     this.renderer = dependencies.create_renderer(canvas, { ...data, chart }, replay_base, cursor_scale,
-      autoplay ? "webgl" : cursor_renderer, slider_renderer);
+      cursor_renderer, slider_renderer);
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
       replay_base.overall_difficulty ?? chart.overall_difficulty ?? 5,
       replay_base.circle_size ?? chart.circle_size, chart.object_count, chart.drain_length_seconds);
@@ -122,14 +115,14 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   get cursor_state(): OsuCursorState {
     return {
       position: this.cursor_position,
-      primary: this.autoplay_pressed || this.action_sources.primary > 0,
+      primary: this.action_sources.primary > 0,
       secondary: this.action_sources.secondary > 0,
     };
   }
 
   start(): void {
     this.dependencies.event_target.addEventListener("keydown", this.handleKeyDown as EventListener);
-    if (!this.playback_replay && !this.autoplay) {
+    if (!this.playback_replay) {
       this.dependencies.event_target.addEventListener("keyup", this.handleKeyUp as EventListener);
     }
     const lead_in = getAudioStartDelay(this.data, this.music_rate);
@@ -151,7 +144,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
 
   aimPointer(_pointer_id: number, client_x: number, client_y: number,
     bounds: { left: number; top: number; width: number; height: number }, performance_time: number): void {
-    if (this.playback_replay || this.autoplay) return;
+    if (this.playback_replay) return;
     const position = this.renderer.clientToPlayfield({ x: client_x, y: client_y }, bounds);
     this.cursor_position = position;
     const time = this.clock.timeAt(performance_time).corrected;
@@ -161,7 +154,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   }
 
   pressPointer(pointer_id: number, action: OsuAction, performance_time: number): void {
-    if (this.playback_replay || this.autoplay) return;
+    if (this.playback_replay) return;
     const actions = this.pointer_actions.get(pointer_id) ?? new Set<OsuAction>();
     if (actions.has(action)) return;
     actions.add(action);
@@ -170,7 +163,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   }
 
   releasePointer(pointer_id: number, action: OsuAction, performance_time: number): void {
-    if (this.playback_replay || this.autoplay) return;
+    if (this.playback_replay) return;
     const actions = this.pointer_actions.get(pointer_id);
     if (!actions?.delete(action)) return;
     if (actions.size === 0) this.pointer_actions.delete(pointer_id);
@@ -178,7 +171,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   }
 
   cancelPointer(pointer_id: number, performance_time: number): void {
-    if (this.playback_replay || this.autoplay) return;
+    if (this.playback_replay) return;
     const actions = this.pointer_actions.get(pointer_id);
     if (!actions) return;
     this.pointer_actions.delete(pointer_id);
@@ -192,7 +185,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       this.finishGameplay(this.chart.hit_objects.length > 0 && song_time >= this.chart.end_time);
       return;
     }
-    if (this.playback_replay || this.autoplay) return;
+    if (this.playback_replay) return;
     const action = this.key_actions.get(event.code);
     if (action === undefined) return;
     event.preventDefault();
@@ -252,7 +245,6 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     this.flushPendingAim(timestamp, false);
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.applyReplayEvents(song_time);
-    this.applyAutoplay(song_time);
     if (this.playback_replay) {
       this.updateReplayCursor(song_time);
       this.rules_engine.setInput(this.cursor_position.x, this.cursor_position.y,
@@ -291,71 +283,6 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       }
       this.replay_event_index += 1;
     }
-  }
-
-  private applyAutoplay(song_time: number): void {
-    if (!this.autoplay) return;
-    const step = 1 / 120;
-    if (!Number.isFinite(this.autoplay_time)) {
-      const first_object_time = this.chart.hit_objects[0]?.absolute_time ?? song_time;
-      this.autoplay_time = Math.min(song_time, first_object_time - step);
-    }
-    while (this.autoplay_time + step < song_time) {
-      this.advanceAutoplay(this.autoplay_time + step);
-    }
-    this.advanceAutoplay(song_time);
-  }
-
-  private advanceAutoplay(time: number): void {
-    while (this.autoplay_object_index < this.chart.hit_objects.length) {
-      const object = this.chart.hit_objects[this.autoplay_object_index]!;
-      if (object.absolute_time > time) break;
-      this.setAutoplayInput(object.absolute_time);
-      if (object.kind !== "spinner") {
-        this.cursor_position = { x: object.x, y: object.y };
-        this.rules_engine.setInput(object.x, object.y, true, object.absolute_time);
-        this.rules_engine.click(object.x, object.y, object.absolute_time);
-      }
-      this.autoplay_object_index += 1;
-    }
-    this.setAutoplayInput(time);
-    this.autoplay_time = time;
-  }
-
-  private setAutoplayInput(time: number): void {
-    const active = this.activeAutoplayObject(time);
-    let position = this.cursor_position;
-    if (active?.kind === "slider") position = this.autoplaySliderPosition(active, time);
-    else if (active?.kind === "spinner") {
-      const angle = (time - active.absolute_time) * Math.PI * 60;
-      position = { x: 256 + Math.cos(angle) * 100, y: 192 + Math.sin(angle) * 100 };
-    }
-    this.cursor_position = position;
-    this.autoplay_pressed = active !== undefined;
-    this.rules_engine.setInput(position.x, position.y, this.autoplay_pressed, time);
-  }
-
-  private activeAutoplayObject(time: number): OsuHitObject | undefined {
-    for (let index = this.autoplay_object_index - 1; index >= 0; index -= 1) {
-      const object = this.chart.hit_objects[index]!;
-      if (object.kind === "circle") continue;
-      if (time <= object.end_time) return object;
-      if (object.end_time < time) break;
-    }
-    return undefined;
-  }
-
-  private autoplaySliderPosition(slider: OsuSlider, time: number): { x: number; y: number } {
-    let path = this.autoplay_slider_paths.get(slider);
-    if (!path) {
-      path = OsuSliderPath.create(slider, this.chart.format_version);
-      this.autoplay_slider_paths.set(slider, path);
-    }
-    if (slider.span_duration <= 0) return { x: slider.x, y: slider.y };
-    const elapsed = Math.min(Math.max(time - slider.absolute_time, 0), slider.total_duration);
-    const span = Math.min(slider.repeat_count - 1, Math.floor(elapsed / slider.span_duration));
-    const progress = Math.min(1, Math.max(0, (elapsed - span * slider.span_duration) / slider.span_duration));
-    return path.positionAtProgress(span % 2 === 0 ? progress : 1 - progress);
   }
 
   private updateReplayCursor(song_time: number): void {

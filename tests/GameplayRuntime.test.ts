@@ -7,6 +7,7 @@ import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 import type { ScoreResult } from "../src/gameplay/scoring/ScoreResult";
 import { replayTick, type CompletedGameplay, type ManiaRecordedReplay } from "../src/replay/RecordedReplay";
 import type { ManiaNoteEvent } from "../src/chart/Chart";
+import { createManiaAutoplayReplay } from "../src/gameplay/AutoplayReplay";
 
 function createData(note_times: readonly number[]): GameplayData {
   return {
@@ -188,12 +189,13 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
       destroy: () => { renderer.destroy_calls += 1; },
     }),
   };
+  const playback = options.playback ?? (options.autoplay ? createManiaAutoplayReplay(data.chart, replay.tap_only) : undefined);
   const runtime = new ManiaGameplayRuntime({} as HTMLCanvasElement, data, 0.6, options.offset ?? 0, 2,
     replay, ["KeyA"], "earliest", (completed, reached_end) => {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       scores.push(completed.score);
-    }, dependencies, options.playback, options.autoplay);
+    }, dependencies, playback);
   return { runtime, events, frames, source, gain, renderer, scores, completions, reached_chart_end };
 }
 

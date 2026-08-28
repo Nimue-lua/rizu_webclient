@@ -184,6 +184,46 @@ test("uses recorded osu rules and forces the WebGL cursor during playback", () =
   assert.equal(harness.osu_options[0]?.playback_replay, playback.replay);
 });
 
+test("generates a mania replay for autoplay", () => {
+  const harness = createDependencies();
+  const data = createManiaData();
+  data.chart.notes = [{ column: 1, absolute_time: 1, weight: 0 }];
+  const options = createOptions(data);
+  options.autoplay = true;
+
+  createGameplaySession(options, harness.dependencies);
+
+  assert.deepEqual(harness.mania_options[0]?.playback_replay?.input_events, [
+    { time: 8192, column: 0, pressed: true, note_index: 0, delta_time: 0 },
+    { time: 8192, column: 0, pressed: false, note_index: 0, delta_time: null },
+  ]);
+});
+
+test("generates an interpolated osu replay for autoplay", () => {
+  const harness = createDependencies();
+  const data = createOsuData();
+  data.chart.hit_objects = [
+    { kind: "circle", x: 100, y: 100, absolute_time: 0.5, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+      new_combo: false, combo_skip: 0, combo_number: 1, combo_color_index: 0 },
+    { kind: "circle", x: 300, y: 200, absolute_time: 1, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+      new_combo: false, combo_skip: 0, combo_number: 2, combo_color_index: 0 },
+  ];
+  const options = createOptions(data);
+  options.autoplay = true;
+  options.osu_cursor_renderer = "os";
+
+  createGameplaySession(options, harness.dependencies);
+
+  assert.equal(harness.osu_options[0]?.osu_cursor_renderer, "webgl");
+  const aims = harness.osu_options[0]?.playback_replay?.input_events.filter((event) => event.type === "aim");
+  assert.deepEqual(aims, [
+    { type: "aim", time: 4096, x: 819200, y: 819200 },
+    { type: "aim", time: 8192, x: 2457600, y: 1638400 },
+  ]);
+});
+
 test("rejects replay playback for a different gameplay mode", () => {
   const options = createOptions(createManiaData());
   options.playback = {

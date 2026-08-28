@@ -11,6 +11,8 @@ import type { GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPoi
 import type { CompletedGameplay, ManiaRecordedReplay, OsuRecordedReplay } from "../replay/RecordedReplay";
 import type { OsuSliderRendererMode } from "./osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "./osu/OsuHardwareCursor";
+import { createManiaAutoplayReplay, createOsuAutoplayReplay } from "./AutoplayReplay";
+import { applyOsuHitObjectStacking } from "./osu/OsuHitObjectStacking";
 
 export interface GameplaySessionOptions {
   canvas: HTMLCanvasElement;
@@ -41,11 +43,10 @@ export interface GameplaySessionFactoryDependencies {
 const default_dependencies: GameplaySessionFactoryDependencies = {
   create_mania: (options) => new ManiaGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.music_offset, options.scroll_speed, options.replay_base, options.input_bindings,
-    options.hit_registration, options.finish, undefined, options.playback_replay, options.autoplay),
+    options.hit_registration, options.finish, undefined, options.playback_replay),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.osu_cursor_renderer, options.replay_base,
-    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay,
-    options.autoplay),
+    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay),
 };
 
 export function createGameplaySession(options: GameplaySessionOptions,
@@ -64,16 +65,20 @@ export function createGameplaySession(options: GameplaySessionOptions,
       replay_base.setTimingIdentity(new Timings("osuod", normalizeOsuOd(options.data.chart.overall_difficulty ?? 5)),
         new Subtimings("scorev", 2));
     }
-    const playback_replay = options.playback?.replay.mode === "mania" ? options.playback.replay : undefined;
+    const playback_replay = options.playback?.replay.mode === "mania" ? options.playback.replay
+      : options.autoplay ? createManiaAutoplayReplay(options.data.chart, replay_base.tap_only) : undefined;
     const session = dependencies.create_mania({ ...options, data: options.data, replay_base,
       hit_registration: replay_base.nearest ? "nearest" : "earliest", playback_replay });
     return { mode: "mania", session, pointer_input: session };
   }
   const { replay_base, ...common_options } = options;
-  const playback_replay = options.playback?.replay.mode === "osu" ? options.playback.replay : undefined;
   const osu_replay_base = options.playback?.replay_base.mode === "osu"
     ? options.playback.replay_base
     : createOsuReplayBase(replay_base.rate, normalizeOsuOd(options.data.chart.overall_difficulty ?? 5));
+  const playback_replay = options.playback?.replay.mode === "osu" ? options.playback.replay
+    : options.autoplay ? createOsuAutoplayReplay(applyOsuHitObjectStacking(options.data.chart,
+      osu_replay_base.approach_rate ?? options.data.chart.approach_rate,
+      osu_replay_base.circle_size ?? options.data.chart.circle_size)) : undefined;
   const session = dependencies.create_osu({
     ...common_options,
     data: options.data,
