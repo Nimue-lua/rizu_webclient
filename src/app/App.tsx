@@ -10,8 +10,6 @@ import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { UnlockingFpsScreen } from "./UnlockingFpsScreen";
-import { OszSelectScreen } from "./OszSelectScreen";
-import { readOszArchive, type OszArchive } from "../library/OszArchive";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import {
@@ -33,7 +31,7 @@ import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 
-type Screen = "welcome" | "unlocking-fps" | "song-select" | "osz-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "unlocking-fps" | "song-select" | "loading" | "gameplay" | "result";
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
 const remote_libraries = new RemoteLibraryStore();
@@ -54,11 +52,6 @@ export function App() {
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
   const [assets, setAssets] = useState<GameplayData | null>(null);
   const [loading_location, setLoadingLocation] = useState<GameplayLocation | null>(null);
-  const [loading_return_screen, setLoadingReturnScreen] = useState<"song-select" | "osz-select">("song-select");
-  const [osz_archive, setOszArchive] = useState<OszArchive | null>(null);
-  const osz_archive_ref = useRef<OszArchive | null>(null);
-  const [osz_importing, setOszImporting] = useState(false);
-  const [osz_import_error, setOszImportError] = useState<string | null>(null);
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [completed_gameplay, setCompletedGameplay] = useState<CompletedGameplay | null>(null);
@@ -100,50 +93,6 @@ export function App() {
       note_skin_catalog.current.dispose();
     };
   }, []);
-
-  useEffect(() => () => osz_archive_ref.current?.dispose(), []);
-
-  const importOsz = async (file: File) => {
-    setScreen("osz-select");
-    setOszImporting(true);
-    setOszImportError(null);
-    if (!file.name.toLowerCase().endsWith(".osz")) {
-      setOszImportError("Drop an .osz beatmap archive");
-      setOszImporting(false);
-      return;
-    }
-    try {
-      const archive = await readOszArchive(file);
-      osz_archive_ref.current?.dispose();
-      osz_archive_ref.current = archive;
-      setOszArchive(archive);
-      setScreen("osz-select");
-    } catch (reason) {
-      console.error(`Failed to import ${file.name}`, reason);
-      setOszImportError(reason instanceof Error ? reason.message : "Failed to open the .osz archive");
-    } finally {
-      setOszImporting(false);
-    }
-  };
-
-  useEffect(() => {
-    if (screen !== "welcome" && screen !== "song-select" && screen !== "osz-select") return;
-    const preventDrop = (event: DragEvent) => {
-      if ([...event.dataTransfer?.items ?? []].some((item) => item.kind === "file")) event.preventDefault();
-    };
-    const handleDrop = (event: DragEvent) => {
-      const file = [...event.dataTransfer?.files ?? []].find((candidate) => candidate.name.toLowerCase().endsWith(".osz"));
-      if (!file) return;
-      event.preventDefault();
-      void importOsz(file);
-    };
-    window.addEventListener("dragover", preventDrop);
-    window.addEventListener("drop", handleDrop);
-    return () => {
-      window.removeEventListener("dragover", preventDrop);
-      window.removeEventListener("drop", handleDrop);
-    };
-  }, [screen]);
 
   const changeMusicRate = (value: number) => {
     const rate = Math.round(value * 1000) / 1000;
@@ -189,7 +138,6 @@ export function App() {
     setPlayback(requested_playback);
     setAutoplay(requested_autoplay);
     setNoteSkinEditor(edit_note_skin);
-    setLoadingReturnScreen(screen === "osz-select" ? "osz-select" : "song-select");
     setScreen("loading");
   };
 
@@ -227,7 +175,7 @@ export function App() {
     setLoadingLocation(null);
     setNoteSkinEditor(false);
     local_library.resume();
-    setScreen(loading_return_screen);
+    setScreen("song-select");
   };
 
   const finishLoading = (loaded_assets: GameplayData) => {
@@ -235,7 +183,7 @@ export function App() {
     setScreen("gameplay");
   };
 
-  const leaveResults = (return_screen = loading_return_screen) => {
+  const leaveResults = () => {
     if (audio_context) {
       void audio_context.close();
     }
@@ -250,7 +198,7 @@ export function App() {
     setAudioContext(null);
     setLoadingLocation(null);
     local_library.resume();
-    setScreen(return_screen);
+    setScreen("song-select");
   };
 
   switch (screen) {
@@ -305,11 +253,11 @@ export function App() {
                 return;
               }
               if (!reached_chart_end) {
-                leaveResults("song-select");
+                leaveResults();
                 return;
               }
               if (note_skin_editor) {
-                leaveResults("song-select");
+                leaveResults();
                 return;
               }
               setCompletedGameplay(completed);
@@ -415,20 +363,6 @@ export function App() {
               onExit={() => setSettingsOpen(false)}
             />
           )}
-        </ScreenTransition>
-      );
-    case "osz-select":
-      return (
-        <ScreenTransition key="osz-select">
-          <OszSelectScreen archive={osz_archive} importing={osz_importing} import_error={osz_import_error}
-            onImport={(file) => void importOsz(file)} onPlay={beginLoading}
-            onAutoplay={(chart, bindings, song) => beginLoading(chart, bindings, song, null, false, true)} onBack={() => {
-              osz_archive_ref.current?.dispose();
-              osz_archive_ref.current = null;
-              setOszArchive(null);
-              setOszImportError(null);
-              setScreen("song-select");
-            }} />
         </ScreenTransition>
       );
   }

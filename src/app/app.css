@@ -121,60 +121,6 @@ svg { width: 22px; height: 22px; }
 .loading-screen { padding: 2rem; text-align: center; }
 .loading-screen p, .song-library-error { color: var(--danger); }
 
-.osz-select-screen { position: relative; display: grid; grid-template-rows: 68px auto minmax(0, 1fr) 96px; width: 100%; height: 100%; overflow: hidden; background: radial-gradient(circle at 75% 15%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 34%), var(--background); isolation: isolate; }
-.osz-select-screen::before { position: absolute; z-index: -1; inset: 0; background: linear-gradient(90deg, var(--background) 0 42%, color-mix(in srgb, var(--background) 80%, transparent)); content: ""; }
-.osz-background { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .28; filter: saturate(.7); }
-.osz-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 clamp(18px, 4vw, 64px); background: color-mix(in srgb, var(--panel) 86%, transparent); border-bottom: 1px solid var(--outline); backdrop-filter: blur(16px); }
-.osz-header button, .osz-header label { display: flex; align-items: center; gap: 9px; width: fit-content; padding: 11px 14px; color: var(--muted); background: transparent; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
-.osz-header > span { display: flex; align-items: center; gap: 8px; max-width: 44vw; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.osz-header label { justify-self: end; color: var(--text); background: var(--surface); }
-.osz-header label.disabled { opacity: .55; }
-.osz-header input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.osz-heading { padding: clamp(28px, 5vh, 62px) clamp(22px, 8vw, 140px) 24px; }
-.osz-heading h1 { max-width: 900px; margin: 0 0 3px; font-family: "Zen Maru Gothic", sans-serif; font-size: clamp(34px, 5vw, 72px); line-height: 1.05; }
-.osz-heading p { margin: 8px 0 20px; color: var(--accent); font-size: clamp(18px, 2vw, 28px); font-weight: 600; }
-.osz-heading p.osz-import-error { color: var(--danger); }
-.osz-heading p.osz-import-status { color: var(--muted); }
-.osz-heading small { color: var(--muted); }
-.osz-picker { display: grid; align-content: start; gap: 7px; width: min(1120px, calc(100% - 44px)); margin: 0 auto; padding: 8px 5px 32px; overflow-y: auto; scrollbar-color: var(--outline) transparent; }
-.osz-inline-error { padding: 14px 18px; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 7px; font-weight: 600; }
-.osz-import-message { display: grid; justify-items: center; gap: 12px; margin: auto; padding: 42px; color: var(--muted); text-align: center; }
-.osz-import-message svg { width: 42px; height: 42px; color: var(--accent); }
-.osz-import-message strong { color: var(--text); font-size: 20px; }
-.osz-import-message.error svg, .osz-import-message.error strong { color: var(--danger); }
-.osz-import-message span { max-width: 460px; line-height: 1.5; }
-.osz-picker > button { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 74px; padding: 10px 20px; color: var(--text); background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid transparent; border-radius: 7px; text-align: left; backdrop-filter: blur(8px); }
-.osz-picker > button.selected { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent), var(--surface) 55%); border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: inset 4px 0 var(--accent); }
-.osz-picker i { display: grid; width: 42px; height: 42px; color: var(--accent); background: var(--background); border-radius: 50%; place-items: center; }
-.osz-picker i .chart-mode-badge.osu, .osz-picker i .chart-mode-badge.taiko { width: 24px; height: 24px; color: var(--text); }
-.osz-picker i .chart-mode-badge.text { max-width: 36px; color: var(--text); font-style: normal; }
-.osz-picker button > span { display: grid; min-width: 0; gap: 4px; }
-.osz-picker strong, .osz-picker small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.osz-picker strong { font-family: "Zen Maru Gothic", sans-serif; font-size: 20px; }
-.osz-picker small { color: var(--muted); }
-.osz-chart-stats { justify-items: end; }
-.osz-chart-stats b { color: var(--accent); font-size: 18px; }
-.osz-footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 14px clamp(22px, 8vw, 140px); background: color-mix(in srgb, var(--panel) 94%, transparent); border-top: 1px solid var(--outline); box-shadow: 0 -12px 40px color-mix(in srgb, var(--shadow) 45%, transparent); }
-.osz-footer > div { display: grid; min-width: 0; gap: 4px; }
-.osz-footer span { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .17em; }
-.osz-footer strong { overflow: hidden; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
-.osz-footer p { margin: 0; color: var(--danger); font-size: 12px; }
-.osz-footer button { display: flex; align-items: center; gap: 11px; min-width: 190px; height: 58px; justify-content: center; color: var(--text); background: var(--success); border-radius: 7px; font-weight: 800; letter-spacing: .05em; }
-.osz-drop-overlay { position: absolute; z-index: 10; inset: 18px; display: grid; color: var(--text); background: color-mix(in srgb, var(--background) 92%, transparent); border: 3px dashed var(--accent); border-radius: 14px; font-size: clamp(20px, 3vw, 36px); font-weight: 800; letter-spacing: .12em; pointer-events: none; place-items: center; }
-
-@media (max-width: 680px) {
-  .osz-header { grid-template-columns: 1fr auto; padding: 0 10px; }
-  .osz-header > span { display: none; }
-  .osz-heading { padding-top: 28px; }
-  .osz-picker > button { grid-template-columns: 38px minmax(0, 1fr); padding: 9px 12px; }
-  .osz-picker i { width: 36px; height: 36px; }
-  .osz-chart-stats { grid-column: 2; justify-items: start; }
-  .osz-chart-stats small { display: none; }
-  .osz-footer { padding: 12px 18px; }
-  .osz-footer > div { display: none; }
-  .osz-footer button { width: calc(50% - 6px); min-width: 0; }
-}
-
 .song-select-screen {
   position: absolute;
   top: 0;
