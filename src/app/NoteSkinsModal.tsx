@@ -14,15 +14,15 @@ interface NoteSkinsModalProps {
   onSelectionChange: (key: string, skin_id: string | undefined) => void;
   onImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
   onDelete: (skin_id: string) => Promise<void>;
+  onEdit: () => void;
   onExit: () => void;
 }
 
-export function NoteSkinsModal({ selections, options, selected_mode, selected_column_count, onSelectionChange, onImport, onDelete, onExit }: NoteSkinsModalProps) {
+export function NoteSkinsModal({ selections, options, selected_mode, selected_column_count, onSelectionChange, onImport, onDelete, onEdit, onExit }: NoteSkinsModalProps) {
   const file_input_ref = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [import_message, setImportMessage] = useState<string | null>(null);
   const compatible_skins = compatibleNoteSkins(selected_mode, selected_column_count, options);
   const selection_key = selected_mode === null ? null : noteSkinSelectionKey(selected_mode, selected_column_count);
   const stored_skin_id = selection_key === null ? "" : selections[selection_key] ?? "";
@@ -42,14 +42,12 @@ export function NoteSkinsModal({ selections, options, selected_mode, selected_co
   const importFile = async (file: File | undefined) => {
     if (!file || importing) return;
     setImporting(true);
-    setImportMessage(null);
     try {
       const imported = await onImport(file);
       const compatible_import = compatibleNoteSkins(selected_mode, selected_column_count, imported.options)[0];
       if (selection_key !== null && compatible_import) onSelectionChange(selection_key, compatible_import.id);
-      setImportMessage(imported.persisted ? `${file.name} imported` : `${file.name} loaded for this session only`);
     } catch (error) {
-      setImportMessage(error instanceof Error ? error.message : "Could not import this skin");
+      console.error("Could not import note skin", error);
     } finally {
       setImporting(false);
       if (file_input_ref.current) file_input_ref.current.value = "";
@@ -63,12 +61,10 @@ export function NoteSkinsModal({ selections, options, selected_mode, selected_co
   const deleteSelected = async () => {
     if (!selected_skin?.local || deleting) return;
     setDeleting(true);
-    setImportMessage(null);
     try {
       await onDelete(selected_skin.id);
-      setImportMessage(`${selected_skin.name} deleted`);
     } catch (error) {
-      setImportMessage(error instanceof Error ? error.message : "Could not delete this skin");
+      console.error("Could not delete note skin", error);
     } finally {
       setDeleting(false);
     }
@@ -99,10 +95,10 @@ export function NoteSkinsModal({ selections, options, selected_mode, selected_co
           <div className="note-skin-import">
             <input ref={file_input_ref} type="file" accept=".osk" onChange={(event) => void importFile(event.target.files?.[0])} />
             <button type="button" disabled={importing} onClick={() => file_input_ref.current?.click()}>{importing ? "IMPORTING..." : "IMPORT .OSK"}</button>
-            {import_message && <span>{import_message}</span>}
           </div>
           <div className="note-skin-actions">
             {selected_skin?.local && <button className="danger" type="button" disabled={deleting} onClick={() => void deleteSelected()}>{deleting ? "DELETING..." : "DELETE"}</button>}
+            <button type="button" disabled={!selected_skin} onClick={onEdit}>EDIT</button>
             <button type="button" onClick={onExit}>CLOSE</button>
           </div>
         </footer>

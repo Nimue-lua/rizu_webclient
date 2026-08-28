@@ -54,6 +54,7 @@ export function App() {
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [completed_gameplay, setCompletedGameplay] = useState<CompletedGameplay | null>(null);
   const [playback, setPlayback] = useState<CompletedGameplay | null>(null);
+  const [note_skin_editor, setNoteSkinEditor] = useState(false);
   const [note_skin_selections, setNoteSkinSelections] = useState<NoteSkinSelections>(
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
@@ -145,7 +146,7 @@ export function App() {
     appSettings.set(settings.tap_only, value);
   };
 
-  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null) => {
+  const beginLoading = (chart: Chartview, chart_input_bindings: readonly (string | null)[], song: { title: string; artist: string }, requested_playback: CompletedGameplay | null = null, edit_note_skin = false) => {
     const skin_mode = noteSkinMode(chart.mode);
     const note_skin = skin_mode === null ? undefined : selectedNoteSkin(skin_mode, chart.mode === 3 ? chart.keys : null,
       note_skin_selections, available_note_skins);
@@ -168,6 +169,7 @@ export function App() {
     setScore(requested_playback?.score ?? null);
     setCompletedGameplay(requested_playback);
     setPlayback(requested_playback);
+    setNoteSkinEditor(edit_note_skin);
     setLoadingReturnScreen(screen === "osz-select" ? "osz-select" : "song-select");
     setScreen("loading");
   };
@@ -203,6 +205,7 @@ export function App() {
 
     setAudioContext(null);
     setLoadingLocation(null);
+    setNoteSkinEditor(false);
     setScreen(loading_return_screen);
   };
 
@@ -221,6 +224,7 @@ export function App() {
     setScore(null);
     setCompletedGameplay(null);
     setPlayback(null);
+    setNoteSkinEditor(false);
     setAudioContext(null);
     setLoadingLocation(null);
     setScreen(return_screen);
@@ -263,6 +267,7 @@ export function App() {
             input_bindings={input_bindings}
             hit_registration={hit_registration}
             playback={playback ?? undefined}
+            note_skin_editor={note_skin_editor}
             onFinish={(completed, reached_chart_end) => {
               if (playback) {
                 setPlayback(null);
@@ -270,6 +275,10 @@ export function App() {
                 return;
               }
               if (!reached_chart_end) {
+                leaveResults("song-select");
+                return;
+              }
+              if (note_skin_editor) {
                 leaveResults("song-select");
                 return;
               }
@@ -350,6 +359,7 @@ export function App() {
             onNoteSkinSelectionChange={changeNoteSkinSelection}
             onNoteSkinImport={importNoteSkin}
             onNoteSkinDelete={deleteNoteSkin}
+            onNoteSkinEdit={(chart, bindings, song) => beginLoading(chart, bindings, song, null, true)}
           />
           {settings_open && (
             <SettingsScreen

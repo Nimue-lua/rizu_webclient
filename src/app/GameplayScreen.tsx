@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { GameplayData } from "../library/GameplayLoader";
 import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import type { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
@@ -9,6 +9,14 @@ import { ManiaTouchControls } from "./ManiaTouchControls";
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { bindOsuHardwareCursor, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
+import { booleanSetting, numberSetting } from "../config/Config";
+import { ConfigNumberControl } from "./ConfigNumberControl";
+import { ConfigBooleanControl } from "./ConfigBooleanControl";
+
+const editor_test_settings = Array.from({ length: 32 }, (_, index) =>
+  numberSetting(`noteskin.editor.todo.${index}`, (index * 37) % 101, 0, 100, 1));
+const editor_test_toggles = Array.from({ length: 12 }, (_, index) =>
+  booleanSetting(`noteskin.editor.toggle.${index}`, index % 3 === 0));
 
 interface GameplayScreenProps {
   assets: GameplayData;
@@ -24,12 +32,79 @@ interface GameplayScreenProps {
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
   playback?: CompletedGameplay;
+  note_skin_editor?: boolean;
   onFinish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
+}
+
+function NoteSkinEditorPanel() {
+  const panel_ref = useRef<HTMLElement>(null);
+  const drag_ref = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  } | null>(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [values, setValues] = useState(() => editor_test_settings.map((definition) => definition.default));
+  const [toggles, setToggles] = useState(() => editor_test_toggles.map((definition) => definition.default));
+
+  const startDrag = (event: PointerEvent<HTMLElement>) => {
+    const panel = panel_ref.current;
+    if (!panel) return;
+    const bounds = panel.getBoundingClientRect();
+    drag_ref.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: position.x,
+      originY: position.y,
+      minX: position.x - bounds.left,
+      maxX: position.x + window.innerWidth - bounds.right,
+      minY: position.y - bounds.top,
+      maxY: position.y + window.innerHeight - bounds.bottom,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const drag = (event: PointerEvent<HTMLElement>) => {
+    const state = drag_ref.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    setPosition({
+      x: Math.min(state.maxX, Math.max(state.minX, state.originX + event.clientX - state.startX)),
+      y: Math.min(state.maxY, Math.max(state.minY, state.originY + event.clientY - state.startY)),
+    });
+  };
+  const stopDrag = (event: PointerEvent<HTMLElement>) => {
+    if (drag_ref.current?.pointerId !== event.pointerId) return;
+    drag_ref.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  return (
+    <aside ref={panel_ref} className="note-skin-editor-panel" style={{ transform: `translate(${position.x}px, ${position.y}px)` }}>
+      <header className="note-skin-editor-titlebar" onPointerDown={startDrag} onPointerMove={drag}
+        onPointerUp={stopDrag} onPointerCancel={stopDrag}>
+        <h1>Note Skin Editor</h1>
+      </header>
+      <div className="note-skin-editor-content">
+        {editor_test_settings.map((definition, index) => <ConfigNumberControl key={definition.key}
+          definition={definition} label={`TODO slider ${index + 1}`} value={values[index]!}
+          onChange={(value) => setValues((current) => current.map((item, item_index) => item_index === index ? value : item))} />)}
+        {editor_test_toggles.map((definition, index) => <ConfigBooleanControl key={definition.key}
+          definition={definition} label={`TODO checkbox ${index + 1}`} value={toggles[index]!}
+          onChange={(value) => setToggles((current) => current.map((item, item_index) => item_index === index ? value : item))} />)}
+      </div>
+    </aside>
+  );
 }
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
   osu_cursor_renderer, osu_raw_input, osu_slider_renderer, replay_base, input_bindings, hit_registration,
-  playback, onFinish }: GameplayScreenProps) {
+  playback, note_skin_editor = false, onFinish }: GameplayScreenProps) {
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
@@ -76,7 +151,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
     osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, playback, replay_base, scroll_speed]);
 
   return (
-    <main className="gameplay-screen">
+    <main className={`gameplay-screen${note_skin_editor ? " note-skin-editor-open" : ""}`}>
       <canvas ref={canvas_ref}
         onPointerDown={(event) => {
           const input = osu_input_ref.current;
@@ -99,6 +174,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       />
       {!playback && assets.mode === "mania" &&
         <ManiaTouchControls column_count={assets.chart.column_count} input_ref={mania_input_ref} />}
+      {note_skin_editor && <NoteSkinEditorPanel />}
     </main>
   );
 }
