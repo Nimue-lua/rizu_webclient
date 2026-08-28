@@ -100,7 +100,7 @@ export class OsuPlayfieldRenderer {
       if (path && object.tick_distances.length > 0 && song_time < object.end_time) {
         this.drawSliderTicks(viewport, object, path, song_time, diameter, alpha, preempt, write);
       }
-      if (path && song_time >= object.absolute_time) {
+      if (path && song_time >= object.absolute_time && song_time <= object.end_time) {
         this.drawSliderBall(viewport, object, path, song_time, diameter, write);
         if (slider_state?.tracking) this.drawSliderFollowCircle(viewport, slider_state, song_time, diameter, write);
       }

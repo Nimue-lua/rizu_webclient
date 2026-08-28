@@ -372,6 +372,11 @@ test("draws slider balls from start time and follow circles only while tracking"
     (...quad) => inactive.push(quad), () => path, () => undefined, []);
   assert.equal(inactive.filter((quad) => quad[5] === ball).length, 1);
   assert.equal(inactive.some((quad) => quad[5] === follow), false);
+
+  const ended: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(1), 1, [], 2.1,
+    (...quad) => ended.push(quad), () => path, () => undefined, []);
+  assert.equal(ended.some((quad) => quad[5] === ball || quad[5] === follow), false);
 });
 
 test("matches stable slider head, ball, and follow-circle activation animations", () => {
