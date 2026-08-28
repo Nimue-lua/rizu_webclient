@@ -23,6 +23,8 @@ import type { RemoteProviderView } from "../library/RemoteLibraryStore";
 const ROW_HEIGHT = 82;
 const BACKGROUND_DEBOUNCE_MS = 200;
 const AUDIO_PREVIEW_DEBOUNCE_MS = 200;
+const AUDIO_PREVIEW_DUCK_MS = 180;
+const AUDIO_PREVIEW_CROSSFADE_MS = 300;
 const SESSION_STARTED_AT = Date.now();
 
 interface LocalPreviewMedia {
@@ -97,7 +99,13 @@ export function SongSelectScreen({
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
   const selected_difficulty_ref = useRef<HTMLButtonElement>(null);
   const restored_song_scroll_ref = useRef(false);
-  const audio_ref = useRef<HTMLAudioElement>(null);
+  const audio_refs = useRef<(HTMLAudioElement | null)[]>([null, null]);
+  const active_audio_ref = useRef(0);
+  const audio_gains_ref = useRef([1, 0]);
+  const audio_fade_frame_ref = useRef<number | null>(null);
+  const preview_request_ref = useRef(0);
+  const pending_preview_start_ref = useRef<(() => void) | null>(null);
+  const master_volume_ref = useRef(master_volume);
   const preview_unlocked_ref = useRef(false);
   const last_preview_change_ref = useRef<number | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
@@ -147,6 +155,29 @@ export function SongSelectScreen({
   const selected_background_url = selected_local_media?.background_url ?? selected_chart?.background_url ?? null;
   const selected_preview_audio_url = selected_local_media?.audio_url ?? selected_chart?.audio_url ?? "";
 
+  master_volume_ref.current = master_volume;
+
+  const fadeAudioGains = (targets: readonly [number, number], duration_ms: number, on_complete?: () => void) => {
+    if (audio_fade_frame_ref.current !== null) cancelAnimationFrame(audio_fade_frame_ref.current);
+    const starts = [...audio_gains_ref.current];
+    const started_at = performance.now();
+    const update = (time: number) => {
+      const progress = Math.min(Math.max((time - started_at) / duration_ms, 0), 1);
+      for (let index = 0; index < 2; index += 1) {
+        const gain = starts[index] + (targets[index] - starts[index]) * progress;
+        audio_gains_ref.current[index] = gain;
+        const audio = audio_refs.current[index];
+        if (audio) audio.volume = Math.min(Math.max(master_volume_ref.current * gain, 0), 1);
+      }
+      if (progress < 1) audio_fade_frame_ref.current = requestAnimationFrame(update);
+      else {
+        audio_fade_frame_ref.current = null;
+        on_complete?.();
+      }
+    };
+    audio_fade_frame_ref.current = requestAnimationFrame(update);
+  };
+
   useEffect(() => {
     setLocalPreviewMedia(null);
     const source_id = selected_chart?.source_id;
@@ -171,7 +202,11 @@ export function SongSelectScreen({
     ]).then(([audio_url, background_url]) => {
       if (active) setLocalPreviewMedia({ chart_id: selected_chart.id, audio_url, background_url });
     }).catch((reason: unknown) => {
-      if (active) console.warn("Could not load local song-select media", reason);
+      if (!active) return;
+      console.warn("Could not load local song-select media", reason);
+      fadeAudioGains([0, 0], AUDIO_PREVIEW_CROSSFADE_MS, () => {
+        for (const audio of audio_refs.current) audio?.pause();
+      });
     });
     return () => {
       active = false;
@@ -235,36 +270,77 @@ export function SongSelectScreen({
   }, [selected_background_url]);
 
   useEffect(() => {
-    const audio = audio_ref.current;
-    if (audio) audio.volume = master_volume;
+    for (let index = 0; index < audio_refs.current.length; index += 1) {
+      const audio = audio_refs.current[index];
+      if (audio) audio.volume = master_volume * audio_gains_ref.current[index];
+    }
   }, [master_volume]);
 
   useEffect(() => {
-    const audio = audio_ref.current;
-    if (!audio) return;
-    audio.defaultPlaybackRate = music_rate;
-    audio.playbackRate = music_rate;
+    for (const audio of audio_refs.current) {
+      if (!audio) continue;
+      audio.defaultPlaybackRate = music_rate;
+      audio.playbackRate = music_rate;
+    }
   }, [music_rate]);
 
   useEffect(() => {
-    const audio = audio_ref.current;
-    if (!audio) return;
+    const request = ++preview_request_ref.current;
+    pending_preview_start_ref.current = null;
+    const active_index = active_audio_ref.current;
+    const ducked_gains: [number, number] = active_index === 0 ? [0.5, 0] : [0, 0.5];
+    fadeAudioGains(ducked_gains, AUDIO_PREVIEW_DUCK_MS);
+
     const now = performance.now();
     const previous_change = last_preview_change_ref.current;
     last_preview_change_ref.current = now;
     const switchPreview = () => {
       const preview_url = selected_preview_audio_url;
-      audio.pause();
-      audio.src = preview_url;
-      audio.defaultPlaybackRate = music_rate;
-      audio.playbackRate = music_rate;
       if (!preview_url) return;
-      const startPlayback = () => {
-        audio.currentTime = selected_chart?.preview_time ?? 0;
-        if (preview_unlocked_ref.current) void audio.play().catch(() => undefined);
+      const previous_index = active_audio_ref.current;
+      const next_index = previous_index === 0 ? 1 : 0;
+      const previous_audio = audio_refs.current[previous_index];
+      const next_audio = audio_refs.current[next_index];
+      if (!next_audio) return;
+      next_audio.pause();
+      next_audio.src = preview_url;
+      next_audio.defaultPlaybackRate = music_rate;
+      next_audio.playbackRate = music_rate;
+      next_audio.volume = 0;
+      audio_gains_ref.current[next_index] = 0;
+
+      let started = false;
+      const stopPreviousAudio = () => {
+        if (request !== preview_request_ref.current) return;
+        fadeAudioGains([0, 0], AUDIO_PREVIEW_CROSSFADE_MS, () => previous_audio?.pause());
       };
-      if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
-      else audio.addEventListener("loadedmetadata", startPlayback, { once: true });
+      const startPlayback = () => {
+        if (started || request !== preview_request_ref.current) return;
+        if (!preview_unlocked_ref.current) {
+          pending_preview_start_ref.current = startPlayback;
+          return;
+        }
+        started = true;
+        pending_preview_start_ref.current = null;
+        next_audio.currentTime = selected_chart?.preview_time ?? 0;
+        void next_audio.play().then(() => {
+          if (request !== preview_request_ref.current) {
+            next_audio.pause();
+            return;
+          }
+          active_audio_ref.current = next_index;
+          const targets: [number, number] = next_index === 0 ? [1, 0] : [0, 1];
+          fadeAudioGains(targets, AUDIO_PREVIEW_CROSSFADE_MS, () => {
+            if (request !== preview_request_ref.current) return;
+            previous_audio?.pause();
+            previous_audio?.removeAttribute("src");
+            previous_audio?.load();
+          });
+        }).catch(stopPreviousAudio);
+      };
+      if (next_audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) startPlayback();
+      else next_audio.addEventListener("canplay", startPlayback, { once: true });
+      next_audio.addEventListener("error", stopPreviousAudio, { once: true });
     };
     if (previous_change === null || now - previous_change >= AUDIO_PREVIEW_DEBOUNCE_MS) {
       switchPreview();
@@ -273,6 +349,10 @@ export function SongSelectScreen({
     const timer = window.setTimeout(switchPreview, AUDIO_PREVIEW_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [selected_preview_audio_url, selected_chart?.preview_time, selected_chart?.source_id]);
+
+  useEffect(() => () => {
+    if (audio_fade_frame_ref.current !== null) cancelAnimationFrame(audio_fade_frame_ref.current);
+  }, []);
 
   const selectEntry = (entry: ChartSelectionEntry) => {
     chart_selector.selectEntry(entry);
@@ -337,27 +417,17 @@ export function SongSelectScreen({
   const unlockPreview = () => {
     if (preview_unlocked_ref.current) return;
     preview_unlocked_ref.current = true;
-    const audio = audio_ref.current;
-    if (!audio || !selected_preview_audio_url) return;
-    audio.src = selected_preview_audio_url;
-    audio.defaultPlaybackRate = music_rate;
-    audio.playbackRate = music_rate;
-    const startPlayback = () => {
-      audio.currentTime = selected_chart?.preview_time ?? 0;
-      void audio.play().catch(() => undefined);
-    };
-    if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) startPlayback();
-    else audio.addEventListener("loadedmetadata", startPlayback, { once: true });
+    pending_preview_start_ref.current?.();
   };
   const playChart = (chart: Chartview, song = selected_song) => {
-    audio_ref.current?.pause();
+    for (const audio of audio_refs.current) audio?.pause();
     onPlay(chart, loadInputBindings(inputLayout(chart)), {
       title: song?.title ?? "Unknown title",
       artist: song?.artist ?? "Unknown artist",
     });
   };
   const autoplayChart = (chart: Chartview, song = selected_song) => {
-    audio_ref.current?.pause();
+    for (const audio of audio_refs.current) audio?.pause();
     onAutoplay(chart, loadInputBindings(inputLayout(chart)), {
       title: song?.title ?? "Unknown title",
       artist: song?.artist ?? "Unknown artist",
@@ -365,7 +435,7 @@ export function SongSelectScreen({
   };
   const editNoteSkin = () => {
     if (!selected_chart) return;
-    audio_ref.current?.pause();
+    for (const audio of audio_refs.current) audio?.pause();
     setSkinsOpen(false);
     onNoteSkinEdit(selected_chart, loadInputBindings(inputLayout(selected_chart)), {
       title: selected_song?.title ?? "Unknown title",
@@ -376,7 +446,7 @@ export function SongSelectScreen({
     if (!selected_chart || play.chart_id !== selected_chart.id) return;
     try {
       const playback = completedGameplayFromStoredPlay(play);
-      audio_ref.current?.pause();
+      for (const audio of audio_refs.current) audio?.pause();
       onReplay(selected_chart, loadInputBindings(inputLayout(selected_chart)), {
         title: selected_song?.title ?? "Unknown title",
         artist: selected_song?.artist ?? "Unknown artist",
@@ -390,7 +460,8 @@ export function SongSelectScreen({
       unlockPreview();
       changeMusicRateFromKeyboard(event);
     }}>
-      <audio ref={audio_ref} preload="auto" />
+      <audio ref={(audio) => { audio_refs.current[0] = audio; }} preload="auto" />
+      <audio ref={(audio) => { audio_refs.current[1] = audio; }} preload="auto" />
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
         onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings}
         onOpenLibrarySources={() => setLibrarySourcesOpen(true)} onRefreshLibrary={onRefreshLibrary} library_scanning={local_library_status.scanning} />
