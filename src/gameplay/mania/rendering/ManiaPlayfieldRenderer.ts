@@ -1,5 +1,5 @@
 import { NoteState, type ManiaVisualNote } from "../ManiaRulesEngine";
-import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin } from "../../renderer/NoteSkin";
+import { NOTE_SKIN_LOGICAL_HEIGHT, type NoteSkin } from "../../../noteskin/NoteSkin";
 import type { SpriteQuadWriter } from "../../renderer/Sprite";
 
 export interface ManiaLayout {

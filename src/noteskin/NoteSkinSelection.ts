@@ -6,14 +6,15 @@ export interface NoteSkinOption {
   url: string;
   local?: boolean;
   sessionOnly?: boolean;
+  builtIn?: boolean;
 }
 
 export type NoteSkinSelections = Readonly<Record<string, string>>;
 
 export const note_skin_options: readonly NoteSkinOption[] = [
-  { id: "osu-default", name: "osu! Default", mode: "osu", columnCount: null, url: "/skins/osu-default.osk" },
-  { id: "osu-default", name: "osu! Default", mode: "mania", columnCount: null, url: "/skins/osu-default.osk" },
-  { id: "pivnoi_skoof", name: "~ Pivnoi Skoof 🍺~", mode: "osu", columnCount: null, url: "/skins/pivnoi_skoof.osk" },
+  { id: "osu-default", name: "osu! Default", mode: "osu", columnCount: null, url: "/skins/osu-default.osk", builtIn: true },
+  { id: "osu-default", name: "osu! Default", mode: "mania", columnCount: null, url: "/skins/osu-default.osk", builtIn: true },
+  { id: "pivnoi_skoof", name: "~ Pivnoi Skoof 🍺~", mode: "osu", columnCount: null, url: "/skins/pivnoi_skoof.osk", builtIn: true },
 ];
 
 const STORAGE_KEY = "rizu.note-skins";
@@ -57,5 +58,6 @@ export function saveNoteSkinSelections(selections: NoteSkinSelections): void {
 export function selectedNoteSkin(mode: string, column_count: number | null,
   selections: NoteSkinSelections, options: readonly NoteSkinOption[] = note_skin_options): NoteSkinOption | undefined {
   const id = selections[noteSkinSelectionKey(mode, column_count)];
-  return compatibleNoteSkins(mode, column_count, options).find((skin) => skin.id === id);
+  const compatible = compatibleNoteSkins(mode, column_count, options);
+  return compatible.find((skin) => skin.id === id) ?? compatible.find((skin) => skin.id === "osu-default") ?? compatible[0];
 }

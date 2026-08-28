@@ -22,16 +22,9 @@ import {
   selectedNoteSkin,
   type NoteSkinOption,
   type NoteSkinSelections,
-} from "../gameplay/renderer/NoteSkinSelection";
-import { destroyNoteSkin } from "../gameplay/renderer/NoteSkin";
-import { DEFAULT_OSU_SKIN_URL } from "../gameplay/renderer/OsuSkin";
-import {
-  inspectLocalNoteSkin,
-  loadLocalNoteSkins,
-  localNoteSkinOptions,
-  saveLocalNoteSkin,
-  shouldPersistLocalNoteSkin,
-} from "../gameplay/renderer/LocalNoteSkinStore";
+} from "../noteskin/NoteSkinSelection";
+import { destroyNoteSkin } from "../noteskin/NoteSkin";
+import { NoteSkinCatalog } from "../noteskin/NoteSkinCatalog";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { submitPlay } from "../replay/ReplayServer";
@@ -65,7 +58,7 @@ export function App() {
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
-  const local_skin_urls = useRef(new Map<string, string>());
+  const note_skin_catalog = useRef(new NoteSkinCatalog());
   const nickname = useSetting(settings.nickname);
   const master_volume = useSetting(settings.master_volume);
   const osu_hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
@@ -86,20 +79,12 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void loadLocalNoteSkins().then((skins) => {
-      if (cancelled) return;
-      const options: NoteSkinOption[] = [...note_skin_options];
-      for (const skin of skins) {
-        const url = URL.createObjectURL(skin.archive);
-        local_skin_urls.current.set(skin.id, url);
-        options.push(...localNoteSkinOptions(skin, url));
-      }
-      setAvailableNoteSkins(options);
+    void note_skin_catalog.current.load().then((options) => {
+      if (!cancelled) setAvailableNoteSkins(options);
     }).catch(() => undefined);
     return () => {
       cancelled = true;
-      for (const url of local_skin_urls.current.values()) URL.revokeObjectURL(url);
-      local_skin_urls.current.clear();
+      note_skin_catalog.current.dispose();
     };
   }, []);
 
@@ -175,7 +160,7 @@ export function App() {
       difficulty: chart.difficulty,
       duration_seconds: chart.duration_seconds,
       long_note_ratio: chart.long_note_ratio,
-      note_skin_url: note_skin?.url ?? (chart.mode === 0 ? DEFAULT_OSU_SKIN_URL : null),
+      note_skin_url: note_skin?.url ?? null,
       title: song.title,
     });
     setInputBindings(chart_input_bindings);
@@ -196,19 +181,19 @@ export function App() {
   };
 
   const importNoteSkin = async (file: File): Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }> => {
-    const skin = await inspectLocalNoteSkin(file);
-    const persisted = shouldPersistLocalNoteSkin(file.size);
-    if (persisted) await saveLocalNoteSkin(skin);
-    const previous_url = local_skin_urls.current.get(skin.id);
-    if (previous_url) URL.revokeObjectURL(previous_url);
-    const url = URL.createObjectURL(skin.archive);
-    local_skin_urls.current.set(skin.id, url);
-    const imported_options = localNoteSkinOptions(skin, url, !persisted);
-    setAvailableNoteSkins((current) => [
-      ...current.filter((option) => option.id !== skin.id),
-      ...imported_options,
-    ]);
-    return { options: imported_options, persisted };
+    const result = await note_skin_catalog.current.import(file);
+    setAvailableNoteSkins(note_skin_catalog.current.getOptions());
+    return result;
+  };
+
+  const deleteNoteSkin = async (skin_id: string) => {
+    const options = await note_skin_catalog.current.delete(skin_id);
+    setAvailableNoteSkins(options);
+    setNoteSkinSelections((current) => {
+      const next = Object.fromEntries(Object.entries(current).filter(([, id]) => id !== skin_id));
+      saveNoteSkinSelections(next);
+      return next;
+    });
   };
 
   const cancelLoading = () => {
@@ -364,6 +349,7 @@ export function App() {
             onTapOnlyChange={changeTapOnly}
             onNoteSkinSelectionChange={changeNoteSkinSelection}
             onNoteSkinImport={importNoteSkin}
+            onNoteSkinDelete={deleteNoteSkin}
           />
           {settings_open && (
             <SettingsScreen

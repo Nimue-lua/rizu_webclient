@@ -3,7 +3,7 @@ import { osuApproachPreempt, osuCircleDiameter } from "../OsuCircleGeometry";
 import type { OsuCircleTransient } from "../OsuCirclePresentation";
 import { OsuCircleState } from "../OsuCircleState";
 import { OsuViewport } from "../OsuViewport";
-import type { OsuStandardSkin } from "../../renderer/OsuSkin";
+import type { OsuStandardSkin } from "../../../noteskin/osu/OsuSkin";
 import type { SpriteQuadWriter } from "../../renderer/Sprite";
 import type { OsuSliderPath } from "../OsuSliderPath";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";

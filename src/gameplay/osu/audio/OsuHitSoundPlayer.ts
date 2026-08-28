@@ -1,6 +1,6 @@
 import type { OsuChart, OsuHitObject, OsuSliderEdgeSet } from "../../../chart/Chart";
 import type { OsuStandardJudgmentEvent } from "../OsuStandardJudgmentEvent";
-import type { OsuStandardSkin } from "../../renderer/OsuSkin";
+import type { OsuStandardSkin } from "../../../noteskin/osu/OsuSkin";
 import { classifyOsuStandardJudgment } from "../scoring/OsuStandardScore";
 import type { OsuStandardTimingValues } from "../timing/OsuStandardOdTimings";
 

@@ -1,13 +1,9 @@
-import { unzipSync } from "fflate";
-import type { NoteSkin, NoteSkinConfig } from "./NoteSkin";
-import type { Sprite, SpriteSkin } from "./Sprite";
+import type { NoteSkin, NoteSkinConfig } from "../NoteSkin";
+import type { Sprite, SpriteSkin } from "../../gameplay/renderer/Sprite";
+import { fetchSkinArchive, findSkinIni, type SkinArchiveFiles } from "./SkinArchive";
+import { parseSkinIni, type SkinIni, type SkinIniSection } from "./SkinIni";
 
-export type SkinIniSection = Readonly<Record<string, string>>;
-
-export interface SkinIni {
-  readonly sections: Readonly<Record<string, SkinIniSection>>;
-  readonly mania: readonly SkinIniSection[];
-}
+export { parseSkinIni } from "./SkinIni";
 
 export const DEFAULT_OSU_SKIN_URL = "/skins/osu-default.osk";
 
@@ -45,33 +41,6 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly comboOverlap: number;
   readonly layeredHitSounds: boolean;
   readonly hitSounds: Readonly<Record<string, AudioBuffer | null>>;
-}
-
-export function parseSkinIni(source: string): SkinIni {
-  const sections: Record<string, Record<string, string>> = {};
-  const mania: Record<string, string>[] = [];
-  let current: Record<string, string> | undefined;
-
-  for (const source_line of source.replace(/^\uFEFF/, "").split(/\r?\n/)) {
-    const line = source_line.trim();
-    const header = /^\[([^\]]+)\]$/.exec(line);
-    if (header) {
-      const name = header[1]!.trim();
-      if (name.toLowerCase() === "mania") {
-        current = {};
-        mania.push(current);
-      } else {
-        current = sections[name] ??= {};
-      }
-      continue;
-    }
-    const separator = line.indexOf(":");
-    if (!current || separator < 0) continue;
-    const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).replace(/\/\/.*$/, "").trim();
-    if (key) current[key] = value;
-  }
-  return { sections, mania };
 }
 
 function numberValue(section: SkinIniSection, key: string, fallback: number): number {
@@ -241,16 +210,10 @@ export function resolveOsuManiaTail(tail_name: string, resolved_head: string,
   return default_sprites.has(normalizedSpriteName(default_tail)) ? default_tail : resolved_head;
 }
 
-let default_archive: Promise<Readonly<Record<string, Uint8Array>>> | undefined;
+let default_archive: Promise<SkinArchiveFiles> | undefined;
 
-async function fetchArchive(url: string, signal?: AbortSignal): Promise<Readonly<Record<string, Uint8Array>>> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`Failed to fetch skin ${url}: ${response.status} ${response.statusText}`);
-  return unzipSync(new Uint8Array(await response.arrayBuffer()));
-}
-
-function defaultArchive(signal?: AbortSignal): Promise<Readonly<Record<string, Uint8Array>>> {
-  default_archive ??= fetchArchive(DEFAULT_OSU_SKIN_URL, signal).catch((error) => {
+function defaultArchive(signal?: AbortSignal): Promise<SkinArchiveFiles> {
+  default_archive ??= fetchSkinArchive(DEFAULT_OSU_SKIN_URL, signal).catch((error) => {
     default_archive = undefined;
     throw error;
   });
@@ -259,27 +222,27 @@ function defaultArchive(signal?: AbortSignal): Promise<Readonly<Record<string, U
 
 async function defaultSpriteFiles(signal?: AbortSignal): Promise<ReadonlyMap<string, SpriteFile>> {
   const files = await defaultArchive(signal);
-  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  const ini_path = findSkinIni(files);
   if (!ini_path) throw new Error("Default osu skin archive is missing skin.ini");
   return spriteFiles(files, ini_path.slice(0, ini_path.lastIndexOf("/") + 1));
 }
 
 async function defaultAudioFiles(signal?: AbortSignal): Promise<ReadonlyMap<string, Uint8Array>> {
   const files = await defaultArchive(signal);
-  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  const ini_path = findSkinIni(files);
   if (!ini_path) throw new Error("Default osu skin archive is missing skin.ini");
   return audioFiles(files, ini_path.slice(0, ini_path.lastIndexOf("/") + 1));
 }
 
 export async function loadOsuManiaSkinUrl(url: string, column_count: number, signal?: AbortSignal): Promise<NoteSkin> {
-  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
+  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchSkinArchive(url, signal);
   return loadOsuManiaSkin(files, column_count, signal);
 }
 
 export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioContext,
   signal?: AbortSignal): Promise<OsuStandardSkin> {
-  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchArchive(url, signal);
-  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchSkinArchive(url, signal);
+  const ini_path = findSkinIni(files);
   if (!ini_path) throw new Error("osu skin archive is missing skin.ini");
   const directory = ini_path.slice(0, ini_path.lastIndexOf("/") + 1);
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));
@@ -400,7 +363,7 @@ function resolveSliderBallFrames(available: ReadonlyMap<string, SpriteFile>, def
 
 export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array>>, column_count: number,
   signal?: AbortSignal): Promise<NoteSkin> {
-  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path));
+  const ini_path = findSkinIni(files);
   if (!ini_path) throw new Error("osu skin archive is missing skin.ini");
   const directory = ini_path.slice(0, ini_path.lastIndexOf("/") + 1);
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));

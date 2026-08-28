@@ -4,7 +4,7 @@ import { getGameplayHudLayout, type GameplayHudRenderer } from "../../GameplayHu
 import { SpriteGameplayHudRenderer } from "../../renderer/GameplayHudRenderer";
 import { OsuComboRenderer } from "./OsuComboRenderer";
 import { OsuPlayfieldRenderer } from "./OsuPlayfieldRenderer";
-import type { OsuStandardSkin } from "../../renderer/OsuSkin";
+import type { OsuStandardSkin } from "../../../noteskin/osu/OsuSkin";
 import type { SpriteDrawCommand } from "../../renderer/Sprite";
 import { WebGlSpriteGraphics } from "../../renderer/WebGlSpriteGraphics";
 import { OsuViewport, type ClientBounds, type Point } from "../OsuViewport";

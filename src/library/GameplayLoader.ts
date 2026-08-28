@@ -1,7 +1,7 @@
 import type { ManiaChart, OsuChart } from "../chart/Chart";
 import { parseOsuChart } from "../chart/format/osu/OsuParser";
-import { loadNoteSkinZip, type NoteSkin } from "../gameplay/renderer/NoteSkin";
-import { loadOsuStandardSkinUrl, type OsuStandardSkin } from "../gameplay/renderer/OsuSkin";
+import type { NoteSkin } from "../noteskin/NoteSkin";
+import { loadOsuManiaSkinUrl, loadOsuStandardSkinUrl, type OsuStandardSkin } from "../noteskin/osu/OsuSkin";
 
 export interface GameplayLocation {
   chart_id: string;
@@ -74,7 +74,7 @@ export class HttpGameplayLoader implements GameplayLoader {
       const note_skin = await loadOsuStandardSkinUrl(skin_url, audio_context, signal);
       return { mode: "osu", audio_buffer, audio_context, chart, chart_id: location.chart_id, note_skin };
     }
-    const note_skin = await loadNoteSkinZip(skin_url, chart.column_count, signal);
+    const note_skin = await loadOsuManiaSkinUrl(skin_url, chart.column_count, signal);
     return { mode: "mania", audio_buffer, audio_context, chart, chart_id: location.chart_id, note_skin };
   }
 }

@@ -1,5 +1,5 @@
-import { unzipSync } from "fflate";
-import { parseSkinIni } from "./OsuSkin";
+import { findSkinIni, unzipSkinArchive } from "./osu/SkinArchive";
+import { parseSkinIni } from "./osu/SkinIni";
 import type { NoteSkinOption } from "./NoteSkinSelection";
 
 const DATABASE_NAME = "rizu-local-skins";
@@ -63,21 +63,31 @@ export async function saveLocalNoteSkin(skin: StoredLocalNoteSkin): Promise<void
   }
 }
 
+export async function deleteLocalNoteSkin(id: string): Promise<void> {
+  const database = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      transaction.objectStore(STORE_NAME).delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Could not delete local skin"));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Could not delete local skin"));
+    });
+  } finally {
+    database.close();
+  }
+}
+
 export async function inspectLocalNoteSkin(file: SkinArchiveFile): Promise<StoredLocalNoteSkin> {
   if (!/\.osk$/i.test(file.name)) throw new Error("Choose an .osk skin archive");
   if (file.size > MAX_SESSION_ARCHIVE_SIZE) throw new Error("Skin archives must be 250 MB or smaller");
 
   const archive_data = await file.arrayBuffer();
-  let files: Readonly<Record<string, Uint8Array>>;
-  try {
-    files = unzipSync(new Uint8Array(archive_data));
-  } catch {
-    throw new Error("The selected file is not a valid .osk archive");
-  }
+  const files = unzipSkinArchive(new Uint8Array(archive_data), "The selected file is not a valid .osk archive");
   const extracted_size = Object.values(files).reduce((total, bytes) => total + bytes.byteLength, 0);
   if (extracted_size > MAX_EXTRACTED_SIZE) throw new Error("The extracted skin is too large");
 
-  const ini_path = Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path.replace(/\\/g, "/")));
+  const ini_path = findSkinIni(files);
   if (!ini_path) throw new Error("The .osk archive does not contain skin.ini");
   const directory = ini_path.replace(/\\/g, "/").replace(/[^/]*$/, "");
   const ini = parseSkinIni(new TextDecoder().decode(files[ini_path]!));

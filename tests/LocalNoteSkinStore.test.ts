@@ -5,7 +5,7 @@ import {
   inspectLocalNoteSkin,
   localNoteSkinOptions,
   shouldPersistLocalNoteSkin,
-} from "../src/gameplay/renderer/LocalNoteSkinStore";
+} from "../src/noteskin/LocalNoteSkinStore";
 
 function archiveFile(name: string, files: Readonly<Record<string, Uint8Array>>) {
   const archive = zipSync(files);

@@ -5,7 +5,7 @@ import type { ChartSelectionEntry, ChartSelector, ChartSortMode } from "../selec
 import { InputBindingsModal } from "./InputBindingsModal";
 import { GameplayModifiersModal } from "./GameplayModifiersModal";
 import { GamemodeFiltersModal } from "./GamemodeFiltersModal";
-import { noteSkinMode, type NoteSkinOption, type NoteSkinSelections } from "../gameplay/renderer/NoteSkinSelection";
+import { noteSkinMode, type NoteSkinOption, type NoteSkinSelections } from "../noteskin/NoteSkinSelection";
 import { NoteSkinsModal } from "./NoteSkinsModal";
 import { ChartBrowser } from "./song-select/ChartBrowser";
 import { LibraryToolbar } from "./song-select/LibraryToolbar";
@@ -39,6 +39,7 @@ interface SongSelectScreenProps {
   onTapOnlyChange: (tap_only: boolean) => void;
   onNoteSkinSelectionChange: (key: string, skin_id: string | undefined) => void;
   onNoteSkinImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
+  onNoteSkinDelete: (skin_id: string) => Promise<void>;
 }
 
 function formatSessionDuration(duration_seconds: number): string {
@@ -66,6 +67,7 @@ export function SongSelectScreen({
   onTapOnlyChange,
   onNoteSkinSelectionChange,
   onNoteSkinImport,
+  onNoteSkinDelete,
 }: SongSelectScreenProps) {
   const viewport_ref = useRef<HTMLDivElement>(null);
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
@@ -306,7 +308,7 @@ export function SongSelectScreen({
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
-      {skins_open && <NoteSkinsModal selections={note_skin_selections} options={available_note_skins} selected_mode={selected_chart ? noteSkinMode(selected_chart.mode) : null} selected_column_count={selected_chart?.mode === 3 ? selected_chart.keys : null} onSelectionChange={onNoteSkinSelectionChange} onImport={onNoteSkinImport} onExit={() => setSkinsOpen(false)} />}
+      {skins_open && <NoteSkinsModal selections={note_skin_selections} options={available_note_skins} selected_mode={selected_chart ? noteSkinMode(selected_chart.mode) : null} selected_column_count={selected_chart?.mode === 3 ? selected_chart.keys : null} onSelectionChange={onNoteSkinSelectionChange} onImport={onNoteSkinImport} onDelete={onNoteSkinDelete} onExit={() => setSkinsOpen(false)} />}
     </main>
   );
 }

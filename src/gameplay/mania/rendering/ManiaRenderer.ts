@@ -4,7 +4,7 @@ import { getGameplayHudLayout, type GameplayHudRenderer } from "../../GameplayHu
 import { SpriteGameplayHudRenderer } from "../../renderer/GameplayHudRenderer";
 import { ManiaOverlayRenderer } from "./ManiaOverlayRenderer";
 import { ManiaPlayfieldRenderer } from "./ManiaPlayfieldRenderer";
-import type { NoteSkin } from "../../renderer/NoteSkin";
+import type { NoteSkin } from "../../../noteskin/NoteSkin";
 import type { SpriteDrawCommand } from "../../renderer/Sprite";
 import { WebGlSpriteGraphics } from "../../renderer/WebGlSpriteGraphics";
 

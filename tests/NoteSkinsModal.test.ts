@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compatibleNoteSkins } from "../src/gameplay/renderer/NoteSkinSelection";
+import { compatibleNoteSkins } from "../src/noteskin/NoteSkinSelection";
 
 test("lists only skins compatible with the selected chart", () => {
   const skins = compatibleNoteSkins("mania", 4);

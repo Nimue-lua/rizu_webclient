@@ -468,6 +468,8 @@ svg { width: 22px; height: 22px; }
 .note-skin-import { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .note-skin-import input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .note-skin-import span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-skin-actions { display: flex; gap: 10px; }
+.note-skins-modal > footer button.danger { color: var(--text); background: #9d2d3b; }
 .note-skin-drop-overlay { position: absolute; z-index: 2; inset: 12px; display: grid; color: var(--text); background: color-mix(in srgb, var(--background) 91%, transparent); border: 3px dashed var(--blue); border-radius: 14px; font-size: 22px; font-weight: 800; letter-spacing: .12em; pointer-events: none; place-items: center; }
 
 @media (max-width: 640px) {
