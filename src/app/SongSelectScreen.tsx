@@ -242,6 +242,13 @@ export function SongSelectScreen({
   useEffect(() => {
     const audio = audio_ref.current;
     if (!audio) return;
+    audio.defaultPlaybackRate = music_rate;
+    audio.playbackRate = music_rate;
+  }, [music_rate]);
+
+  useEffect(() => {
+    const audio = audio_ref.current;
+    if (!audio) return;
     const now = performance.now();
     const previous_change = last_preview_change_ref.current;
     last_preview_change_ref.current = now;
@@ -249,6 +256,8 @@ export function SongSelectScreen({
       const preview_url = selected_audio_preview_url;
       audio.pause();
       audio.src = preview_url;
+      audio.defaultPlaybackRate = music_rate;
+      audio.playbackRate = music_rate;
       if (!preview_url) return;
       const startPlayback = () => {
         if (selected_chart?.source_type === "local") audio.currentTime = selected_chart.preview_time ?? 0;
@@ -307,6 +316,19 @@ export function SongSelectScreen({
     if (next_chart) chart_selector.selectChart(next_chart.id);
   };
 
+  const changeMusicRateFromKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "[" && event.key !== "]") return;
+    const target = event.target;
+    if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement ||
+      target instanceof HTMLInputElement && target.type !== "range" ||
+      target instanceof HTMLElement && target.isContentEditable) return;
+    if (input_bindings_open || modifiers_open || filters_open || skins_open ||
+      global_leaderboard_open || library_sources_open) return;
+    event.preventDefault();
+    const offset = event.key === "[" ? -0.05 : 0.05;
+    onMusicRateChange(Math.min(4, Math.max(0.25, Math.round((music_rate + offset) * 100) / 100)));
+  };
+
   const date_text = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(now).replace(",", "");
@@ -318,6 +340,8 @@ export function SongSelectScreen({
     const audio = audio_ref.current;
     if (!audio || !selected_audio_preview_url) return;
     audio.src = selected_audio_preview_url;
+    audio.defaultPlaybackRate = music_rate;
+    audio.playbackRate = music_rate;
     const startPlayback = () => {
       if (selected_chart?.source_type === "local") audio.currentTime = selected_chart.preview_time ?? 0;
       void audio.play().catch(() => undefined);
@@ -362,7 +386,10 @@ export function SongSelectScreen({
     }
   };
   return (
-    <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={unlockPreview}>
+    <main className="song-select-screen" onPointerDownCapture={unlockPreview} onKeyDownCapture={(event) => {
+      unlockPreview();
+      changeMusicRateFromKeyboard(event);
+    }}>
       <audio ref={audio_ref} preload="auto" />
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
         onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings}
