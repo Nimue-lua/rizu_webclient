@@ -37,7 +37,7 @@ export function LibraryToolbar({ selection, onLocationChange, onOpenFilters, onQ
       </button>
       <label className="chart-search">
         <SongSelectIcon name="search" />
-        <input value={selection.query} onChange={(event) => onQueryChange(event.target.value)} type="search" placeholder="Search songs, artists, or creators" aria-label="Search charts" />
+        <input value={selection.query} onChange={(event) => onQueryChange(event.target.value)} type="search" placeholder="Search or filter: keys=4 difficulty>5 length<2m" aria-label="Search charts" />
       </label>
     </section>
   );

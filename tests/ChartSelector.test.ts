@@ -4,7 +4,7 @@ import type { Library } from "../src/library/Library";
 import type { ChartfileSetView, Chartview, LibraryView } from "../src/library/views";
 import { ChartSelector } from "../src/select/ChartSelector";
 
-function chart(id: string, difficulty: number, duration_seconds: number, location_id = 1, mode = 3): Chartview {
+function chart(id: string, difficulty: number, duration_seconds: number, location_id = 1, mode = 3, keys = 4): Chartview {
   return {
     audio_preview_url: "",
     audio_url: "",
@@ -18,7 +18,7 @@ function chart(id: string, difficulty: number, duration_seconds: number, locatio
     duration_seconds,
     format: "osu",
     id,
-    keys: 4,
+    keys,
     location_id,
     long_note_ratio: 0,
     mode,
@@ -28,7 +28,7 @@ function chart(id: string, difficulty: number, duration_seconds: number, locatio
 }
 
 const songs: ChartfileSetView[] = [
-  { id: "zeta", title: "Zeta", artist: "Alpha", charts: [chart("zeta-easy", 2, 180), chart("zeta-hard", 7, 120)] },
+  { id: "zeta", title: "Zeta", artist: "Alpha", charts: [chart("zeta-easy", 2, 180), chart("zeta-hard", 7, 120, 1, 3, 7)] },
   { id: "alpha", title: "Alpha", artist: "Zulu", charts: [chart("alpha-only", 4, 90, 2), chart("alpha-osu", 3, 60, 1, 0)] },
 ];
 
@@ -97,4 +97,66 @@ test("applies chart filters before flattening", async () => {
     "zeta-easy",
     "zeta-hard",
   ]);
+});
+
+test("filters mania charts by exact key count", async () => {
+  const selector = await loadedSelector();
+  selector.setSortMode("difficulty");
+
+  selector.setQuery("keys=7");
+  assert.deepEqual(selector.getSelectionEntries().map((entry) => entry.chart?.id), ["zeta-hard"]);
+
+  selector.setQuery("KEY=4");
+  assert.deepEqual(selector.getSelectionEntries().map((entry) => entry.chart?.id), [
+    "zeta-easy",
+    "alpha-only",
+  ]);
+});
+
+test("combines key filters with text search and excludes non-mania charts", async () => {
+  const selector = await loadedSelector();
+  selector.setSortMode("difficulty");
+
+  selector.setQuery("Zeta key=4");
+  assert.deepEqual(selector.getSelectionEntries().map((entry) => entry.chart?.id), ["zeta-easy"]);
+
+  selector.setQuery("key=4 Chart alpha-osu");
+  assert.deepEqual(selector.getSelectionEntries(), []);
+});
+
+test("supports numeric comparison operators and native aliases", async () => {
+  const selector = await loadedSelector();
+  selector.setSortMode("difficulty");
+
+  const cases: [string, string[]][] = [
+    ["difficulty>3", ["alpha-only", "zeta-hard"]],
+    ["diff<=3", ["zeta-easy", "alpha-osu"]],
+    ["d!=4", ["zeta-easy", "alpha-osu", "zeta-hard"]],
+    ["d~=2", ["alpha-osu", "alpha-only", "zeta-hard"]],
+    ["length<2m", ["alpha-osu", "alpha-only"]],
+    ["dur>=120", ["zeta-easy", "zeta-hard"]],
+    ["keys>4", ["zeta-hard"]],
+    ["key!=4", ["zeta-hard"]],
+  ];
+  for (const [query, expected] of cases) {
+    selector.setQuery(query);
+    assert.deepEqual(selector.getSelectionEntries().map((entry) => entry.chart?.id), expected, query);
+  }
+});
+
+test("ANDs filters and separate text terms", async () => {
+  const selector = await loadedSelector();
+  selector.setSortMode("difficulty");
+
+  selector.setQuery("zeta hard d>=7 duration<=2m keys=7");
+  assert.deepEqual(selector.getSelectionEntries().map((entry) => entry.chart?.id), ["zeta-hard"]);
+
+  selector.setQuery("zeta alpha");
+  assert.deepEqual(selector.getSelectionEntries().map((entry) => entry.chart?.id), ["zeta-easy", "zeta-hard"]);
+});
+
+test("ignores unknown and invalid filter expressions like native search", async () => {
+  const selector = await loadedSelector();
+  selector.setQuery("unknown=5 difficulty=hard length=1.5m");
+  assert.deepEqual(selector.getFilteredSongs().map((song) => song.id), ["zeta", "alpha"]);
 });

@@ -23,6 +23,36 @@ export interface ChartSelectorSnapshot {
 
 type Listener = () => void;
 
+type NumericFilter = {
+  field: "difficulty" | "duration" | "keys";
+  operator: "=" | "!=" | "<" | ">" | "<=" | ">=";
+  value: number;
+};
+
+const numeric_filter_fields: Record<string, NumericFilter["field"]> = {
+  d: "difficulty",
+  diff: "difficulty",
+  difficulty: "difficulty",
+  dur: "duration",
+  duration: "duration",
+  l: "duration",
+  len: "duration",
+  length: "duration",
+  key: "keys",
+  keys: "keys",
+};
+
+function matchesNumericFilter(value: number, filter: NumericFilter): boolean {
+  switch (filter.operator) {
+    case "=": return value === filter.value;
+    case "!=": return value !== filter.value;
+    case "<": return value < filter.value;
+    case ">": return value > filter.value;
+    case "<=": return value <= filter.value;
+    case ">=": return value >= filter.value;
+  }
+}
+
 export class ChartSelector {
   private readonly library: Library;
   private readonly listeners = new Set<Listener>();
@@ -124,9 +154,39 @@ export class ChartSelector {
 
   getFilteredSongs(): ChartfileSetView[] {
     const songs = this.getSongs();
-    const query = this.snapshot.query.trim().toLocaleLowerCase();
-    if (!query) return songs;
-    return songs.filter((song) => `${song.title}\n${song.artist}\n${song.charts.map((chart) => `${chart.name} ${chart.creator}`).join("\n")}`.toLocaleLowerCase().includes(query));
+    const filters: NumericFilter[] = [];
+    const terms: string[] = [];
+    for (const token of this.snapshot.query.trim().split(/\s+/)) {
+      if (!token) continue;
+      const expression = token.match(/^(.+?)(~=|!=|>=|<=|=|>|<)(.+)$/);
+      if (!expression) {
+        terms.push(token.toLocaleLowerCase());
+        continue;
+      }
+
+      const [, raw_field, raw_operator, raw_value] = expression;
+      const field = numeric_filter_fields[raw_field.toLocaleLowerCase()];
+      if (!field) continue;
+      const duration_minutes = field === "duration" ? raw_value.match(/^(\d+)m$/) : null;
+      const value = duration_minutes ? Number(duration_minutes[1]) * 60 : Number(raw_value);
+      if (!Number.isFinite(value)) continue;
+      filters.push({ field, operator: raw_operator === "~=" ? "!=" : raw_operator as NumericFilter["operator"], value });
+    }
+    if (!terms.length && !filters.length) return songs;
+
+    return songs.flatMap((song) => {
+      const song_text = `${song.title}\n${song.artist}`.toLocaleLowerCase();
+      const charts = song.charts.filter((chart) => {
+        const matches_filters = filters.every((filter) => {
+          if (filter.field === "keys") return chart.mode === 3 && chart.keys !== null && matchesNumericFilter(chart.keys, filter);
+          return matchesNumericFilter(filter.field === "duration" ? chart.duration_seconds : chart.difficulty, filter);
+        });
+        const chart_text = `${chart.name}\n${chart.creator}`.toLocaleLowerCase();
+        return matches_filters && terms.every((term) => song_text.includes(term) || chart_text.includes(term));
+      });
+      if (!charts.length) return [];
+      return [{ ...song, charts }];
+    });
   }
 
   getSelectionEntries(): ChartSelectionEntry[] {
