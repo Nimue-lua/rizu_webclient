@@ -2,7 +2,8 @@ import type { OsuGameplayData } from "../../library/GameplayLoader";
 import type { OsuReplayBaseValues } from "../../replay/osu/OsuReplayBase";
 import { AudioGameplayClock } from "../AudioGameplayClock";
 import type { GameplaySession, OsuPointerInput } from "../GameplaySession";
-import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange } from "../GameplayTiming";
+import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange,
+  getIntroSkipTime } from "../GameplayTiming";
 import { HudStateDeriver } from "../HudState";
 import type { OsuAction, OsuCursorState, OsuInputEvent } from "./OsuInputEvent";
 import { OsuRulesEngine } from "./OsuRulesEngine";
@@ -66,6 +67,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private replay_aim_index = 0;
   private readonly replay_aim_events: Array<{ time: number; x: number; y: number }>;
   private readonly progress_range;
+  private readonly intro_skip_time: number | null;
+  private readonly music_offset_time: number;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
@@ -76,8 +79,10 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     private readonly playback_replay?: OsuRecordedReplay) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
+    this.music_offset_time = music_offset / 1000 * this.music_rate;
     this.replay_base = replay_base;
     this.progress_range = getGameplayProgressRange(data, this.music_rate);
+    this.intro_skip_time = getIntroSkipTime(data, this.music_rate);
     this.replay_aim_events = (playback_replay?.input_events ?? []).flatMap((event) => event.type === "aim"
       ? [{ time: replayValue(event.time), x: replayValue(event.x), y: replayValue(event.y) }]
       : []);
@@ -187,6 +192,10 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       this.finishGameplay(this.chart.hit_objects.length > 0 && song_time >= this.chart.end_time);
       return;
     }
+    if (event.code === "Space" && this.skipIntro(event.timeStamp)) {
+      event.preventDefault();
+      return;
+    }
     if (this.playback_replay) return;
     const action = this.key_actions.get(event.code);
     if (action === undefined) return;
@@ -195,6 +204,13 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     this.pressed_keys.add(event.code);
     this.changeAction(action, true, event.timeStamp);
   };
+
+  private skipIntro(performance_time: number): boolean {
+    if (this.intro_skip_time === null || this.clock.timeAt(performance_time).corrected >= this.intro_skip_time) return false;
+    this.playback.seek(this.intro_skip_time - this.music_offset_time);
+    this.clock.seek(this.intro_skip_time);
+    return true;
+  }
 
   private readonly handleKeyUp = (event: KeyboardEvent) => {
     const action = this.key_actions.get(event.code);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getGameplayProgress, getGameplayProgressRange } from "../src/gameplay/GameplayTiming";
+import { getGameplayProgress, getGameplayProgressRange, getIntroSkipTime } from "../src/gameplay/GameplayTiming";
 import type { GameplayData } from "../src/library/GameplayLoader";
 
 test("uses negative progress for the intro and positive progress through gameplay", () => {
@@ -22,4 +22,14 @@ test("uses negative progress for the intro and positive progress through gamepla
   assert.equal(getGameplayProgress(2, range), 0);
   assert.equal(getGameplayProgress(4.5, range), 0.5);
   assert.equal(getGameplayProgress(7, range), 1);
+});
+
+test("skips to one real second before the first playable note", () => {
+  const data = {
+    mode: "mania",
+    chart: { mode: "mania", notes: [{ column: 0, absolute_time: 10, weight: 0 }] },
+  } as GameplayData;
+
+  assert.equal(getIntroSkipTime(data, 1), 9);
+  assert.equal(getIntroSkipTime(data, 2), 8);
 });

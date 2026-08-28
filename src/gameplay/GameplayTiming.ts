@@ -2,6 +2,7 @@ import type { GameplayData } from "../library/GameplayLoader";
 
 const AUDIO_SCHEDULE_MARGIN = 0.1;
 const FIRST_NOTE_LEAD_IN = 1.2;
+const INTRO_SKIP_LEAD_IN = 1;
 const RESULT_DELAY = 1.2;
 
 export interface GameplayProgressRange {
@@ -20,6 +21,11 @@ export function getAudioStartDelay(data: GameplayData, music_rate: number): numb
   const first_note_time = firstPlayableTime(data);
   if (!Number.isFinite(first_note_time)) return AUDIO_SCHEDULE_MARGIN;
   return Math.max(AUDIO_SCHEDULE_MARGIN, FIRST_NOTE_LEAD_IN - first_note_time / music_rate);
+}
+
+export function getIntroSkipTime(data: GameplayData, music_rate: number): number | null {
+  const first_note_time = firstPlayableTime(data);
+  return Number.isFinite(first_note_time) ? first_note_time - INTRO_SKIP_LEAD_IN * music_rate : null;
 }
 
 export function getGameplayProgressRange(data: GameplayData, music_rate: number): GameplayProgressRange | null {

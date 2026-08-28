@@ -55,7 +55,9 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
   let destroy_calls = 0;
   const cursor_renderers: string[] = [];
   const gain = { gain: { value: 1 }, connect() {}, disconnect() {} };
-  const source = { buffer: null, playbackRate: { value: 1 }, connect() {}, start() {}, stop() {}, disconnect() {} };
+  const source_offsets: number[] = [];
+  const source = { buffer: null, playbackRate: { value: 1 }, connect() {},
+    start(_time: number, offset = 0) { source_offsets.push(offset); }, stop() {}, disconnect() {} };
   const audio_context = {
     currentTime: 10,
     destination: {},
@@ -94,7 +96,7 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
       reached_chart_end.push(reached_end);
       results.push(completed.score);
     }, dependencies, runtime_playback);
-  return { runtime, events, frames, cursor_states, cursor_renderers, results, completions, reached_chart_end,
+  return { runtime, events, frames, cursor_states, cursor_renderers, source_offsets, results, completions, reached_chart_end,
     get destroy_calls() { return destroy_calls; } };
 }
 
@@ -111,6 +113,21 @@ test("records aim and actions at corrected event time between render frames", ()
   assert.ok(Math.abs(harness.runtime.input_events[0]!.time - 0.15) < 1e-12);
   assert.ok(Math.abs(harness.runtime.input_events[1]!.time - 0.16) < 1e-12);
   assert.deepEqual(harness.runtime.cursor_state, { position: { x: 100, y: 200 }, primary: true, secondary: false });
+});
+
+test("Space skips the osu intro to one second before the first object", () => {
+  const object = { kind: "circle", x: 256, y: 192, absolute_time: 10, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } } as const;
+  const harness = createHarness(undefined, false, [object]);
+  let prevented = false;
+  harness.runtime.start();
+
+  harness.events.dispatch("keydown", {
+    code: "Space", timeStamp: 1000, repeat: false, preventDefault: () => { prevented = true; },
+  } as KeyboardEvent);
+
+  assert.equal(prevented, true);
+  assert.deepEqual(harness.source_offsets, [0, 9]);
 });
 
 test("samples only the latest osu aim position at up to 60 FPS", () => {

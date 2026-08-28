@@ -107,6 +107,7 @@ class FakeSource {
   buffer: AudioBuffer | null = null;
   readonly playbackRate = { value: 1 };
   start_time: number | null = null;
+  start_offset: number | null = null;
   stop_calls = 0;
   disconnect_calls = 0;
 
@@ -114,8 +115,9 @@ class FakeSource {
     return gain;
   }
 
-  start(time: number): void {
+  start(time: number, offset = 0): void {
     this.start_time = time;
+    this.start_offset = offset;
   }
 
   stop(): void {
@@ -324,6 +326,19 @@ test("prevents browser shortcuts for repeated gameplay keys", () => {
   } as unknown as KeyboardEvent);
 
   assert.equal(prevented, true);
+});
+
+test("Space skips the mania intro to one second before the first note", () => {
+  const harness = createRuntime([{ column: 1, absolute_time: 10, weight: 0 }]);
+  let prevented = false;
+  harness.runtime.start();
+
+  harness.events.dispatch("keydown", {
+    code: "Space", timeStamp: 1000, repeat: false, preventDefault: () => { prevented = true; },
+  } as KeyboardEvent);
+
+  assert.equal(prevented, true);
+  assert.equal(harness.source.start_offset, 9);
 });
 
 test("Escape releases held input, misses the remaining chart, and finishes once", () => {

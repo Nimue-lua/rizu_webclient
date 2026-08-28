@@ -4,7 +4,8 @@ import type { GameplaySession, ManiaPointerInput } from "../GameplaySession";
 import { ManiaRenderer as WebGlManiaRenderer } from "./rendering/ManiaRenderer";
 import { HudStateDeriver, type GameplayPresentationState } from "../HudState";
 import type { ManiaReplayBase } from "../../replay/mania/ManiaReplayBase";
-import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange } from "../GameplayTiming";
+import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange,
+  getIntroSkipTime } from "../GameplayTiming";
 import { AudioGameplayClock } from "../AudioGameplayClock";
 import { WebAudioPlayback } from "../audio/WebAudioPlayback";
 import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInputEvent,
@@ -61,6 +62,8 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly last_note_time: number;
   private replay_event_index = 0;
   private readonly progress_range;
+  private readonly intro_skip_time: number | null;
+  private readonly music_offset_time: number;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
     scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
@@ -70,9 +73,11 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
+    this.music_offset_time = music_offset / 1000 * this.music_rate;
     this.replay_base = replay_base;
     this.gameplay_end_time = getGameplayEndTime(data, this.music_rate);
     this.progress_range = getGameplayProgressRange(data, this.music_rate);
+    this.intro_skip_time = getIntroSkipTime(data, this.music_rate);
     this.last_note_time = data.chart.notes.reduce((last, note) => Math.max(last, note.absolute_time), -Infinity);
     this.finish = finish;
     this.dependencies = dependencies;
@@ -151,6 +156,10 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
       this.abortGameplay(this.clock.timeAt(event.timeStamp).corrected);
       return;
     }
+    if (event.code === "Space" && this.skipIntro(event.timeStamp)) {
+      event.preventDefault();
+      return;
+    }
     if (this.playback_replay) return;
     const column = this.key_columns.get(event.code);
     if (column === undefined) return;
@@ -164,6 +173,13 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.recordInput(column, true, time, note_index, previous_logic_event_count);
     if (note_index !== undefined) this.key_catches.set(event.code, note_index);
   };
+
+  private skipIntro(performance_time: number): boolean {
+    if (this.intro_skip_time === null || this.clock.timeAt(performance_time).corrected >= this.intro_skip_time) return false;
+    this.playback.seek(this.intro_skip_time - this.music_offset_time);
+    this.clock.seek(this.intro_skip_time);
+    return true;
+  }
 
   private readonly handleKeyUp = (event: KeyboardEvent) => {
     const column = this.key_columns.get(event.code);
