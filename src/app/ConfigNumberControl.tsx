@@ -1,6 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import type { NumberDefinition } from "../config/Config";
 import { ConfigResetButton } from "./ConfigResetButton";
+import { RangeInput } from "./RangeInput";
 
 interface ConfigNumberControlProps {
   readonly definition: NumberDefinition;
@@ -22,8 +23,8 @@ export function ConfigNumberControl({ definition, label, value, output = value, 
         {onReset && <ConfigResetButton label={`Reset ${label} to default`} onReset={onReset} />}
         <label htmlFor={input_id}>{label}&nbsp;&nbsp;<output>{output}</output></label>
       </div>
-      <input id={input_id} type="range" min={definition.min} max={definition.max} step={definition.step} value={value}
-        style={style} onChange={(event) => onChange(Number(event.target.value))} />
+      <RangeInput id={input_id} min={definition.min} max={definition.max} step={definition.step} value={value}
+        style={style} onValueChange={onChange} />
     </div>
   );
 }

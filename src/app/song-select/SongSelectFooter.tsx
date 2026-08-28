@@ -1,4 +1,5 @@
 import { useRef, type CSSProperties } from "react";
+import { useHoverRangeKeys } from "../RangeInput";
 import { SongSelectIcon } from "./SongSelectUi";
 
 interface SongSelectFooterProps {
@@ -22,11 +23,12 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
     "--rate-angle": `${speed_progress * 270}deg`,
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
+  const hover_key_handlers = useHoverRangeKeys(music_rate, 0.25, 4, 0.05, onMusicRateChange);
 
   const moveRateDrag = (client_x: number) => {
     const drag = rate_drag_ref.current;
     if (!drag) return;
-    const value = drag.start_rate + (client_x - drag.start_x) / 360 * 3.75;
+    const value = drag.start_rate + (client_x - drag.start_x) / 1440 * 3.75;
     onMusicRateChange(Math.min(4, Math.max(0.25, Math.round(value / 0.05) * 0.05)));
   };
 
@@ -45,7 +47,7 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
             event.preventDefault();
             const offset = event.deltaY < 0 ? 0.05 : -0.05;
             onMusicRateChange(Math.min(4, Math.max(0.25, Math.round((music_rate + offset) * 100) / 100)));
-          }}><span /><input id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); rate_drag_ref.current = { pointer_id: event.pointerId, start_x: event.clientX, start_rate: music_rate }; }} onPointerMove={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) moveRateDrag(event.clientX); }} onPointerUp={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} onPointerCancel={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} /></span>
+          }}><span /><input {...hover_key_handlers} id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); rate_drag_ref.current = { pointer_id: event.pointerId, start_x: event.clientX, start_rate: music_rate }; }} onPointerMove={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) moveRateDrag(event.clientX); }} onPointerUp={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} onPointerCancel={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} /></span>
         </label></div>
         <button className="autoplay-control" disabled={!selected_chart_available} onClick={onAutoplay}><span>AUTO</span><SongSelectIcon name="play" /></button>
         <button className="play-control" disabled={!selected_chart_available} onClick={onPlay}><span>PLAY</span><SongSelectIcon name="play" /></button>
