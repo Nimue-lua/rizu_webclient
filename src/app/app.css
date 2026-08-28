@@ -541,7 +541,7 @@ html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-i
 .library-source-row b.checking { color: var(--accent); }
 .library-source-add-local, .library-source-remote-form button { display: flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; min-width: 150px; height: 40px; padding: 0 16px; color: var(--text); background: var(--blue); border-radius: 5px; font-size: 11px; font-weight: 800; letter-spacing: .05em; }
 .library-source-add-local svg { width: 17px; }
-.library-source-remote-form { display: grid; grid-template-columns: minmax(180px, 280px) minmax(180px, 280px) auto; gap: 8px; }
+.library-source-remote-form { display: grid; grid-template-columns: minmax(220px, 340px) auto; gap: 8px; }
 .library-source-remote-form input { min-width: 0; height: 40px; padding: 0 12px; background: var(--panel); border: 1px solid var(--outline); border-radius: 5px; user-select: text; }
 .library-source-error { margin: -12px 0 0; padding: 11px 14px; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 5px; }
 .library-source-note { margin: -10px 0 0; color: var(--muted); font-size: 11px; }

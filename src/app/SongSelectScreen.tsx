@@ -56,7 +56,7 @@ interface SongSelectScreenProps {
   onNoteSkinDelete: (skin_id: string) => Promise<void>;
   onNoteSkinEdit: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onAddLocalLibrary: () => Promise<void>;
-  onAddRemoteLibrary: (url: string, description?: string) => Promise<void>;
+  onAddRemoteLibrary: (url: string) => Promise<void>;
   onRefreshLibrary: () => void;
   local_library_status: LocalLibraryStatus;
   remote_providers: readonly RemoteProviderView[];

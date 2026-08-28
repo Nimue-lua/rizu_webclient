@@ -7,13 +7,12 @@ interface LibrarySourcesScreenProps {
   local_status: LocalLibraryStatus;
   remote_providers: readonly RemoteProviderView[];
   onAddLocal: () => Promise<void>;
-  onAddRemote: (url: string, description?: string) => Promise<void>;
+  onAddRemote: (url: string) => Promise<void>;
   onExit: () => void;
 }
 
 export function LibrarySourcesScreen({ local_status, remote_providers, onAddLocal, onAddRemote, onExit }: LibrarySourcesScreenProps) {
   const [url, setUrl] = useState("");
-  const [description, setDescription] = useState("");
   const [adding_local, setAddingLocal] = useState(false);
   const [adding_remote, setAddingRemote] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +30,8 @@ export function LibrarySourcesScreen({ local_status, remote_providers, onAddLoca
     setAddingRemote(true);
     setError(null);
     try {
-      await onAddRemote(url, description);
+      await onAddRemote(url);
       setUrl("");
-      setDescription("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not add remote provider");
     } finally {
@@ -70,8 +68,6 @@ export function LibrarySourcesScreen({ local_status, remote_providers, onAddLoca
             <form className="library-source-remote-form" onSubmit={(event) => { event.preventDefault(); void addRemote(); }}>
               <input autoFocus type="text" value={url} onChange={(event) => setUrl(event.target.value)}
                 placeholder="s3.kuudere.fun" aria-label="Remote chart provider URL" />
-              <input type="text" value={description} onChange={(event) => setDescription(event.target.value)}
-                placeholder="Description (optional)" aria-label="Remote chart provider description" />
               <button type="submit" disabled={adding_remote || !url.trim()}>{adding_remote ? "CHECKING..." : "ADD REMOTE"}</button>
             </form>
           </div>

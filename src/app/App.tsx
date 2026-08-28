@@ -365,7 +365,7 @@ export function App() {
               }
               await local_library.addSource(await picker());
             }}
-            onAddRemoteLibrary={(url, description) => remote_libraries.add(url, description)}
+            onAddRemoteLibrary={(url) => remote_libraries.add(url)}
             onRefreshLibrary={() => {
               const abort_controller = new AbortController();
               void chart_selector.load(abort_controller.signal, true);
