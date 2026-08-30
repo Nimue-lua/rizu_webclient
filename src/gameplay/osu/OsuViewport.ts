@@ -3,7 +3,7 @@ export const OSU_STAGE_HEIGHT = 480;
 export const OSU_PLAYFIELD_WIDTH = 512;
 export const OSU_PLAYFIELD_HEIGHT = 384;
 export const OSU_PLAYFIELD_LEFT = 64;
-export const OSU_PLAYFIELD_TOP = 48;
+export const OSU_PLAYFIELD_TOP = 56;
 
 export interface Point {
   readonly x: number;

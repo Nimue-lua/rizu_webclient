@@ -3,7 +3,7 @@ import test from "node:test";
 import { osuApproachPreempt, osuCircleDiameter } from "../src/gameplay/osu/OsuCircleGeometry";
 import { OsuPlayfieldRenderer, stableShakeOffset } from "../src/gameplay/osu/rendering/OsuPlayfieldRenderer";
 import type { OsuStandardSkin } from "../src/noteskin/osu/OsuSkin";
-import { OsuViewport } from "../src/gameplay/osu/OsuViewport";
+import { OSU_PLAYFIELD_TOP, OsuViewport } from "../src/gameplay/osu/OsuViewport";
 import { OsuCircleState } from "../src/gameplay/osu/OsuCircleState";
 import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
 import type { OsuSlider } from "../src/chart/Chart";
@@ -338,7 +338,7 @@ test("animates the slider ball along repeat-aware path progress", () => {
     (...quad) => quads.push(quad), () => path, () => undefined);
   const ball = quads.at(-1)!;
   assert.equal(ball[0], 64 + 150 - 5);
-  assert.equal(ball[1], 48 + 100 - 5);
+  assert.equal(ball[1], OSU_PLAYFIELD_TOP + 100 - 5);
   assert.equal(ball[5], ball0);
 });
 
@@ -601,7 +601,7 @@ test("fits layered spinner artwork inside the osu playfield", () => {
 
   assert.ok(Math.abs(quads[0]![2] - 384) < 1e-9);
   assert.ok(Math.abs(quads[0]![3] - 384) < 1e-9);
-  assert.ok(Math.abs(quads[0]![1] - 48) < 1e-9);
+  assert.ok(Math.abs(quads[0]![1] - OSU_PLAYFIELD_TOP) < 1e-9);
   assert.ok(Math.abs(quads[1]![2] - 384) < 1e-9);
 });
 
