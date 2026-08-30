@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react";
 import { flushSync } from "react-dom";
 import { HttpGameplayLoader, type GameplayData, type GameplayLocation } from "../library/GameplayLoader";
 import { CombinedLibrary } from "../library/Library";
@@ -34,7 +34,8 @@ import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 import { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
 
 type Screen = "welcome" | "catalog-loading" | "song-select" | "loading" | "gameplay" | "result";
-type ScreenTransitionKind = "song-loading" | "loading-gameplay";
+type ViewTransitionKind = "screen" | "song-loading" | "loading-gameplay";
+type PendingViewTransition = { screen: Screen; kind: ViewTransitionKind; updateState?: () => void };
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
 const remote_libraries = new RemoteLibraryStore();
@@ -44,8 +45,8 @@ interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
 }
 
-function ScreenTransition({ children, dedicated = false }: PropsWithChildren<{ dedicated?: boolean }>) {
-  return <div className={`screen-transition${dedicated ? " dedicated-transition" : ""}`}>{children}</div>;
+function ScreenContainer({ children }: PropsWithChildren) {
+  return <div className="screen-container">{children}</div>;
 }
 
 export function App() {
@@ -66,6 +67,8 @@ export function App() {
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const [preview_player] = useState(() => new SongPreviewPlayer());
+  const active_view_transition = useRef<ViewTransition | null>(null);
+  const pending_view_transition = useRef<PendingViewTransition | null>(null);
   const local_library_status = useSyncExternalStore(local_library.subscribe, local_library.getStatus);
   const remote_providers = useSyncExternalStore(remote_libraries.subscribe, remote_libraries.getSnapshot);
   const note_skin_catalog = useRef(new NoteSkinCatalog());
@@ -82,23 +85,49 @@ export function App() {
   const music_rate = useSetting(settings.music_rate);
   const constant_scroll = useSetting(settings.constant_scroll);
   const tap_only = useSetting(settings.tap_only);
-  const replay_base = new ManiaReplayBase();
-  replay_base.rate = music_rate;
-  replay_base.const = constant_scroll;
-  replay_base.tap_only = tap_only;
+  const replay_base = useMemo(() => {
+    const base = new ManiaReplayBase();
+    base.rate = music_rate;
+    base.const = constant_scroll;
+    base.tap_only = tap_only;
+    return base;
+  }, [constant_scroll, music_rate, tap_only]);
 
-  const transitionTo = (next_screen: Screen, kind: ScreenTransitionKind) => {
-    if (!document.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const transitionTo = (next_screen: Screen, kind: ViewTransitionKind = "screen", updateState?: () => void) => {
+    const update = () => {
+      updateState?.();
       setScreen(next_screen);
+    };
+
+    if (!document.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      update();
       return;
     }
 
-    document.documentElement.dataset.screenTransition = kind;
+    const active_transition = active_view_transition.current;
+    if (active_transition) {
+      pending_view_transition.current = { screen: next_screen, kind, updateState };
+      active_transition.skipTransition();
+      return;
+    }
+
+    document.documentElement.dataset.viewTransition = kind;
     const transition = document.startViewTransition(() => {
-      flushSync(() => setScreen(next_screen));
+      flushSync(update);
     });
+    active_view_transition.current = transition;
     void transition.finished.catch(() => undefined).finally(() => {
-      delete document.documentElement.dataset.screenTransition;
+      if (active_view_transition.current === transition) {
+        active_view_transition.current = null;
+        delete document.documentElement.dataset.viewTransition;
+        const pending = pending_view_transition.current;
+        pending_view_transition.current = null;
+        if (pending) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => transitionTo(pending.screen, pending.kind, pending.updateState));
+          });
+        }
+      }
     });
   };
 
@@ -197,17 +226,17 @@ export function App() {
       void audio_context.close();
     }
 
-    setAudioContext(null);
-    setLoadingLocation(null);
-    setNoteSkinEditor(false);
     local_library.resume();
-    setScreen("song-select");
+    transitionTo("song-select", "screen", () => {
+      setAudioContext(null);
+      setLoadingLocation(null);
+      setNoteSkinEditor(false);
+    });
   };
 
   const finishLoading = (loaded_assets: GameplayData) => {
     preview_player.stop();
-    setAssets(loaded_assets);
-    transitionTo("gameplay", "loading-gameplay");
+    transitionTo("gameplay", "loading-gameplay", () => setAssets(loaded_assets));
   };
 
   const leaveResults = () => {
@@ -215,39 +244,40 @@ export function App() {
       void audio_context.close();
     }
 
-    if (assets) destroyNoteSkin(assets.note_skin);
-    setAssets(null);
-    setScore(null);
-    setCompletedGameplay(null);
-    setPlayback(null);
-    setAutoplay(false);
-    setNoteSkinEditor(false);
-    setAudioContext(null);
-    setLoadingLocation(null);
     local_library.resume();
-    setScreen("song-select");
+    transitionTo("song-select", "screen", () => {
+      if (assets) destroyNoteSkin(assets.note_skin);
+      setAssets(null);
+      setScore(null);
+      setCompletedGameplay(null);
+      setPlayback(null);
+      setAutoplay(false);
+      setNoteSkinEditor(false);
+      setAudioContext(null);
+      setLoadingLocation(null);
+    });
   };
 
   switch (screen) {
     case "welcome":
       return (
-        <ScreenTransition key="welcome">
+        <ScreenContainer key="welcome">
           <WelcomeScreen
             onPlay={() => {
-              setScreen("catalog-loading");
+              transitionTo("catalog-loading");
             }}
           />
-        </ScreenTransition>
+        </ScreenContainer>
       );
     case "catalog-loading":
       return (
-        <ScreenTransition key="catalog-loading">
+        <ScreenContainer key="catalog-loading">
           <CatalogLoadingScreen
             chart_selector={chart_selector}
             local_library={local_library}
-            onLoaded={() => setScreen("song-select")}
+            onLoaded={() => transitionTo("song-select")}
           />
-        </ScreenTransition>
+        </ScreenContainer>
       );
     case "gameplay":
       if (!assets) {
@@ -255,7 +285,7 @@ export function App() {
       }
 
       return (
-        <ScreenTransition dedicated key="gameplay">
+        <ScreenContainer key="gameplay">
           <GameplayScreen
             assets={assets}
             master_volume={master_volume}
@@ -275,8 +305,7 @@ export function App() {
             initial_lead_in={1.15}
             onFinish={(completed, reached_chart_end) => {
               if (playback) {
-                setPlayback(null);
-                setScreen("result");
+                transitionTo("result", "screen", () => setPlayback(null));
                 return;
               }
               if (autoplay) {
@@ -291,9 +320,10 @@ export function App() {
                 leaveResults();
                 return;
               }
-              setCompletedGameplay(completed);
-              setScore(completed.score);
-              setScreen("result");
+              transitionTo("result", "screen", () => {
+                setCompletedGameplay(completed);
+                setScore(completed.score);
+              });
               const play = storedPlay(assets.chart_id, completed);
               void savePlay(play).catch((error: unknown) => {
                 console.error("Could not save gameplay replay", error);
@@ -303,7 +333,7 @@ export function App() {
               });
             }}
           />
-        </ScreenTransition>
+        </ScreenContainer>
       );
     case "loading":
       if (!audio_context || !loading_location) {
@@ -311,7 +341,7 @@ export function App() {
       }
 
       return (
-        <ScreenTransition dedicated key="loading">
+        <ScreenContainer key="loading">
           <LoadingScreen
             gameplay_loader={gameplay_loader}
             location={loading_location}
@@ -319,11 +349,11 @@ export function App() {
             onCancel={cancelLoading}
             onLoaded={finishLoading}
           />
-        </ScreenTransition>
+        </ScreenContainer>
       );
     case "result":
       return (
-        <ScreenTransition key="result">
+        <ScreenContainer key="result">
           <ResultScreen
             score={score}
             background_url={loading_location?.background_url ?? null}
@@ -339,16 +369,15 @@ export function App() {
             mode={assets?.mode ?? "mania"}
             onReplay={() => {
               if (!completed_gameplay) return;
-              setPlayback(completed_gameplay);
-              setScreen("gameplay");
+              transitionTo("gameplay", "screen", () => setPlayback(completed_gameplay));
             }}
             onExit={() => leaveResults()}
           />
-        </ScreenTransition>
+        </ScreenContainer>
       );
     case "song-select":
       return (
-        <ScreenTransition key="song-select">
+        <ScreenContainer key="song-select">
           <SongSelectScreen
             chart_selector={chart_selector}
             preview_player={preview_player}
@@ -395,7 +424,7 @@ export function App() {
               onExit={() => setSettingsOpen(false)}
             />
           )}
-        </ScreenTransition>
+        </ScreenContainer>
       );
   }
 }

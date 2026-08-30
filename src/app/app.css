@@ -40,26 +40,24 @@ button:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .55; }
 svg { width: 22px; height: 22px; }
 
 .screen { display: grid; min-height: 100vh; place-items: center; }
-.screen-transition {
+.screen-container {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  transform-origin: center;
-  animation: screen-in 400ms cubic-bezier(.2, .75, .25, 1) both;
-}
-.screen-transition.dedicated-transition { animation: none; }
-
-@keyframes screen-in {
-  from { transform: scale(1.02); opacity: 0; }
 }
 
-html[data-screen-transition] .screen-transition { animation: none; }
-html[data-screen-transition]::view-transition-old(root),
-html[data-screen-transition]::view-transition-new(root) { animation-duration: inherit; animation-fill-mode: both; }
-html[data-screen-transition="song-loading"]::view-transition-old(root) { z-index: 1; animation: none; }
-html[data-screen-transition="song-loading"]::view-transition-new(root) { z-index: 2; animation: loading-circle-reveal 850ms cubic-bezier(.62, 0, .2, 1) both; }
-html[data-screen-transition="loading-gameplay"]::view-transition-old(root) { z-index: 2; animation: loading-screen-depart 1150ms cubic-bezier(.45, 0, .25, 1) both; }
-html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-index: 1; animation: none; }
+html[data-view-transition]::view-transition-old(root),
+html[data-view-transition]::view-transition-new(root) { animation-duration: inherit; animation-fill-mode: both; }
+html[data-view-transition="screen"]::view-transition-old(root) { animation: none; opacity: 0; }
+html[data-view-transition="screen"]::view-transition-new(root) { animation: screen-view-in 250ms cubic-bezier(.2, .75, .25, 1) both; }
+html[data-view-transition="song-loading"]::view-transition-old(root) { z-index: 1; animation: none; }
+html[data-view-transition="song-loading"]::view-transition-new(root) { z-index: 2; animation: loading-circle-reveal 850ms cubic-bezier(.62, 0, .2, 1) both; }
+html[data-view-transition="loading-gameplay"]::view-transition-old(root) { z-index: 2; animation: loading-screen-depart 1150ms cubic-bezier(.45, 0, .25, 1) both; }
+html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-index: 1; animation: none; }
+
+@keyframes screen-view-in {
+  from { transform: scale(1.01); opacity: 0; }
+}
 
 @keyframes loading-circle-reveal {
   from { clip-path: circle(0 at 50% 50%); }
@@ -304,7 +302,6 @@ html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-i
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen-transition { animation: none; }
   .loading-background, .loading-artwork, .loading-chart, .loading-heading { animation: none; }
   .song-hero-background { transform: none; transition: none; }
   .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { transform: none; }
