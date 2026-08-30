@@ -1,4 +1,4 @@
-import type { Chart, ManiaNoteEvent, OsuHitObject, OsuHitSample, OsuSliderCurveType,
+import type { BreakPeriod, Chart, ManiaNoteEvent, OsuHitObject, OsuHitSample, OsuSliderCurveType,
   OsuTimingPoint } from "../../Chart";
 import { createVisualPoints, type TimingChange } from "../../VisualTimeline";
 
@@ -21,11 +21,6 @@ interface RawHitObject {
   end_time?: number;
   fields: readonly string[];
   source_index: number;
-}
-
-interface BreakPeriod {
-  start_time: number;
-  end_time: number;
 }
 
 function sortTimingPoints(points: RawTimingPoint[]): void {
@@ -439,6 +434,7 @@ export function parseOsuChart(source: string): Chart {
       combo_colors: normalized_combo_colors,
       timing_points: normalizeOsuTimingPoints(timing_points, sample_set),
       hit_objects: standard_hit_objects,
+      ...(breaks.length > 0 ? { break_periods: breaks } : {}),
     };
   }
   const key_count = Math.floor(circle_size);
@@ -463,5 +459,6 @@ export function parseOsuChart(source: string): Chart {
     primary_tempo,
     notes,
     visual_points: createVisualPoints(timing_changes, primary_tempo),
+    ...(breaks.length > 0 ? { break_periods: breaks } : {}),
   };
 }

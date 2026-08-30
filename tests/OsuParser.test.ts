@@ -368,6 +368,7 @@ OverallDifficulty:6
     assert.equal(chart.hp_drain_rate, 7);
     assert.equal(chart.object_count, 2);
     assert.equal(chart.drain_length_seconds, 7);
+    assert.deepEqual(chart.break_periods, [{ start_time: 3, end_time: 5 }]);
   }
 });
 

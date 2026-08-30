@@ -7,7 +7,7 @@ import { normalizeOsuOd } from "./mania/timing/OsuManiaV2Timings";
 import type { ManiaHitRegistration } from "./mania/ManiaRulesEngine";
 import { ManiaGameplayRuntime } from "./mania/ManiaGameplayRuntime";
 import { OsuGameplayRuntime } from "./osu/OsuGameplayRuntime";
-import type { GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPointerInput } from "./GameplaySession";
+import type { GameplayBackgroundState, GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPointerInput } from "./GameplaySession";
 import type { CompletedGameplay, ManiaRecordedReplay, OsuRecordedReplay } from "../replay/RecordedReplay";
 import type { OsuSliderRendererMode } from "./osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "./osu/OsuHardwareCursor";
@@ -31,6 +31,7 @@ export interface GameplaySessionOptions {
   autoplay?: boolean;
   playback?: CompletedGameplay;
   finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
+  background_state_change?: (state: GameplayBackgroundState) => void;
 }
 
 export interface GameplaySessionFactoryDependencies {
@@ -44,10 +45,12 @@ export interface GameplaySessionFactoryDependencies {
 const default_dependencies: GameplaySessionFactoryDependencies = {
   create_mania: (options) => new ManiaGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.music_offset, options.scroll_speed, options.replay_base, options.input_bindings,
-    options.hit_registration, options.finish, undefined, options.playback_replay, options.initial_lead_in),
+    options.hit_registration, options.finish, undefined, options.playback_replay, options.initial_lead_in,
+    options.background_state_change),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.osu_cursor_renderer, options.replay_base,
-    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay, options.initial_lead_in),
+    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay, options.initial_lead_in,
+    options.background_state_change),
 };
 
 export function createGameplaySession(options: GameplaySessionOptions,

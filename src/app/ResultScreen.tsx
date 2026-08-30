@@ -20,7 +20,6 @@ function formatDuration(duration_seconds: number): string {
 
 interface ResultScreenProps {
   score: ScoreResult | null;
-  background_url: string | null;
   title: string;
   artist: string;
   chart_name: string;
@@ -35,7 +34,7 @@ interface ResultScreenProps {
   onExit: () => void;
 }
 
-export function ResultScreen({ score, background_url, title, artist, chart_name, duration_seconds,
+export function ResultScreen({ score, title, artist, chart_name, duration_seconds,
   long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, mode, onReplay, onExit }: ResultScreenProps) {
   const grade_color = GRADE_COLORS[score?.grade ?? ""] ?? FALLBACK_GRADE_COLOR;
 
@@ -52,7 +51,6 @@ export function ResultScreen({ score, background_url, title, artist, chart_name,
 
   return (
     <main className="screen result-screen">
-      {background_url && <img className="result-background" src={background_url} alt="" />}
       <div className="result-bottom-gradient" />
       <button className="result-replay" type="button" onClick={onReplay}>
         <Play fill="currentColor" aria-hidden="true" /> Watch replay

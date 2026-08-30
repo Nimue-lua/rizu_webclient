@@ -29,12 +29,13 @@ import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { submitPlay } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
-import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
+import { LocalLibraryCatalog, readLocalAsset } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 import { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
+import type { GameplayBackgroundState } from "../gameplay/GameplaySession";
 
 type Screen = "welcome" | "catalog-loading" | "song-select" | "loading" | "gameplay" | "result";
-type ViewTransitionKind = "screen" | "song-loading" | "loading-gameplay";
+type ViewTransitionKind = "screen" | "song-loading" | "loading-gameplay" | "gameplay-result";
 type PendingViewTransition = { screen: Screen; kind: ViewTransitionKind; updateState?: () => void };
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
@@ -47,6 +48,19 @@ interface DirectoryPickerWindow extends Window {
 
 function ScreenContainer({ children }: PropsWithChildren) {
   return <div className="screen-container">{children}</div>;
+}
+
+function ChartScreenContainer({ children, background_url, background_class }: PropsWithChildren<{
+  background_url: string | null;
+  background_class: string;
+}>) {
+  return (
+    <div className="screen-container chart-screen-container">
+      {background_url && <img className={`chart-background ${background_class}`} src={background_url} alt="" />}
+      {background_class.startsWith("gameplay-chart-background") && <div className="gameplay-background-noise" />}
+      <div className="chart-screen-content">{children}</div>
+    </div>
+  );
 }
 
 export function App() {
@@ -62,6 +76,8 @@ export function App() {
   const [playback, setPlayback] = useState<CompletedGameplay | null>(null);
   const [autoplay, setAutoplay] = useState(false);
   const [note_skin_editor, setNoteSkinEditor] = useState(false);
+  const [chart_background_url, setChartBackgroundUrl] = useState<string | null>(null);
+  const [gameplay_background_state, setGameplayBackgroundState] = useState<GameplayBackgroundState>("visible");
   const [note_skin_selections, setNoteSkinSelections] = useState<NoteSkinSelections>(
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
@@ -145,6 +161,26 @@ export function App() {
   useEffect(() => () => {
     preview_player.destroy();
   }, [preview_player]);
+
+  useEffect(() => {
+    setChartBackgroundUrl(loading_location?.background_url ?? null);
+    if (!loading_location?.source_id || !loading_location.background_path) return;
+
+    let cancelled = false;
+    let object_url: string | null = null;
+    void readLocalAsset(loading_location.source_id, loading_location.background_path)
+      .then((data) => {
+        if (cancelled) return;
+        object_url = URL.createObjectURL(new Blob([data]));
+        setChartBackgroundUrl(object_url);
+      })
+      .catch((reason: unknown) => console.warn("Failed to load chart background", reason));
+
+    return () => {
+      cancelled = true;
+      if (object_url) URL.revokeObjectURL(object_url);
+    };
+  }, [loading_location]);
 
   const changeMusicRate = (value: number) => {
     const rate = Math.round(value * 1000) / 1000;
@@ -236,7 +272,10 @@ export function App() {
 
   const finishLoading = (loaded_assets: GameplayData) => {
     preview_player.stop();
-    transitionTo("gameplay", "loading-gameplay", () => setAssets(loaded_assets));
+    transitionTo("gameplay", "loading-gameplay", () => {
+      setAssets(loaded_assets);
+      setGameplayBackgroundState("visible");
+    });
   };
 
   const leaveResults = () => {
@@ -285,7 +324,8 @@ export function App() {
       }
 
       return (
-        <ScreenContainer key="gameplay">
+        <ChartScreenContainer background_url={chart_background_url}
+          background_class={`gameplay-chart-background ${gameplay_background_state}`}>
           <GameplayScreen
             assets={assets}
             master_volume={master_volume}
@@ -303,9 +343,10 @@ export function App() {
             playback={playback ?? undefined}
             note_skin_editor={note_skin_editor}
             initial_lead_in={1.15}
+            onBackgroundStateChange={setGameplayBackgroundState}
             onFinish={(completed, reached_chart_end) => {
               if (playback) {
-                transitionTo("result", "screen", () => setPlayback(null));
+                transitionTo("result", "gameplay-result", () => setPlayback(null));
                 return;
               }
               if (autoplay) {
@@ -320,7 +361,7 @@ export function App() {
                 leaveResults();
                 return;
               }
-              transitionTo("result", "screen", () => {
+              transitionTo("result", "gameplay-result", () => {
                 setCompletedGameplay(completed);
                 setScore(completed.score);
               });
@@ -333,7 +374,7 @@ export function App() {
               });
             }}
           />
-        </ScreenContainer>
+        </ChartScreenContainer>
       );
     case "loading":
       if (!audio_context || !loading_location) {
@@ -341,22 +382,22 @@ export function App() {
       }
 
       return (
-        <ScreenContainer key="loading">
+        <ChartScreenContainer background_url={chart_background_url} background_class="loading-chart-background">
           <LoadingScreen
             gameplay_loader={gameplay_loader}
             location={loading_location}
             audio_context={audio_context}
             onCancel={cancelLoading}
             onLoaded={finishLoading}
+            background_url={chart_background_url}
           />
-        </ScreenContainer>
+        </ChartScreenContainer>
       );
     case "result":
       return (
-        <ScreenContainer key="result">
+        <ChartScreenContainer background_url={chart_background_url} background_class="result-chart-background">
           <ResultScreen
             score={score}
-            background_url={loading_location?.background_url ?? null}
             title={loading_location?.title ?? "Unknown title"}
             artist={loading_location?.artist ?? "Unknown artist"}
             chart_name={loading_location?.chart_name ?? "Unknown chart"}
@@ -369,11 +410,11 @@ export function App() {
             mode={assets?.mode ?? "mania"}
             onReplay={() => {
               if (!completed_gameplay) return;
-              transitionTo("gameplay", "screen", () => setPlayback(completed_gameplay));
+              transitionTo("gameplay", "gameplay-result", () => setPlayback(completed_gameplay));
             }}
             onExit={() => leaveResults()}
           />
-        </ScreenContainer>
+        </ChartScreenContainer>
       );
     case "song-select":
       return (

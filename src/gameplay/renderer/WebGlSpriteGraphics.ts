@@ -1,7 +1,7 @@
 import { resizeGameplayCanvas, type GameplayFrame } from "./GameplayFrame";
 import type { Sprite, SpriteDrawCommand, SpriteSkin } from "./Sprite";
 
-const BACKGROUND_COLOR = [0.035, 0.035, 0.045, 1] as const;
+const BACKGROUND_COLOR = [0, 0, 0, 0] as const;
 const VERTEX_FLOATS = 8;
 
 const vertex_shader_source = `#version 300 es

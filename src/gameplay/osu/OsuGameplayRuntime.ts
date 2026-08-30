@@ -1,7 +1,7 @@
 import type { OsuGameplayData } from "../../library/GameplayLoader";
 import type { OsuReplayBaseValues } from "../../replay/osu/OsuReplayBase";
 import { AudioGameplayClock } from "../AudioGameplayClock";
-import type { GameplaySession, OsuPointerInput } from "../GameplaySession";
+import type { GameplayBackgroundState, GameplaySession, OsuPointerInput } from "../GameplaySession";
 import { getAudioStartDelay, getGameplayEndTime, getGameplayProgress, getGameplayProgressRange,
   getIntroSkipTime } from "../GameplayTiming";
 import { HudStateDeriver } from "../HudState";
@@ -17,6 +17,7 @@ import type { OsuCursorRendererMode } from "./OsuHardwareCursor";
 import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
 import { Timings } from "../timing/Timings";
 import { replayTick, replayValue, type CompletedGameplay, type OsuRecordedReplay } from "../../replay/RecordedReplay";
+import { osuApproachPreempt } from "./OsuCircleGeometry";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;
@@ -69,6 +70,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly progress_range;
   private readonly intro_skip_time: number | null;
   private readonly music_offset_time: number;
+  private readonly outro_start_time: number;
+  private background_state: GameplayBackgroundState | null = null;
 
   constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
     master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
@@ -77,7 +80,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
     private readonly playback_replay?: OsuRecordedReplay,
-    private readonly initial_lead_in = 0) {
+    private readonly initial_lead_in = 0,
+    private readonly background_state_change?: (state: GameplayBackgroundState) => void) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
     this.music_offset_time = music_offset / 1000 * this.music_rate;
@@ -91,6 +95,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const chart = applyOsuHitObjectStacking(data.chart, replay_base.approach_rate ?? data.chart.approach_rate,
       replay_base.circle_size ?? data.chart.circle_size);
     this.chart = chart;
+    this.outro_start_time = chart.end_time + timing_configuration.values.hit_50;
     this.renderer = dependencies.create_renderer(canvas, { ...data, chart }, replay_base, cursor_scale,
       cursor_renderer, slider_renderer);
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
@@ -263,6 +268,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly render = (timestamp: number) => {
     this.flushPendingAim(timestamp, false);
     const song_time = this.clock.timeAt(timestamp).monotonic;
+    this.updateBackgroundState(song_time);
     this.applyReplayEvents(song_time);
     if (this.playback_replay) {
       this.updateReplayCursor(song_time);
@@ -282,6 +288,17 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     }
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   };
+
+  private updateBackgroundState(song_time: number): void {
+    const first_object_time = this.chart.hit_objects[0]?.absolute_time ?? Infinity;
+    const visible = song_time < first_object_time - osuApproachPreempt(this.chart.approach_rate) ||
+      song_time > this.outro_start_time ||
+      (this.chart.break_periods ?? []).some((period) => period.start_time <= song_time && song_time <= period.end_time);
+    const state = visible ? "visible" : "hidden";
+    if (state === this.background_state) return;
+    this.background_state = state;
+    this.background_state_change?.(state);
+  }
 
   private applyReplayEvents(song_time: number): void {
     const events = this.playback_replay?.input_events;

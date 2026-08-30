@@ -12,6 +12,11 @@ export interface VisualPoint {
   global_speed: number;
 }
 
+export interface BreakPeriod {
+  readonly start_time: number;
+  readonly end_time: number;
+}
+
 export interface ManiaChart {
   mode: "mania";
   column_count: number;
@@ -19,6 +24,7 @@ export interface ManiaChart {
   primary_tempo: number;
   notes: readonly ManiaNoteEvent[];
   visual_points: readonly VisualPoint[];
+  break_periods?: readonly BreakPeriod[];
 }
 
 export interface OsuHitSample {
@@ -102,6 +108,7 @@ export interface OsuChart {
   combo_colors: readonly (readonly [number, number, number, number])[];
   timing_points: readonly OsuTimingPoint[];
   hit_objects: readonly OsuHitObject[];
+  break_periods?: readonly BreakPeriod[];
 }
 
 export type Chart = ManiaChart | OsuChart;

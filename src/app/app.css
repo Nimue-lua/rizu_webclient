@@ -45,11 +45,23 @@ svg { width: 22px; height: 22px; }
   inset: 0;
   overflow: hidden;
 }
+.chart-screen-container { background: #000; }
+.chart-screen-content { position: absolute; z-index: 1; inset: 0; }
+.chart-background { position: absolute; z-index: 0; inset: -32px; width: calc(100% + 64px); height: calc(100% + 64px); object-fit: cover; pointer-events: none; }
+.loading-chart-background { filter: blur(22px) saturate(.9) brightness(.55); transform: scale(1.08); animation: loading-background-in 1.5s cubic-bezier(.2, .7, .2, 1) both; }
+.gameplay-chart-background { filter: blur(4px) contrast(.72) saturate(.92) brightness(.78); }
+.result-chart-background { filter: blur(10px) contrast(.86) saturate(.92) brightness(.78); }
+.gameplay-chart-background { opacity: 1; transition: opacity 320ms ease-out; }
+.gameplay-chart-background.hidden { opacity: 0; }
+.gameplay-background-noise { position: absolute; z-index: 0; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"); opacity: .09; pointer-events: none; transition: opacity 320ms ease-out; }
+.gameplay-chart-background.hidden + .gameplay-background-noise { opacity: 0; }
 
 html[data-view-transition]::view-transition-old(root),
 html[data-view-transition]::view-transition-new(root) { animation-duration: inherit; animation-fill-mode: both; }
 html[data-view-transition="screen"]::view-transition-old(root) { animation: none; opacity: 0; }
 html[data-view-transition="screen"]::view-transition-new(root) { animation: screen-view-in 250ms cubic-bezier(.2, .75, .25, 1) both; }
+html[data-view-transition="gameplay-result"]::view-transition-old(root) { z-index: 1; animation: none; }
+html[data-view-transition="gameplay-result"]::view-transition-new(root) { z-index: 2; animation: screen-view-in 300ms cubic-bezier(.2, .75, .25, 1) both; }
 html[data-view-transition="song-loading"]::view-transition-old(root) { z-index: 1; animation: none; }
 html[data-view-transition="song-loading"]::view-transition-new(root) { z-index: 2; animation: loading-circle-reveal 850ms cubic-bezier(.62, 0, .2, 1) both; }
 html[data-view-transition="loading-gameplay"]::view-transition-old(root) { z-index: 2; animation: loading-screen-depart 1150ms cubic-bezier(.45, 0, .25, 1) both; }
@@ -111,9 +123,8 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
   .welcome-play { height: 68px; }
 }
 
-.loading-screen { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--background); isolation: isolate; }
-.loading-background { position: absolute; z-index: -3; inset: -32px; width: calc(100% + 64px); height: calc(100% + 64px); object-fit: cover; filter: blur(22px) saturate(.9) brightness(.55); transform: scale(1.08); animation: loading-background-in 1.5s cubic-bezier(.2, .7, .2, 1) both; }
-.loading-shade { position: absolute; z-index: -2; inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--background) 86%, transparent) 0%, color-mix(in srgb, var(--background) 58%, transparent) 52%, color-mix(in srgb, var(--background) 82%, transparent) 100%), linear-gradient(0deg, color-mix(in srgb, var(--background) 92%, transparent), transparent 55%); }
+.loading-screen { position: relative; width: 100%; height: 100%; overflow: hidden; background: transparent; isolation: isolate; }
+.loading-shade { position: absolute; z-index: 0; inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--background) 86%, transparent) 0%, color-mix(in srgb, var(--background) 58%, transparent) 52%, color-mix(in srgb, var(--background) 82%, transparent) 100%), linear-gradient(0deg, color-mix(in srgb, var(--background) 92%, transparent), transparent 55%); }
 .loading-shade::after { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"); opacity: .035; content: ""; }
 .loading-heading { position: absolute; top: clamp(28px, 6vh, 70px); left: clamp(28px, 7vw, 130px); margin: 0; color: var(--text); font-size: clamp(26px, 3vw, 48px); font-weight: 700; letter-spacing: .12em; text-shadow: 0 3px 18px color-mix(in srgb, var(--shadow) 80%, transparent); text-transform: uppercase; animation: loading-copy-in 600ms cubic-bezier(.2, .75, .25, 1) both; }
 .loading-heading::after { display: block; width: 72px; height: 4px; margin-top: 12px; background: var(--difficulty-color); content: ""; }
@@ -302,7 +313,7 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-background, .loading-artwork, .loading-chart, .loading-heading { animation: none; }
+  .loading-chart-background, .loading-artwork, .loading-chart, .loading-heading { animation: none; }
   .song-hero-background { transform: none; transition: none; }
   .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { transform: none; }
   .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { animation-duration: 1ms; animation-delay: 0s; }
@@ -581,10 +592,9 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .gameplay-touch-zones { position: absolute; z-index: 1; inset: 0; display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; touch-action: none; }
 .gameplay-touch-zones button { width: 100%; height: 100%; padding: 0; background: transparent; border-radius: 0; touch-action: none; }
 .gameplay-touch-zones button:hover, .gameplay-touch-zones button:active { filter: none; }
-.result-screen { position: relative; overflow: hidden; background: var(--background); font-size: 2rem; isolation: isolate; }
-.result-background { position: absolute; z-index: -3; inset: -18px; width: calc(100% + 36px); height: calc(100% + 36px); object-fit: cover; filter: blur(10px) contrast(.86) saturate(.92) brightness(.78); }
-.result-screen::before { position: absolute; z-index: -2; inset: 0; background: color-mix(in srgb, var(--background) 15%, transparent); content: ""; }
-.result-screen::after { position: absolute; z-index: -1; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"); opacity: .04; pointer-events: none; content: ""; }
+.result-screen { position: relative; overflow: hidden; background: transparent; font-size: 2rem; isolation: isolate; }
+.result-screen::before { position: absolute; z-index: 0; inset: 0; background: color-mix(in srgb, var(--background) 15%, transparent); content: ""; }
+.result-screen::after { position: absolute; z-index: 0; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E"); opacity: .04; pointer-events: none; content: ""; }
 .result-bottom-gradient { position: absolute; z-index: 0; inset: 0; background: linear-gradient(to bottom, transparent 38%, color-mix(in srgb, var(--background) 40%, transparent) 63%, color-mix(in srgb, var(--background) 95%, transparent)); pointer-events: none; }
 .result-replay { position: absolute; z-index: 2; top: 26px; right: 30px; display: flex; align-items: center; gap: 10px; padding: 12px 17px; color: var(--text); background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent); border-radius: 7px; box-shadow: 0 12px 30px color-mix(in srgb, var(--shadow) 35%, transparent); font-family: "Rubik", sans-serif; font-size: 15px; font-weight: 600; backdrop-filter: blur(8px); }
 .result-replay svg { width: 18px; height: 18px; color: var(--accent); }

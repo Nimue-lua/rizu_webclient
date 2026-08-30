@@ -1,7 +1,6 @@
 import { Clock3, Star } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { GameplayData, GameplayLoader, GameplayLocation, GameplayLoadProgress } from "../library/GameplayLoader";
-import { readLocalAsset } from "../library/LocalLibraryStore";
 import { difficultyColor, formatDuration } from "./song-select/SongSelectUi";
 import { DownloadProgressList, type DownloadProgressItem } from "./DownloadProgressList";
 
@@ -13,6 +12,7 @@ interface LoadingScreenProps {
   audio_context: AudioContext;
   onCancel: () => void;
   onLoaded: (assets: GameplayData) => void;
+  background_url: string | null;
 }
 
 export function LoadingScreen({
@@ -21,10 +21,10 @@ export function LoadingScreen({
   audio_context,
   onCancel,
   onLoaded,
+  background_url,
 }: LoadingScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<ReadonlyMap<string, DownloadProgressItem>>(() => new Map());
-  const [background_url, setBackgroundUrl] = useState(location.background_url);
   const title_container_ref = useRef<HTMLHeadingElement>(null);
   const title_ref = useRef<HTMLSpanElement>(null);
   const mode_name = location.mode === 3 && location.keys !== null
@@ -45,27 +45,6 @@ export function LoadingScreen({
     document.fonts.ready.then(fitTitle).catch(() => undefined);
     return () => observer.disconnect();
   }, [location.title]);
-
-  useEffect(() => {
-    if (!location.source_id || !location.background_path) return;
-
-    let cancelled = false;
-    let object_url: string | null = null;
-    void readLocalAsset(location.source_id, location.background_path)
-      .then((data) => {
-        if (cancelled) return;
-        object_url = URL.createObjectURL(new Blob([data]));
-        setBackgroundUrl(object_url);
-      })
-      .catch((reason: unknown) => {
-        console.warn("Failed to load chart background", reason);
-      });
-
-    return () => {
-      cancelled = true;
-      if (object_url) URL.revokeObjectURL(object_url);
-    };
-  }, [location.background_path, location.source_id]);
 
   useEffect(() => {
     const abort_controller = new AbortController();
@@ -94,7 +73,6 @@ export function LoadingScreen({
       className="loading-screen"
       style={{ "--difficulty-color": difficultyColor(location.difficulty) } as CSSProperties}
     >
-      {background_url && <img className="loading-background" src={background_url} alt="" />}
       <div className="loading-shade" />
       <p className="loading-heading">Now loading</p>
       <div className="loading-content">
