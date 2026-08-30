@@ -126,8 +126,8 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
     <div className="song-select-column left-column">
       <article className={`song-hero${background_loaded ? " loaded" : ""}`}>
         {background_url && <img key={background_url} className="song-hero-background" src={background_url} alt="" onLoad={onBackgroundLoaded} onError={onBackgroundLoaded} />}
-        <div className="song-hero-chart"><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
-        <div className="song-hero-metadata"><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
+        <div className="song-hero-chart" key={selected_chart?.id ?? "no-chart"}><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
+        <div className="song-hero-metadata" key={selected_song?.id ?? "no-song"}><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
       </article>
       <section className="score-list" aria-label="Scores">
         <header><span>{personal_best ? <>Personal Best: <strong>{(personal_best.accuracy * 100).toFixed(2)}%</strong></> : "Not played yet"}</span><div className="score-source">

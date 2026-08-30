@@ -279,10 +279,10 @@ html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-i
 .song-hero-chart { position: absolute; top: 14px; right: 18px; left: 18px; display: grid; min-width: 0; text-shadow: 2px 2px var(--background); }
 .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { transform: translateY(8px); opacity: 0; }
-.song-hero.loaded .song-hero-metadata h1 { animation: song-hero-row-in .4s .08s ease-out forwards; }
-.song-hero.loaded .song-hero-metadata p { animation: song-hero-row-in .4s .16s ease-out forwards; }
-.song-hero.loaded .song-hero-chart strong { animation: song-hero-row-in .4s .24s ease-out forwards; }
-.song-hero.loaded .song-hero-chart span { animation: song-hero-row-in .4s .32s ease-out forwards; }
+.song-hero-metadata h1 { animation: song-hero-row-in .4s .08s ease-out forwards; }
+.song-hero-metadata p { animation: song-hero-row-in .4s .16s ease-out forwards; }
+.song-hero-chart strong { animation: song-hero-row-in .4s .24s ease-out forwards; }
+.song-hero-chart span { animation: song-hero-row-in .4s .32s ease-out forwards; }
 .song-hero-chart strong { font-size: clamp(18px, 1.35vw, 26px); }
 .song-hero-chart span { color: var(--muted); font-size: 14px; }
 .song-hero-metadata { position: absolute; right: 18px; bottom: 14px; left: 18px; text-shadow: 2px 2px var(--background); }
@@ -298,7 +298,7 @@ html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-i
   .loading-background, .loading-artwork, .loading-chart, .loading-heading { animation: none; }
   .song-hero-background { transform: none; transition: none; }
   .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { transform: none; }
-  .song-hero.loaded .song-hero-chart strong, .song-hero.loaded .song-hero-chart span, .song-hero.loaded .song-hero-metadata h1, .song-hero.loaded .song-hero-metadata p { animation-duration: 1ms; animation-delay: 0s; }
+  .song-hero-chart strong, .song-hero-chart span, .song-hero-metadata h1, .song-hero-metadata p { animation-duration: 1ms; animation-delay: 0s; }
 }
 
 .score-list { display: grid; grid-template-rows: 49px minmax(0, 1fr); gap: 4px; min-height: 0; overflow: hidden; padding: 5px; background: var(--panel); border: 1px solid var(--outline); border-radius: 7px; }
