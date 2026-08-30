@@ -140,16 +140,33 @@ html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-i
 .loading-stats strong { font-size: 31px; font-variant-numeric: tabular-nums; font-weight: 500; line-height: 1; }
 .loading-stats small { margin-top: 7px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .2em; }
 .loading-mode-stat { grid-template-columns: auto !important; min-width: 120px !important; }
-.loading-status { position: absolute; right: clamp(24px, 4vw, 68px); bottom: clamp(22px, 4vw, 52px); display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.loading-status { position: absolute; right: clamp(24px, 4vw, 68px); bottom: clamp(22px, 4vw, 52px); width: min(460px, calc(100% - 48px)); color: var(--muted); font-size: 12px; font-weight: 600; }
 .loading-error { display: flex; align-items: center; gap: 18px; text-transform: none; }
 .loading-error p { max-width: min(620px, 60vw); margin: 0; color: var(--danger); letter-spacing: 0; }
 .loading-error button { padding: 11px 15px; background: var(--panel); border: 1px solid var(--outline); border-radius: 5px; font-size: 12px; }
 .loading-error button:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
 .song-library-error { color: var(--danger); }
 
+.download-progress-list { display: grid; gap: 14px; width: 100%; }
+.download-progress-item { display: grid; gap: 7px; }
+.download-progress-label { display: flex; justify-content: space-between; gap: 20px; color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; letter-spacing: .08em; text-transform: uppercase; }
+.download-progress-label span:last-child { color: var(--muted); white-space: nowrap; }
+.download-progress-track { position: relative; height: 5px; overflow: hidden; background: color-mix(in srgb, var(--text) 14%, transparent); border-radius: 999px; }
+.download-progress-track > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width 100ms linear; }
+.download-progress-track.indeterminate > span { position: absolute; width: 35%; animation: download-indeterminate 1.2s ease-in-out infinite; }
+.download-processing { margin: 0; color: var(--muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+
+.catalog-loading-screen { display: grid; min-height: 100%; padding: 32px; background: var(--background); place-items: center; }
+.catalog-loading-card { display: grid; grid-template-columns: 58px minmax(0, 520px); align-items: start; gap: 25px; width: min(640px, 100%); }
+.catalog-loading-card > img { width: 58px; height: 58px; }
+.catalog-loading-eyebrow { margin: 0 0 9px; color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .2em; }
+.catalog-loading-card h1 { margin: 0 0 38px; font-size: clamp(30px, 5vw, 48px); line-height: 1.05; }
+.catalog-loading-error { margin: 24px 0 0; color: var(--danger); font-size: 13px; line-height: 1.5; }
+
 @keyframes loading-background-in { from { opacity: 0; transform: scale(1.18); } }
 @keyframes loading-artwork-in { from { opacity: 0; transform: translateX(-42px) rotate(-1.5deg); } }
 @keyframes loading-copy-in { from { opacity: 0; transform: translateX(32px); } }
+@keyframes download-indeterminate { from { left: -35%; } to { left: 100%; } }
 
 @media (max-width: 700px) {
   .loading-content { top: 48%; grid-template-columns: 1fr; align-items: start; gap: 24px; }
@@ -162,9 +179,12 @@ html[data-screen-transition="loading-gameplay"]::view-transition-new(root) { z-i
   .loading-stats > span:first-child { padding-left: 0; }
   .loading-stats > .loading-difficulty-stat::after { right: 15px; }
   .loading-stats strong { font-size: 25px; }
-  .loading-status { right: 24px; bottom: 18px; left: 24px; justify-content: flex-end; }
+  .loading-status { right: 24px; bottom: 18px; left: 24px; width: auto; }
   .loading-error { width: 100%; align-items: stretch; flex-direction: column; }
   .loading-error p { max-width: none; }
+  .catalog-loading-screen { padding: 24px 20px; }
+  .catalog-loading-card { grid-template-columns: 1fr; }
+  .catalog-loading-card > img { width: 44px; height: 44px; }
 }
 
 @media (max-width: 700px) and (max-height: 680px) {

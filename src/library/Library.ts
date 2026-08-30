@@ -2,18 +2,26 @@ import initSqlJs from "sql.js";
 import sql_wasm_url from "sql.js/dist/sql-wasm.wasm?url";
 import type { ChartfileSetView, Chartview, LibraryView } from "./views";
 import { remoteAssetUrl } from "./ProviderUrl";
+import type { DownloadProgress } from "../download/Download";
 
 const CATALOG_SCHEMA_VERSION = 8;
 
 export interface Library {
-  load(signal: AbortSignal): Promise<LibraryView>;
+  load(signal: AbortSignal, onProgress?: LibraryProgressCallback): Promise<LibraryView>;
 }
+
+export interface LibraryLoadProgress extends DownloadProgress {
+  readonly id: string;
+  readonly label: string;
+}
+
+export type LibraryProgressCallback = (progress: LibraryLoadProgress) => void;
 
 export class CombinedLibrary implements Library {
   constructor(private readonly libraries: readonly Library[]) {}
 
-  async load(signal: AbortSignal): Promise<LibraryView> {
-    const libraries = await Promise.all(this.libraries.map((library) => library.load(signal)));
+  async load(signal: AbortSignal, onProgress?: LibraryProgressCallback): Promise<LibraryView> {
+    const libraries = await Promise.all(this.libraries.map((library) => library.load(signal, onProgress)));
     const locations: LibraryView["locations"] = [];
     const songs: LibraryView["songs"] = [];
     let next_location_id = 1;

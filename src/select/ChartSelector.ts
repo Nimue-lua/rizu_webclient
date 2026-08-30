@@ -1,4 +1,4 @@
-import type { Library } from "../library/Library";
+import type { Library, LibraryProgressCallback } from "../library/Library";
 import type { ChartfileSetView, Chartview, LibraryView, Location } from "../library/views";
 
 export type ChartSortMode = "title" | "artist" | "difficulty" | "duration";
@@ -80,10 +80,10 @@ export class ChartSelector {
     return () => this.listeners.delete(listener);
   };
 
-  async load(signal: AbortSignal, force = false): Promise<void> {
+  async load(signal: AbortSignal, force = false, onProgress?: LibraryProgressCallback): Promise<void> {
     if (this.loaded && !force) return;
     try {
-      const library = await this.library.load(signal);
+      const library = await this.library.load(signal, onProgress);
       if (signal.aborted) return;
       this.applyLibrary(library);
       this.loaded = true;

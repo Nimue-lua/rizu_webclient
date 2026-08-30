@@ -141,12 +141,6 @@ export function SongSelectScreen({
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const abort_controller = new AbortController();
-    void chart_selector.load(abort_controller.signal);
-    return () => abort_controller.abort();
-  }, [chart_selector]);
-
   const { selection_entries, selected_song, selected_chart } = useMemo(() => ({
     selection_entries: chart_selector.getSelectionEntries(),
     selected_song: chart_selector.getSelectedSong(),

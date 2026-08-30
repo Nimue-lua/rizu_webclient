@@ -2,6 +2,7 @@ import type { NoteSkin, NoteSkinConfig } from "../NoteSkin";
 import type { Sprite, SpriteSkin } from "../../gameplay/renderer/Sprite";
 import { fetchSkinArchive, findSkinIni, type SkinArchiveFiles } from "./SkinArchive";
 import { parseSkinIni, type SkinIni, type SkinIniSection } from "./SkinIni";
+import type { DownloadProgressCallback } from "../../download/Download";
 
 export { parseSkinIni } from "./SkinIni";
 
@@ -236,14 +237,25 @@ async function defaultAudioFiles(signal?: AbortSignal): Promise<ReadonlyMap<stri
   return audioFiles(files, ini_path.slice(0, ini_path.lastIndexOf("/") + 1));
 }
 
-export async function loadOsuManiaSkinUrl(url: string, column_count: number, signal?: AbortSignal): Promise<NoteSkin> {
-  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchSkinArchive(url, signal);
+export async function loadOsuManiaSkinUrl(url: string, column_count: number, signal?: AbortSignal,
+  onProgress?: DownloadProgressCallback): Promise<NoteSkin> {
+  const files = url === DEFAULT_OSU_SKIN_URL
+    ? await (default_archive ??= fetchSkinArchive(DEFAULT_OSU_SKIN_URL, signal, onProgress).catch((error) => {
+      default_archive = undefined;
+      throw error;
+    }))
+    : await fetchSkinArchive(url, signal, onProgress);
   return loadOsuManiaSkin(files, column_count, signal);
 }
 
 export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioContext,
-  signal?: AbortSignal): Promise<OsuStandardSkin> {
-  const files = url === DEFAULT_OSU_SKIN_URL ? await defaultArchive(signal) : await fetchSkinArchive(url, signal);
+  signal?: AbortSignal, onProgress?: DownloadProgressCallback): Promise<OsuStandardSkin> {
+  const files = url === DEFAULT_OSU_SKIN_URL
+    ? await (default_archive ??= fetchSkinArchive(DEFAULT_OSU_SKIN_URL, signal, onProgress).catch((error) => {
+      default_archive = undefined;
+      throw error;
+    }))
+    : await fetchSkinArchive(url, signal, onProgress);
   const ini_path = findSkinIni(files);
   if (!ini_path) throw new Error("osu skin archive is missing skin.ini");
   const directory = ini_path.slice(0, ini_path.lastIndexOf("/") + 1);

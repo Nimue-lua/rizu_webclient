@@ -1,8 +1,9 @@
 import { Clock3, Star } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import type { GameplayData, GameplayLoader, GameplayLocation } from "../library/GameplayLoader";
+import type { GameplayData, GameplayLoader, GameplayLocation, GameplayLoadProgress } from "../library/GameplayLoader";
 import { readLocalAsset } from "../library/LocalLibraryStore";
 import { difficultyColor, formatDuration } from "./song-select/SongSelectUi";
+import { DownloadProgressList, type DownloadProgressItem } from "./DownloadProgressList";
 
 const MODE_NAMES = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
 
@@ -22,6 +23,7 @@ export function LoadingScreen({
   onLoaded,
 }: LoadingScreenProps) {
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ReadonlyMap<string, DownloadProgressItem>>(() => new Map());
   const [background_url, setBackgroundUrl] = useState(location.background_url);
   const title_container_ref = useRef<HTMLHeadingElement>(null);
   const title_ref = useRef<HTMLSpanElement>(null);
@@ -69,7 +71,9 @@ export function LoadingScreen({
     const abort_controller = new AbortController();
 
     void gameplay_loader
-      .load(location, audio_context, abort_controller.signal)
+      .load(location, audio_context, abort_controller.signal, (item: GameplayLoadProgress) => {
+        setProgress((current) => new Map(current).set(item.id, item));
+      })
       .then((assets) => {
         if (!abort_controller.signal.aborted) {
           onLoaded(assets);
@@ -110,14 +114,15 @@ export function LoadingScreen({
           </div>
         </section>
       </div>
-      {error && (
-        <div className="loading-status" aria-live="assertive">
+      <div className="loading-status">
+        {!error && <DownloadProgressList items={[...progress.values()]} />}
+        {error && (
           <div className="loading-error">
             <p>{error}</p>
             <button type="button" onClick={onCancel}>Back to song select</button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 }

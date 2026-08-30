@@ -1,4 +1,5 @@
 import { unzipSync } from "fflate";
+import { downloadArrayBuffer, type DownloadProgressCallback } from "../../download/Download";
 
 export type SkinArchiveFiles = Readonly<Record<string, Uint8Array>>;
 
@@ -14,8 +15,8 @@ export function findSkinIni(files: SkinArchiveFiles): string | undefined {
   return Object.keys(files).find((path) => /(^|\/)skin\.ini$/i.test(path.replace(/\\/g, "/")));
 }
 
-export async function fetchSkinArchive(url: string, signal?: AbortSignal): Promise<SkinArchiveFiles> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`Failed to fetch skin ${url}: ${response.status} ${response.statusText}`);
-  return unzipSkinArchive(new Uint8Array(await response.arrayBuffer()), `Skin ${url} is not a valid archive`);
+export async function fetchSkinArchive(url: string, signal?: AbortSignal,
+  onProgress?: DownloadProgressCallback): Promise<SkinArchiveFiles> {
+  const data = await downloadArrayBuffer(url, { signal }, onProgress);
+  return unzipSkinArchive(new Uint8Array(data), `Skin ${url} is not a valid archive`);
 }

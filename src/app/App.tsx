@@ -10,6 +10,7 @@ import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import { WelcomeScreen } from "./WelcomeScreen";
+import { CatalogLoadingScreen } from "./CatalogLoadingScreen";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import {
@@ -31,7 +32,7 @@ import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 
-type Screen = "welcome" | "song-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "catalog-loading" | "song-select" | "loading" | "gameplay" | "result";
 type ScreenTransitionKind = "song-loading" | "loading-gameplay";
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
@@ -232,8 +233,18 @@ export function App() {
         <ScreenTransition key="welcome">
           <WelcomeScreen
             onPlay={() => {
-              void local_library.reconnectSources().finally(() => setScreen("song-select"));
+              setScreen("catalog-loading");
             }}
+          />
+        </ScreenTransition>
+      );
+    case "catalog-loading":
+      return (
+        <ScreenTransition key="catalog-loading">
+          <CatalogLoadingScreen
+            chart_selector={chart_selector}
+            local_library={local_library}
+            onLoaded={() => setScreen("song-select")}
           />
         </ScreenTransition>
       );

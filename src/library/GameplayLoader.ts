@@ -4,6 +4,7 @@ import type { NoteSkin } from "../noteskin/NoteSkin";
 import { loadOsuManiaSkinUrl, loadOsuStandardSkinUrl, type OsuStandardSkin } from "../noteskin/osu/OsuSkin";
 import { loadNoteSkinOverrides, noteSkinOverrideKey } from "../noteskin/NoteSkinOverrides";
 import { readLocalAsset, readLocalChart } from "./LocalLibraryStore";
+import { downloadArrayBuffer, type DownloadProgress } from "../download/Download";
 
 export interface GameplayLocation {
   chart_id: string;
@@ -55,20 +56,26 @@ export interface OsuGameplayData extends GameplayDataBase {
 
 export type GameplayData = ManiaGameplayData | OsuGameplayData;
 
+export interface GameplayLoadProgress extends DownloadProgress {
+  readonly id: "audio" | "chart" | "skin";
+  readonly label: string;
+}
+
+export type GameplayProgressCallback = (progress: GameplayLoadProgress) => void;
+
 export interface GameplayLoader {
-  load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData>;
+  load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal,
+    onProgress?: GameplayProgressCallback): Promise<GameplayData>;
 }
 
-async function fetchAsset(url: string, signal: AbortSignal): Promise<ArrayBuffer> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-  return response.arrayBuffer();
+async function fetchAsset(url: string, signal: AbortSignal,
+  onProgress?: (progress: DownloadProgress) => void): Promise<ArrayBuffer> {
+  return downloadArrayBuffer(url, { signal }, onProgress);
 }
 
-async function fetchChart(url: string, signal: AbortSignal): Promise<string> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-  const source = await response.text();
+async function fetchChart(url: string, signal: AbortSignal,
+  onProgress?: (progress: DownloadProgress) => void): Promise<string> {
+  const source = new TextDecoder().decode(await downloadArrayBuffer(url, { signal }, onProgress));
   if (!source.trimStart().startsWith("osu file format v")) {
     throw new Error(`Failed to fetch chart data from ${url}`);
   }
@@ -76,7 +83,8 @@ async function fetchChart(url: string, signal: AbortSignal): Promise<string> {
 }
 
 export class HttpGameplayLoader implements GameplayLoader {
-  async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal): Promise<GameplayData> {
+  async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal,
+    onProgress?: GameplayProgressCallback): Promise<GameplayData> {
     const skin_url = location.note_skin_url;
     if (!skin_url) throw new Error("No note skin is selected for this key mode");
     const local = location.source_id && location.audio_path && location.chart_path;
@@ -86,19 +94,21 @@ export class HttpGameplayLoader implements GameplayLoader {
         readLocalChart(location.source_id!, location.chart_path!),
       ])
       : await Promise.all([
-        fetchAsset(location.audio_url, signal),
-        fetchChart(location.chart_url, signal),
+        fetchAsset(location.audio_url, signal, (progress) => onProgress?.({ ...progress, id: "audio", label: "Music" })),
+        fetchChart(location.chart_url, signal, (progress) => onProgress?.({ ...progress, id: "chart", label: "Chart" })),
       ]);
     const [audio_buffer, chart] = await Promise.all([
       audio_context.decodeAudioData(audio_data),
       Promise.resolve(parseOsuChart(chart_source)),
     ]);
     if (chart.mode === "osu") {
-      const note_skin = await loadOsuStandardSkinUrl(skin_url, audio_context, signal);
+      const note_skin = await loadOsuStandardSkinUrl(skin_url, audio_context, signal,
+        (progress) => onProgress?.({ ...progress, id: "skin", label: "Note skin" }));
       return { mode: "osu", audio_buffer, audio_context, chart, chart_id: location.chart_id,
         note_skin_id: location.note_skin_id, note_skin };
     }
-    const note_skin = await loadOsuManiaSkinUrl(skin_url, chart.column_count, signal);
+    const note_skin = await loadOsuManiaSkinUrl(skin_url, chart.column_count, signal,
+      (progress) => onProgress?.({ ...progress, id: "skin", label: "Note skin" }));
     const note_skin_source = {
       hitPosition: note_skin.config.hitPosition,
       columnStart: note_skin.config.columnStart,
