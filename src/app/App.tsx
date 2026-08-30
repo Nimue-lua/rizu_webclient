@@ -10,7 +10,6 @@ import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import { WelcomeScreen } from "./WelcomeScreen";
-import { UnlockingFpsScreen } from "./UnlockingFpsScreen";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
 import {
@@ -32,7 +31,7 @@ import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 
-type Screen = "welcome" | "unlocking-fps" | "song-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "song-select" | "loading" | "gameplay" | "result";
 type ScreenTransitionKind = "song-loading" | "loading-gameplay";
 const gameplay_loader = new HttpGameplayLoader();
 const local_library = new LocalLibraryCatalog();
@@ -235,14 +234,7 @@ export function App() {
             onPlay={() => {
               void local_library.reconnectSources().finally(() => setScreen("song-select"));
             }}
-            onUnlockingFps={() => setScreen("unlocking-fps")}
           />
-        </ScreenTransition>
-      );
-    case "unlocking-fps":
-      return (
-        <ScreenTransition key="unlocking-fps">
-          <UnlockingFpsScreen onBack={() => setScreen("welcome")} />
         </ScreenTransition>
       );
     case "gameplay":
