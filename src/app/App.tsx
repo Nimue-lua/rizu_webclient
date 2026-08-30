@@ -81,7 +81,7 @@ export function App() {
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
   const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
-  const hit_registration = useSetting(settings.hit_registration);
+  const hit_registration = useSetting(settings.mania_hit_registration);
   const music_rate = useSetting(settings.music_rate);
   const constant_scroll = useSetting(settings.constant_scroll);
   const tap_only = useSetting(settings.tap_only);

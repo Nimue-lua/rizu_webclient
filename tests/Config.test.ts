@@ -8,7 +8,6 @@ import {
   numberSetting,
   stringSetting,
 } from "../src/config/Config";
-import { createSettingsConfig, settings } from "../src/config/Settings";
 
 class MemoryStorage implements ConfigStorage {
   readonly values = new Map<string, string>();
@@ -91,39 +90,4 @@ test("keeps working when persistence is unavailable", () => {
   assert.equal(config.load(), false);
   config.set(enabled, false);
   assert.equal(config.get(enabled), false);
-});
-
-test("keeps legacy settings when writing their migration fails", () => {
-  const values = new Map([["rizu.master-volume", "0.6"]]);
-  const storage: ConfigStorage = {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: () => { throw new Error("full"); },
-    removeItem: (key) => { values.delete(key); },
-  };
-  const config = createSettingsConfig(storage);
-  assert.equal(config.get(settings.master_volume), 0.6);
-  assert.equal(storage.getItem("rizu.master-volume"), "0.6");
-});
-
-test("migrates valid legacy web settings once", () => {
-  const storage = new MemoryStorage();
-  storage.setItem("rizu.master-volume", "0.6");
-  storage.setItem("rizu.scroll-speed-type", "osu");
-  storage.setItem("rizu.osu-raw-input", "false");
-  storage.setItem("rizu.music-rate", "not a number");
-  const config = createSettingsConfig(storage);
-
-  assert.equal(config.get(settings.master_volume), 0.6);
-  assert.equal(config.get(settings.scroll_speed_type), "osu");
-  assert.equal(config.get(settings.osu_raw_input), false);
-  assert.equal(config.get(settings.music_rate), 1);
-  assert.equal(storage.getItem("rizu.master-volume"), null);
-  assert.deepEqual(JSON.parse(storage.getItem("rizu.settings")!), {
-    version: 1,
-    values: {
-      "audio.volume.master": 0.6,
-      "gameplay.scroll_speed_type": "osu",
-      "gameplay.osu.raw_input": false,
-    },
-  });
 });

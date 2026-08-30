@@ -53,7 +53,7 @@ export function SettingsScreen({
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
   const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
-  const hit_registration = useSetting(settings.hit_registration);
+  const hit_registration = useSetting(settings.mania_hit_registration);
   const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
   const panel_ref = useRef<HTMLElement>(null);
 
@@ -181,10 +181,10 @@ export function SettingsScreen({
                 <span aria-hidden="true" />
                 <strong>osu! raw pointer input</strong>
               </label>
-              <label className="settings-control settings-select-control" htmlFor="settings-hit-registration">
-                <span>Hit registration</span>
-                <select id="settings-hit-registration" value={hit_registration}
-                  onChange={(event) => appSettings.set(settings.hit_registration, event.target.value as ManiaHitRegistration)}>
+              <label className="settings-control settings-select-control" htmlFor="settings-mania-hit-registration">
+                <span>Mania hit registration</span>
+                <select id="settings-mania-hit-registration" value={hit_registration}
+                  onChange={(event) => appSettings.set(settings.mania_hit_registration, event.target.value as ManiaHitRegistration)}>
                   <option value="earliest">Earliest note</option>
                   <option value="nearest">Nearest note</option>
                 </select>
