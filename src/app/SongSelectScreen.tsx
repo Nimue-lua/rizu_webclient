@@ -19,12 +19,10 @@ import { readLocalFile } from "../library/LocalLibraryStore";
 import { LibrarySourcesScreen } from "./LibrarySourcesScreen";
 import type { LocalLibraryStatus } from "../library/LocalLibraryStore";
 import type { RemoteProviderView } from "../library/RemoteLibraryStore";
+import type { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
 
 const ROW_HEIGHT = 82;
 const BACKGROUND_DEBOUNCE_MS = 200;
-const AUDIO_PREVIEW_DEBOUNCE_MS = 200;
-const AUDIO_PREVIEW_DUCK_MS = 180;
-const AUDIO_PREVIEW_CROSSFADE_MS = 300;
 const SESSION_STARTED_AT = Date.now();
 
 interface LocalPreviewMedia {
@@ -37,7 +35,7 @@ interface SongSelectScreenProps {
   chart_selector: ChartSelector;
   nickname: string;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
-  preview_audio: readonly [HTMLAudioElement, HTMLAudioElement];
+  preview_player: SongPreviewPlayer;
   onAutoplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onReplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }, playback: CompletedGameplay) => void;
   onSettings: () => void;
@@ -73,7 +71,7 @@ export function SongSelectScreen({
   chart_selector,
   nickname,
   onPlay,
-  preview_audio,
+  preview_player,
   onAutoplay,
   onReplay,
   onSettings,
@@ -101,15 +99,6 @@ export function SongSelectScreen({
   const difficulty_strip_ref = useRef<HTMLDivElement>(null);
   const selected_difficulty_ref = useRef<HTMLButtonElement>(null);
   const restored_song_scroll_ref = useRef(false);
-  const audio_refs = useRef(preview_audio);
-  const active_audio_ref = useRef(0);
-  const audio_gains_ref = useRef([1, 0]);
-  const audio_fade_frame_ref = useRef<number | null>(null);
-  const preview_request_ref = useRef(0);
-  const pending_preview_start_ref = useRef<(() => void) | null>(null);
-  const master_volume_ref = useRef(master_volume);
-  const preview_unlocked_ref = useRef(false);
-  const last_preview_change_ref = useRef<number | null>(null);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
   const scroll_top_ref = useRef(0);
   const [now, setNow] = useState(() => new Date());
@@ -151,29 +140,6 @@ export function SongSelectScreen({
   const selected_background_url = selected_local_media?.background_url ?? selected_chart?.background_url ?? null;
   const selected_preview_audio_url = selected_local_media?.audio_url ?? selected_chart?.audio_url ?? "";
 
-  master_volume_ref.current = master_volume;
-
-  const fadeAudioGains = (targets: readonly [number, number], duration_ms: number, on_complete?: () => void) => {
-    if (audio_fade_frame_ref.current !== null) cancelAnimationFrame(audio_fade_frame_ref.current);
-    const starts = [...audio_gains_ref.current];
-    const started_at = performance.now();
-    const update = (time: number) => {
-      const progress = Math.min(Math.max((time - started_at) / duration_ms, 0), 1);
-      for (let index = 0; index < 2; index += 1) {
-        const gain = starts[index] + (targets[index] - starts[index]) * progress;
-        audio_gains_ref.current[index] = gain;
-        const audio = audio_refs.current[index];
-        if (audio) audio.volume = Math.min(Math.max(master_volume_ref.current * gain, 0), 1);
-      }
-      if (progress < 1) audio_fade_frame_ref.current = requestAnimationFrame(update);
-      else {
-        audio_fade_frame_ref.current = null;
-        on_complete?.();
-      }
-    };
-    audio_fade_frame_ref.current = requestAnimationFrame(update);
-  };
-
   useEffect(() => {
     setLocalPreviewMedia(null);
     const source_id = selected_chart?.source_id;
@@ -200,15 +166,13 @@ export function SongSelectScreen({
     }).catch((reason: unknown) => {
       if (!active) return;
       console.warn("Could not load local song-select media", reason);
-      fadeAudioGains([0, 0], AUDIO_PREVIEW_CROSSFADE_MS, () => {
-        for (const audio of audio_refs.current) audio?.pause();
-      });
+      preview_player.stop(300);
     });
     return () => {
       active = false;
       for (const url of urls) URL.revokeObjectURL(url);
     };
-  }, [selected_chart?.audio_path, selected_chart?.background_path, selected_chart?.id, selected_chart?.source_id, selected_chart?.source_type]);
+  }, [preview_player, selected_chart?.audio_path, selected_chart?.background_path, selected_chart?.id, selected_chart?.source_id, selected_chart?.source_type]);
 
   useEffect(() => {
     let active = true;
@@ -266,89 +230,18 @@ export function SongSelectScreen({
   }, [selected_background_url]);
 
   useEffect(() => {
-    for (let index = 0; index < audio_refs.current.length; index += 1) {
-      const audio = audio_refs.current[index];
-      if (audio) audio.volume = master_volume * audio_gains_ref.current[index];
-    }
-  }, [master_volume]);
+    preview_player.setVolume(master_volume);
+  }, [master_volume, preview_player]);
 
   useEffect(() => {
-    for (const audio of audio_refs.current) {
-      if (!audio) continue;
-      audio.defaultPlaybackRate = music_rate;
-      audio.playbackRate = music_rate;
-    }
-  }, [music_rate]);
+    preview_player.setPlaybackRate(music_rate);
+  }, [music_rate, preview_player]);
 
   useEffect(() => {
-    const request = ++preview_request_ref.current;
-    pending_preview_start_ref.current = null;
-    const active_index = active_audio_ref.current;
-    const ducked_gains: [number, number] = active_index === 0 ? [0.5, 0] : [0, 0.5];
-    fadeAudioGains(ducked_gains, AUDIO_PREVIEW_DUCK_MS);
-
-    const now = performance.now();
-    const previous_change = last_preview_change_ref.current;
-    last_preview_change_ref.current = now;
-    const switchPreview = () => {
-      const preview_url = selected_preview_audio_url;
-      if (!preview_url) return;
-      const previous_index = active_audio_ref.current;
-      const next_index = previous_index === 0 ? 1 : 0;
-      const previous_audio = audio_refs.current[previous_index];
-      const next_audio = audio_refs.current[next_index];
-      if (!next_audio) return;
-      next_audio.pause();
-      next_audio.src = preview_url;
-      next_audio.defaultPlaybackRate = music_rate;
-      next_audio.playbackRate = music_rate;
-      next_audio.volume = 0;
-      audio_gains_ref.current[next_index] = 0;
-
-      let started = false;
-      const stopPreviousAudio = () => {
-        if (request !== preview_request_ref.current) return;
-        fadeAudioGains([0, 0], AUDIO_PREVIEW_CROSSFADE_MS, () => previous_audio?.pause());
-      };
-      const startPlayback = () => {
-        if (started || request !== preview_request_ref.current) return;
-        if (!preview_unlocked_ref.current) {
-          pending_preview_start_ref.current = startPlayback;
-          return;
-        }
-        started = true;
-        pending_preview_start_ref.current = null;
-        next_audio.currentTime = selected_chart?.preview_time ?? 0;
-        void next_audio.play().then(() => {
-          if (request !== preview_request_ref.current) {
-            next_audio.pause();
-            return;
-          }
-          active_audio_ref.current = next_index;
-          const targets: [number, number] = next_index === 0 ? [1, 0] : [0, 1];
-          fadeAudioGains(targets, AUDIO_PREVIEW_CROSSFADE_MS, () => {
-            if (request !== preview_request_ref.current) return;
-            previous_audio?.pause();
-            previous_audio?.removeAttribute("src");
-            previous_audio?.load();
-          });
-        }).catch(stopPreviousAudio);
-      };
-      if (next_audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) startPlayback();
-      else next_audio.addEventListener("canplay", startPlayback, { once: true });
-      next_audio.addEventListener("error", stopPreviousAudio, { once: true });
-    };
-    if (previous_change === null || now - previous_change >= AUDIO_PREVIEW_DEBOUNCE_MS) {
-      switchPreview();
-      return;
-    }
-    const timer = window.setTimeout(switchPreview, AUDIO_PREVIEW_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [selected_preview_audio_url, selected_chart?.preview_time, selected_chart?.source_id]);
-
-  useEffect(() => () => {
-    if (audio_fade_frame_ref.current !== null) cancelAnimationFrame(audio_fade_frame_ref.current);
-  }, []);
+    if (selected_chart?.source_type === "local" && !selected_local_media) return;
+    preview_player.select(selected_song?.id ?? "", selected_preview_audio_url, selected_chart?.preview_time ?? 0);
+  }, [preview_player, selected_local_media, selected_preview_audio_url, selected_chart?.preview_time,
+    selected_chart?.source_type, selected_song?.id]);
 
   const selectEntry = (entry: ChartSelectionEntry) => {
     chart_selector.selectEntry(entry);
@@ -411,9 +304,7 @@ export function SongSelectScreen({
   const session_duration = formatSessionDuration(Math.floor((now.getTime() - SESSION_STARTED_AT) / 1_000));
   const hero_loaded = background_url === null || background_url === loaded_background_url;
   const unlockPreview = () => {
-    if (preview_unlocked_ref.current) return;
-    preview_unlocked_ref.current = true;
-    pending_preview_start_ref.current?.();
+    preview_player.unlock();
   };
   const playChart = (chart: Chartview, song = selected_song) => {
     onPlay(chart, loadInputBindings(inputLayout(chart)), {

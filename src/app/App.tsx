@@ -31,6 +31,7 @@ import { submitPlay } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
+import { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
 
 type Screen = "welcome" | "catalog-loading" | "song-select" | "loading" | "gameplay" | "result";
 type ScreenTransitionKind = "song-loading" | "loading-gameplay";
@@ -64,7 +65,7 @@ export function App() {
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
-  const [preview_audio] = useState<readonly [HTMLAudioElement, HTMLAudioElement]>(() => [new Audio(), new Audio()]);
+  const [preview_player] = useState(() => new SongPreviewPlayer());
   const local_library_status = useSyncExternalStore(local_library.subscribe, local_library.getStatus);
   const remote_providers = useSyncExternalStore(remote_libraries.subscribe, remote_libraries.getSnapshot);
   const note_skin_catalog = useRef(new NoteSkinCatalog());
@@ -113,8 +114,8 @@ export function App() {
   }, []);
 
   useEffect(() => () => {
-    for (const audio of preview_audio) audio.pause();
-  }, [preview_audio]);
+    preview_player.destroy();
+  }, [preview_player]);
 
   const changeMusicRate = (value: number) => {
     const rate = Math.round(value * 1000) / 1000;
@@ -204,7 +205,7 @@ export function App() {
   };
 
   const finishLoading = (loaded_assets: GameplayData) => {
-    for (const audio of preview_audio) audio.pause();
+    preview_player.stop();
     setAssets(loaded_assets);
     transitionTo("gameplay", "loading-gameplay");
   };
@@ -350,7 +351,7 @@ export function App() {
         <ScreenTransition key="song-select">
           <SongSelectScreen
             chart_selector={chart_selector}
-            preview_audio={preview_audio}
+            preview_player={preview_player}
             nickname={nickname.trim() || "Anonymous"}
             master_volume={master_volume}
             music_rate={replay_base.rate}
