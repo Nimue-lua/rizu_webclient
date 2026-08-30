@@ -121,3 +121,27 @@ test("selecting another chart from the same set leaves its preview playing", asy
     restoreBrowserTimers();
   }
 });
+
+test("toggle pauses and resumes the active preview", async () => {
+  installBrowserTimers();
+  try {
+    const first = new FakeAudio();
+    const second = new FakeAudio();
+    const player = new SongPreviewPlayer([first, second] as unknown as [HTMLAudioElement, HTMLAudioElement]);
+
+    player.unlock();
+    player.select("song-set-1", "song.mp3", 10);
+    await Promise.resolve();
+    assert.equal(player.getPaused(), false);
+
+    player.togglePaused();
+    assert.equal(player.getPaused(), true);
+    player.togglePaused();
+    await Promise.resolve();
+
+    assert.equal(player.getPaused(), false);
+    assert.equal(second.play_count, 2);
+  } finally {
+    restoreBrowserTimers();
+  }
+});

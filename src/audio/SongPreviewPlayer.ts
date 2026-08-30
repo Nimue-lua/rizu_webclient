@@ -4,6 +4,7 @@ const PREVIEW_CROSSFADE_MS = 300;
 
 export class SongPreviewPlayer {
   private readonly audio: readonly [HTMLAudioElement, HTMLAudioElement];
+  private readonly listeners = new Set<() => void>();
   private active_index = 0;
   private gains: [number, number] = [0, 0];
   private volume = 1;
@@ -15,10 +16,18 @@ export class SongPreviewPlayer {
   private debounce_timer: number | null = null;
   private last_change: number | null = null;
   private selected_id: string | null = null;
+  private paused = true;
 
   constructor(audio: readonly [HTMLAudioElement, HTMLAudioElement] = [new Audio(), new Audio()]) {
     this.audio = audio;
   }
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  getPaused = (): boolean => this.paused;
 
   setVolume(volume: number): void {
     this.volume = Math.min(Math.max(volume, 0), 1);
@@ -91,6 +100,7 @@ export class SongPreviewPlayer {
             return;
           }
           this.active_index = next_index;
+          this.setPaused(false);
           this.fadeTo(next_index === 0 ? [1, 0] : [0, 1], PREVIEW_CROSSFADE_MS, () => {
             if (request !== this.request) return;
             this.clearAudio(previous_audio);
@@ -113,6 +123,23 @@ export class SongPreviewPlayer {
     this.clearDebounce();
     this.cancelFade();
     for (const audio of this.audio) audio.pause();
+    this.setPaused(true);
+  }
+
+  resume(): void {
+    if (!this.paused || !this.selected_id) return;
+    const audio = this.audio[this.active_index];
+    if (!audio.src) return;
+    const request = this.request;
+    void audio.play().then(() => {
+      if (request === this.request) this.setPaused(false);
+      else audio.pause();
+    }).catch(() => undefined);
+  }
+
+  togglePaused(): void {
+    if (this.paused) this.resume();
+    else this.pause();
   }
 
   stop(fade_ms = 0): void {
@@ -120,6 +147,7 @@ export class SongPreviewPlayer {
     this.selected_id = null;
     this.pending_start = null;
     this.clearDebounce();
+    this.setPaused(true);
     if (fade_ms > 0) {
       this.fadeTo([0, 0], fade_ms, () => this.clearAllAudio());
       return;
@@ -179,5 +207,11 @@ export class SongPreviewPlayer {
     audio.pause();
     audio.removeAttribute("src");
     audio.load();
+  }
+
+  private setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    for (const listener of this.listeners) listener();
   }
 }

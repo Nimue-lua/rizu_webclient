@@ -94,10 +94,14 @@ interface SelectedSongPanelProps {
   selected_song: ChartfileSetView | undefined;
   stored_plays: readonly StoredPlay[];
   onBackgroundLoaded: () => void;
+  onAutoplay: () => void;
+  onTogglePreview: () => void;
+  preview_paused: boolean;
   onReplay: (play: StoredPlay) => void;
 }
 
-export function SelectedSongPanel({ nickname, background_url, background_loaded, selected_chart, selected_song, stored_plays, onBackgroundLoaded, onReplay }: SelectedSongPanelProps) {
+export function SelectedSongPanel({ nickname, background_url, background_loaded, selected_chart, selected_song,
+  stored_plays, onBackgroundLoaded, onAutoplay, onTogglePreview, preview_paused, onReplay }: SelectedSongPanelProps) {
   const [score_source, setScoreSource] = useState<"local" | "online">("online");
   const [online_scores, setOnlineScores] = useState<readonly OnlineScore[]>([]);
   const [online_scores_state, setOnlineScoresState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
@@ -126,6 +130,13 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
     <div className="song-select-column left-column">
       <article className={`song-hero${background_loaded ? " loaded" : ""}`}>
         {background_url && <img key={background_url} className="song-hero-background" src={background_url} alt="" onLoad={onBackgroundLoaded} onError={onBackgroundLoaded} />}
+        <button className="song-hero-preview-toggle" type="button" disabled={!selected_chart}
+          aria-label={preview_paused ? "Resume song preview" : "Pause song preview"} onClick={onTogglePreview}>
+          <SongSelectIcon name={preview_paused ? "play" : "pause"} />
+        </button>
+        <button className="song-hero-autoplay" type="button" disabled={!selected_chart} onClick={onAutoplay}>
+          <SongSelectIcon name="play" /><span>AUTO</span>
+        </button>
         <div className="song-hero-chart" key={selected_chart?.id ?? "no-chart"}><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
         <div className="song-hero-metadata" key={selected_song?.id ?? "no-song"}><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
       </article>

@@ -12,11 +12,10 @@ interface SongSelectFooterProps {
   onOpenModifiers: () => void;
   onOpenSkins: () => void;
   onPlay: () => void;
-  onAutoplay: () => void;
 }
 
 export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_available, tap_only,
-  onMusicRateChange, onOpenInputs, onOpenModifiers, onOpenSkins, onPlay, onAutoplay }: SongSelectFooterProps) {
+  onMusicRateChange, onOpenInputs, onOpenModifiers, onOpenSkins, onPlay }: SongSelectFooterProps) {
   const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const speed_progress = (music_rate - 0.25) / 3.75;
   const speed_style = {
@@ -49,7 +48,6 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
             onMusicRateChange(Math.min(4, Math.max(0.25, Math.round((music_rate + offset) * 100) / 100)));
           }}><span /><input {...hover_key_handlers} id="music-rate" type="range" min="0.25" max="4" step="0.05" value={music_rate} aria-label="Music speed" onChange={(event) => onMusicRateChange(Number(event.target.value))} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.focus(); event.currentTarget.setPointerCapture(event.pointerId); rate_drag_ref.current = { pointer_id: event.pointerId, start_x: event.clientX, start_rate: music_rate }; }} onPointerMove={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) moveRateDrag(event.clientX); }} onPointerUp={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} onPointerCancel={(event) => { if (rate_drag_ref.current?.pointer_id === event.pointerId) rate_drag_ref.current = null; }} /></span>
         </label></div>
-        <button className="autoplay-control" disabled={!selected_chart_available} onClick={onAutoplay}><span>AUTO</span><SongSelectIcon name="play" /></button>
         <button className="play-control" disabled={!selected_chart_available} onClick={onPlay}><span>PLAY</span><SongSelectIcon name="play" /></button>
       </div>
     </footer>

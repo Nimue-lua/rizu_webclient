@@ -15,6 +15,7 @@ import {
   Monitor,
   Music2,
   Paintbrush,
+  Pause,
   Play,
   Puzzle,
   RefreshCw,
@@ -31,7 +32,7 @@ import type { ChartSortMode } from "../../select/ChartSelector";
 
 type IconName = "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
   "chevron-right" | "clock" | "download" | "file" | "filter" | "folder" | "globe" | "keyboard" |
-  "metronome" | "monitor" | "music" | "paintbrush" | "play" | "puzzle" | "search" |
+  "metronome" | "monitor" | "music" | "paintbrush" | "pause" | "play" | "puzzle" | "search" |
   "refresh" | "settings" | "terminal" | "trophy" | "undo" | "zap";
 
 const icons: Record<IconName, LucideIcon> = {
@@ -51,6 +52,7 @@ const icons: Record<IconName, LucideIcon> = {
   monitor: Monitor,
   music: Music2,
   paintbrush: Paintbrush,
+  pause: Pause,
   play: Play,
   puzzle: Puzzle,
   refresh: RefreshCw,

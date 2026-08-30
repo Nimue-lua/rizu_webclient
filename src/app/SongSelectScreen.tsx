@@ -100,6 +100,7 @@ export function SongSelectScreen({
   const selected_difficulty_ref = useRef<HTMLButtonElement>(null);
   const restored_song_scroll_ref = useRef(false);
   const selection = useSyncExternalStore(chart_selector.subscribe, chart_selector.getSnapshot);
+  const preview_paused = useSyncExternalStore(preview_player.subscribe, preview_player.getPaused);
   const scroll_top_ref = useRef(0);
   const [now, setNow] = useState(() => new Date());
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
@@ -356,7 +357,9 @@ export function SongSelectScreen({
         <section className="song-select-content">
           <SelectedSongPanel background_url={background_url} background_loaded={hero_loaded} selected_chart={selected_chart}
             selected_song={selected_song} stored_plays={stored_plays} nickname={nickname}
-            onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)} onReplay={playReplay} />
+            onBackgroundLoaded={() => setLoadedBackgroundUrl(background_url)}
+            onAutoplay={() => selected_chart && autoplayChart(selected_chart)} onTogglePreview={() => preview_player.togglePaused()}
+            preview_paused={preview_paused} onReplay={playReplay} />
           <ChartBrowser chart_level_sort={chart_level_sort} difficulty_strip_ref={difficulty_strip_ref} error={selection.error}
             initial_scroll_top={scroll_top_ref.current} query={selection.query} selected_chart={selected_chart} selected_difficulty_ref={selected_difficulty_ref}
             selected_song={selected_song} selection_entries={selection_entries} sort_mode={selection.sort_mode} viewport_ref={viewport_ref}
@@ -372,7 +375,7 @@ export function SongSelectScreen({
         <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
           onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
           onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)}
-          onAutoplay={() => selected_chart && autoplayChart(selected_chart)} />
+        />
       </>}
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
