@@ -18,7 +18,7 @@ export interface OnlineScore {
   readonly keys: number | null;
   readonly replay_base: unknown;
   readonly difficulty: number;
-  readonly pp: number;
+  readonly max_skill_difficulty: number;
 }
 
 export interface OnlineUser {

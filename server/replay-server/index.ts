@@ -141,16 +141,6 @@ function credentials(payload: JsonObject): { name: string; password: string } {
   return { name, password };
 }
 
-export function playPp(difficulty: unknown, accuracy: unknown): number {
-  const safe_difficulty = typeof difficulty === "number" && Number.isFinite(difficulty)
-    ? Math.max(0, difficulty)
-    : 0;
-  const safe_accuracy = typeof accuracy === "number" && Number.isFinite(accuracy)
-    ? Math.min(1, Math.max(0, accuracy))
-    : 0;
-  return Math.round(safe_difficulty ** 2 * 8 * safe_accuracy ** 6 * 100) / 100;
-}
-
 export function skillRating(difficulty: unknown, accuracy: unknown): number {
   const safe_difficulty = typeof difficulty === "number" && Number.isFinite(difficulty)
     ? Math.max(0, difficulty)
@@ -237,7 +227,7 @@ function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
   const chart = typeof metadata.chart_md5 === "string" && typeof metadata.chart_index === "number"
     ? catalogChart(catalog, metadata.chart_md5, metadata.chart_index)
     : undefined;
-  const difficulty = chart?.difficulty ?? 0;
+  const max_skill_difficulty = Math.max(0, ...SKILLS.map((skill) => chart?.[skill] ?? 0));
   return {
     ...metadata,
     id: row.id,
@@ -246,12 +236,12 @@ function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
     submitted_at: row.submitted_at,
     registered: row.user_id !== null,
     replay_url: `/api/scores/${row.id}/replay`,
-    difficulty,
+    difficulty: chart?.difficulty ?? 0,
+    max_skill_difficulty,
     keys: chart?.keys ?? null,
     chart_name: chart?.name ?? "Unknown difficulty",
     title: chart?.title ?? "Unknown title",
     artist: chart?.artist ?? "Unknown artist",
-    pp: playPp(difficulty, metadata.accuracy),
   };
 }
 

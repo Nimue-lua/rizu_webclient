@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, test } from "node:test";
-import { openReplayDatabase, createReplayServer, playPp, skillRating } from "./index.ts";
+import { openReplayDatabase, createReplayServer, skillRating } from "./index.ts";
 
 interface ApiResult {
   [key: string]: any;
@@ -114,7 +114,8 @@ test("shows only a registered user's best chart score and every anonymous score"
     ["Anonymous", 0.7, false],
   ]);
   assert.equal(result.scores[0].difficulty, 5);
-  assert.equal(result.scores[0].pp, playPp(5, 0.95));
+  assert.equal(result.scores[0].max_skill_difficulty, 8);
+  assert.equal(result.scores[0].pp, undefined);
 });
 
 test("lists recent plays newest first without deduplicating users", async () => {
@@ -128,11 +129,12 @@ test("lists recent plays newest first without deduplicating users", async () => 
     ["11111111111111111111111111111111", 1, "Player"],
   ]);
   assert.equal(result.scores[0].difficulty, 10);
+  assert.equal(result.scores[0].max_skill_difficulty, 9);
   assert.equal(result.scores[0].artist, "Second Artist");
   assert.equal(result.scores[0].title, "Second Song");
   assert.equal(result.scores[0].keys, 7);
   assert.equal(result.scores[0].chart_name, "Challenge");
-  assert.equal(result.scores[0].pp, playPp(10, 0.9));
+  assert.equal(result.scores[0].pp, undefined);
 });
 
 test("counts all scores and scores submitted today", async () => {

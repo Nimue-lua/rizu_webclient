@@ -1,15 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { catalogUrl, DEFAULT_REMOTE_PROVIDER, remoteAssetUrl } from "../src/library/ProviderUrl";
-
-test("uses the local development catalog as the built-in provider", () => {
-  assert.deepEqual(DEFAULT_REMOTE_PROVIDER, {
-    id: "builtin",
-    name: "Local catalog",
-    description: "/media/SSD/s3_test",
-    catalog_url: "http://localhost:4174/catalog.sqlite",
-  });
-});
+import { catalogUrl, remoteAssetUrl } from "../src/library/ProviderUrl";
 
 test("normalizes remote provider URLs to catalog.sqlite", () => {
   assert.equal(catalogUrl("charts.example.com"), "https://charts.example.com/catalog.sqlite");

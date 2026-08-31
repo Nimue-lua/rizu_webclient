@@ -128,9 +128,9 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .welcome-score-result strong { font-size: 15px; }
 .welcome-score-result time { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .welcome-score-grade { display: grid; color: var(--score-color); background: color-mix(in srgb, var(--surface) 72%, transparent); font-size: 32px; font-weight: 500; place-items: center; }
-.welcome-score-pp { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 9px; background: var(--surface); white-space: nowrap; }
-.welcome-score-pp strong { font-size: 19px; }
-.welcome-score-pp span { color: var(--muted); font-size: 9px; font-weight: 700; }
+.welcome-score-difficulty { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 9px; background: var(--surface); white-space: nowrap; }
+.welcome-score-difficulty strong { font-size: 19px; }
+.welcome-score-difficulty svg { width: 12px; height: 12px; color: var(--muted); stroke-width: 3; }
 .welcome-score-entry:hover { filter: brightness(1.1); }
 .welcome-recent-status { display: grid; min-height: 144px; color: var(--muted); font-size: 13px; place-items: center; }
 .welcome-copy { color: var(--muted); font-size: 14px; line-height: 1.65; }
@@ -156,7 +156,7 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
   .welcome-score-entry { grid-template-columns: minmax(0, 1fr) 96px 44px; }
   .welcome-score-result { padding-right: 8px; }
   .welcome-score-grade { font-size: 26px; }
-  .welcome-score-pp { display: none; }
+  .welcome-score-difficulty { display: none; }
 }
 
 .loading-screen { position: relative; width: 100%; height: 100%; overflow: hidden; background: transparent; isolation: isolate; }
@@ -378,6 +378,7 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .score-details strong { color: var(--grade-color); font-size: 24px; font-weight: 400; }
 .score-details span { color: var(--grade-color); font-size: 16px; line-height: 1; white-space: nowrap; }
 .score-details b { margin-right: 12px; color: var(--text); font-weight: 400; }
+.score-details b svg { width: 11px; height: 11px; margin-left: 2px; stroke-width: 3; }
 .score-details time { color: var(--muted); }
 
 .global-leaderboard-screen { display: grid; grid-row: 2 / -1; grid-template-rows: 112px minmax(0, 1fr); min-height: 0; overflow: hidden; background: var(--background); }

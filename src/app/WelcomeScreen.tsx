@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Play, Trophy } from "lucide-react";
+import { ArrowUpRight, Play, Sigma, Trophy } from "lucide-react";
 import { listRecentPlays, loadScoreStats, type OnlineScore, type ScoreStats } from "../replay/ReplayServer";
 
 interface WelcomeScreenProps {
@@ -105,7 +105,7 @@ export function WelcomeScreen({ onPlay }: WelcomeScreenProps) {
                     <time dateTime={play.submitted_at} title={new Date(play.submitted_at).toLocaleString()}>{timeAgo(play.submitted_at, now)}</time>
                   </div>
                   <strong className={`welcome-score-grade grade-${(play.grade ?? "-").toLowerCase()}`}>{play.grade ?? "-"}</strong>
-                  <div className="welcome-score-pp"><strong>{play.pp.toFixed(2)}</strong><span>PP</span></div>
+                  <div className="welcome-score-difficulty"><strong>{play.max_skill_difficulty.toFixed(2)}</strong><Sigma aria-hidden="true" /></div>
                 </article>)}
               </div> : <div className="welcome-recent-status">
                 {plays_state === "loading" ? "Loading recent plays..." : plays_state === "error" ? "Could not load recent plays" : "No plays submitted yet"}
