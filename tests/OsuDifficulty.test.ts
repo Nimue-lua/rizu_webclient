@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuCircle, OsuHitObject, OsuSlider } from "../src/chart/Chart";
 import { calculateOsuDifficulty, calculateOsuDifficultyAttributes } from "../src/gameplay/osu/scoring/OsuDifficulty";
+import { OsuMouseMovementSimulator } from "../src/gameplay/osu/scoring/OsuMouseMovement";
 
 const sample = { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" };
 
@@ -54,6 +55,25 @@ test("rapid notes rate as speed regardless of spacing", () => {
   assert.ok(attributes(fast_stacked).speed > attributes(slow).speed);
 });
 
+test("low-speed bursts add little speed strain", () => {
+  const burst = (interval: number) => [0, interval, interval * 2].map((time) => circle(time));
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
+
+  assert.equal(attributes(burst(150)).speed, 0);
+  assert.ok(attributes(burst(62.5)).speed > attributes(burst(79)).speed * 2);
+});
+
+test("long streams rate above short bursts at the same tapping speed", () => {
+  const pattern = (count: number, interval: number) =>
+    Array.from({ length: count }, (_, index) => circle(index * interval));
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
+
+  assert.ok(attributes(pattern(49, 62.5)).speed > attributes(pattern(3, 62.5)).speed * 2);
+  assert.ok(attributes(pattern(49, 79)).speed > attributes(pattern(3, 79)).speed * 2);
+});
+
 test("spaced jumps rate as dexterity without an angle bonus", () => {
   const stacked = [circle(0), circle(150), circle(300)];
   const one_direction = [circle(0, 0, 0), circle(150, 150, 0), circle(300, 300, 0)];
@@ -64,6 +84,26 @@ test("spaced jumps rate as dexterity without an angle bonus", () => {
   assert.equal(attributes(stacked).dexterity, 0);
   assert.ok(attributes(one_direction).dexterity > 0);
   assert.ok(attributes(square).dexterity > attributes(one_direction).dexterity);
+});
+
+test("mouse movement uses circle edges and exposes velocity", () => {
+  const large_circles = new OsuMouseMovementSimulator(3);
+  const small_circles = new OsuMouseMovementSimulator(7);
+  const large_move = large_circles.move({ x: 0, y: 0 }, { x: 70, y: 0 }, 100);
+  const small_move = small_circles.move({ x: 0, y: 0 }, { x: 70, y: 0 }, 100);
+
+  assert.equal(large_move.edge_distance, 0);
+  assert.ok(small_move.edge_distance > 0);
+  assert.equal(small_circles.velocity, small_move.edge_distance / 100);
+});
+
+test("smaller circles make the same stream harder to aim", () => {
+  const stream = Array.from({ length: 101 }, (_, index) => circle(index * 100, index % 2 ? 306 : 206));
+  const large = calculateOsuDifficultyAttributes({ circle_size: 3, end_time: 120, hit_objects: stream });
+  const small = calculateOsuDifficultyAttributes({ circle_size: 7, end_time: 120, hit_objects: stream });
+
+  assert.ok(small.dexterity > large.dexterity);
+  assert.ok(small.technical > large.technical);
 });
 
 test("sustained spaced streams add aim-sync technical difficulty", () => {
@@ -81,12 +121,33 @@ test("sustained spaced streams add aim-sync technical difficulty", () => {
   assert.ok(long_spaced.technical > long_stacked.technical * 5);
 });
 
+test("repeated long spaced streams build sustained precision strain", () => {
+  const stream = (start: number, count: number) => Array.from({ length: count }, (_, index) =>
+    circle(start + index * 94, index % 2 ? 306 : 206));
+  const short = stream(0, 9);
+  const endless = Array.from({ length: 12 }, (_, index) => stream(index * 1500, 14)).flat();
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ circle_size: 4.2, end_time: 120, hit_objects });
+
+  assert.ok(attributes(endless).technical > attributes(short).technical * 1.5);
+});
+
 test("awkward jump angles strain more than one-direction movement", () => {
   const one_direction = [circle(0, 0, 0), circle(200, 150, 0), circle(400, 300, 0)];
   const square = [circle(0, 0, 0), circle(200, 150, 0), circle(400, 150, 150)];
   const attributes = (hit_objects: readonly OsuHitObject[]) =>
     calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
   assert.ok(attributes(square).technical > attributes(one_direction).technical + 0.5);
+});
+
+test("sudden reversals are more technical than continuing forward", () => {
+  const straight = [circle(0, 0, 0), circle(150, 150, 0), circle(300, 300, 0)];
+  const reversal = [circle(0, 0, 0), circle(150, 150, 0), circle(300, 0, 0)];
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ circle_size: 5, end_time: 120, hit_objects });
+
+  assert.ok(attributes(reversal).dexterity > attributes(straight).dexterity);
+  assert.ok(attributes(reversal).technical > attributes(straight).technical + 0.5);
 });
 
 test("square jump turns are more technical than triangle turns", () => {
@@ -140,14 +201,19 @@ test("discounts short charts by length", () => {
   assert.equal(rating(120), full);
 });
 
-test("overall difficulty is a tight smooth maximum of the four skills", () => {
+test("overall difficulty combines all four skill demands", () => {
   const hit_objects = Array.from({ length: 101 }, (_, index) => circle(index * 100, index % 2 ? 400 : 100));
   const attributes = calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
   const skills = [attributes.speed, attributes.dexterity, attributes.stamina, attributes.technical];
 
-  assert.ok(Math.abs(attributes.difficulty - skills.reduce((sum, skill) => sum + skill ** 6, 0) ** (1 / 6)) < 1e-10);
+  assert.ok(Math.abs(attributes.difficulty - Math.hypot(...skills)) < 1e-10);
   assert.ok(attributes.difficulty >= Math.max(...skills));
-  assert.ok(attributes.difficulty <= Math.max(...skills) * 4 ** (1 / 6));
+  assert.ok(attributes.difficulty <= Math.max(...skills) * 2);
+});
+
+test("overall difficulty rewards strong secondary skills", () => {
+  const aggregate = (skills: readonly number[]) => Math.hypot(...skills);
+  assert.ok(aggregate([10, 12, 3, 6]) > aggregate([2, 12, 1, 2]) + 4);
 });
 
 test("long fast repeating sliders receive a large technical bonus", () => {
@@ -181,6 +247,17 @@ test("fast repeating sliders rate above slow plain sliders in technical", () => 
     calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
 
   assert.ok(attributes(fast_repeating).technical > attributes(slow).technical + 0.5);
+});
+
+test("short sliders inside the follow radius require no cursor velocity", () => {
+  const short = calculateOsuDifficultyAttributes({
+    circle_size: 3, end_time: 120, hit_objects: [circle(0), slider(500, 100, 250)],
+  });
+  const long = calculateOsuDifficultyAttributes({
+    circle_size: 3, end_time: 120, hit_objects: [circle(0), slider(500, 500, 250)],
+  });
+
+  assert.ok(long.technical > short.technical + 1);
 });
 
 test("keeps malformed negative slider lengths finite", () => {

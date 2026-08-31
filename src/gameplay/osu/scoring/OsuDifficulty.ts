@@ -1,8 +1,5 @@
-import type { OsuChart, OsuHitObject } from "../../../chart/Chart";
-
-function distance(left: OsuHitObject, right: OsuHitObject): number {
-  return Math.hypot(right.x - left.x, right.y - left.y);
-}
+import type { OsuChart } from "../../../chart/Chart";
+import { OsuMouseMovementSimulator } from "./OsuMouseMovement";
 
 export interface OsuDifficultyAttributes {
   difficulty: number;
@@ -25,7 +22,7 @@ function scaleSkill(strain: number): number {
 }
 
 function aggregateSkills(skills: readonly number[]): number {
-  return skills.reduce((sum, skill) => sum + skill ** 6, 0) ** (1 / 6);
+  return Math.hypot(...skills);
 }
 
 function movementDifficulty(section_rates: ReadonlyMap<number, number>): number {
@@ -43,8 +40,14 @@ function movementDifficulty(section_rates: ReadonlyMap<number, number>): number 
   return (peak_strain + Math.sqrt(sustained_load) * 0.05) * 1.7;
 }
 
+function sustainedAimSyncDifficulty(section_strains: ReadonlyMap<number, number>): number {
+  const sustained_load = [...section_strains.values()]
+    .reduce((sum, strain) => sum + Math.max(0, strain - 4) / 4, 0);
+  return Math.sqrt(sustained_load) * 0.2;
+}
+
 export function calculateOsuDifficultyAttributes(
-  chart: Pick<OsuChart, "end_time" | "hit_objects">,
+  chart: Pick<OsuChart, "end_time" | "hit_objects"> & Partial<Pick<OsuChart, "circle_size">>,
 ): OsuDifficultyAttributes {
   const objects = chart.hit_objects.filter((object) => object.kind !== "spinner");
   if (objects.length === 0) return { difficulty: 0, speed: 0, dexterity: 0, stamina: 0, technical: 0 };
@@ -55,72 +58,68 @@ export function calculateOsuDifficultyAttributes(
   const aim_sync_strains: number[] = [];
   const first_time = objects[0]!.absolute_time;
   const movement_sections = new Map<number, number>();
+  const aim_sync_sections = new Map<number, number>();
   let previous_delta = 0;
-  let previous_angle = 0;
   let stamina_seconds = 0;
   let spaced_stream_length = 0;
+  let tapping_run_length = 0;
+  const mouse = new OsuMouseMovementSimulator(chart.circle_size ?? 5);
   for (let index = 1; index < objects.length; index += 1) {
     const previous = objects[index - 1]!;
     const object = objects[index]!;
     const delta = (object.absolute_time - previous.absolute_time) * 1000;
     if (!(delta > 0)) continue;
 
-    const spacing = distance(previous, object);
+    const center_spacing = Math.hypot(object.x - previous.x, object.y - previous.y);
+    const movement = mouse.move(previous, object, delta);
+    const spacing = movement.edge_distance;
     const speed = 200 / Math.max(delta, 50);
     const rhythm = previous_delta > 0
       ? Math.min(Math.abs(Math.log2(delta / previous_delta)), 2) * 1.2
       : 0;
     const jump = Math.min((spacing / 150) * speed * 1.2, 5);
-    let turn_angle = 0;
-    let angle_technical = 0;
-    const earlier = objects[index - 2];
-    if (earlier) {
-      const incoming_x = previous.x - earlier.x;
-      const incoming_y = previous.y - earlier.y;
-      const outgoing_x = object.x - previous.x;
-      const outgoing_y = object.y - previous.y;
-      const incoming_distance = Math.hypot(incoming_x, incoming_y);
-      if (incoming_distance > 0 && spacing > 0) {
-        const cosine = Math.max(-1, Math.min(1,
-          (incoming_x * outgoing_x + incoming_y * outgoing_y) / (incoming_distance * spacing)));
-        turn_angle = Math.acos(cosine);
-        const angle_factor = Math.sin(turn_angle);
-        const unpredictability = Math.min(Math.abs(turn_angle - previous_angle) / (Math.PI / 2), 1);
-        angle_technical = Math.min((Math.min(incoming_distance, spacing) / 150) * speed * angle_factor * unpredictability, 3);
-      }
-    }
+    const angle_technical = Math.min((spacing / 150) * speed * movement.turn_difficulty, 3);
     if (delta <= 500) {
-      const awkwardness = 1 + Math.sin(turn_angle) * 0.2;
       const section = Math.floor((object.absolute_time - first_time) / 0.5);
-      movement_sections.set(section, (movement_sections.get(section) ?? 0) + spacing * awkwardness * 2);
+      movement_sections.set(section, (movement_sections.get(section) ?? 0) + spacing * movement.awkwardness * 2);
     }
-    const stream = delta <= 200 && spacing <= 140
-      ? speed * 0.75 * (1 + Math.min(spacing / 120, 1) * 0.6)
+    const stream = delta <= 200 && center_spacing <= 140
+      ? speed * 0.75 * (1 + Math.min(center_spacing / 120, 1) * 0.6)
       : 0;
     if (delta >= 30_000) stamina_seconds = 0;
     else if (delta > 200) stamina_seconds *= 10 ** (-delta / 5000);
     if (stream > 0) stamina_seconds = Math.min(120, stamina_seconds + delta / 1000);
     const stamina = stream > 0 ? Math.sqrt(Math.min(stamina_seconds, 10) / 10) * stream * 1.5 : 0;
-    if (delta <= 200) speed_strains.push(speed * 1.5);
+    if (delta <= 150) {
+      tapping_run_length = Math.min(24, tapping_run_length + 1);
+      const tapping_rate = Math.max(0, 150 / Math.max(delta, 50) - 1);
+      const sustained_bonus = 0.35 + 0.65 * Math.sqrt(tapping_run_length / 24);
+      speed_strains.push(tapping_rate * 2.6 * sustained_bonus);
+    } else {
+      tapping_run_length = 0;
+    }
     spaced_stream_length = delta > 120
       ? 0
-      : spacing >= 70
+      : spacing > 0
         ? Math.min(12, spaced_stream_length + 1)
         : Math.max(0, spaced_stream_length - 1);
     const aim_sync = jump * Math.min(spaced_stream_length / 12, 1) * 2.8;
-    if (aim_sync > 0) aim_sync_strains.push(aim_sync);
+    if (aim_sync > 0) {
+      aim_sync_strains.push(aim_sync);
+      const section = Math.floor((object.absolute_time - first_time) / 0.5);
+      aim_sync_sections.set(section, (aim_sync_sections.get(section) ?? 0) + aim_sync);
+    }
     if (stamina > 0) stamina_strains.push(stamina);
     const transition_technical = rhythm * Math.sqrt(speed) + angle_technical + aim_sync;
     if (transition_technical > 0) technical_strains.push(transition_technical);
     previous_delta = delta;
-    previous_angle = turn_angle;
   }
 
   for (const object of objects) {
     if (object.kind !== "slider") continue;
     const slider_length = Math.max(0, object.pixel_length);
     const span_duration_ms = object.span_duration * 1000;
-    const slider_speed = span_duration_ms > 0 ? slider_length / span_duration_ms : 0;
+    const slider_speed = mouse.sliderVelocity(slider_length, span_duration_ms);
     const slider_technical = slider_speed
       * (1.2 + Math.min(Math.sqrt(slider_length / 100) * 0.35, 1.5))
       * (1 + Math.max(0, object.repeat_count - 1) * 0.25);
@@ -132,10 +131,14 @@ export function calculateOsuDifficultyAttributes(
   const speed = scaleSkill(hardestAverage(speed_strains) * length_multiplier);
   const dexterity = scaleSkill(movementDifficulty(movement_sections) * length_multiplier);
   const stamina = scaleSkill(hardestAverage(stamina_strains) * length_multiplier);
-  const technical = scaleSkill(Math.max(hardestAverage(technical_strains), hardestAverage(aim_sync_strains)) * length_multiplier);
+  const technical_strain = Math.max(hardestAverage(technical_strains), hardestAverage(aim_sync_strains))
+    + sustainedAimSyncDifficulty(aim_sync_sections);
+  const technical = scaleSkill(technical_strain * length_multiplier);
   return { difficulty: aggregateSkills([speed, dexterity, stamina, technical]), speed, dexterity, stamina, technical };
 }
 
-export function calculateOsuDifficulty(chart: Pick<OsuChart, "end_time" | "hit_objects">): number {
+export function calculateOsuDifficulty(
+  chart: Pick<OsuChart, "end_time" | "hit_objects"> & Partial<Pick<OsuChart, "circle_size">>,
+): number {
   return calculateOsuDifficultyAttributes(chart).difficulty;
 }

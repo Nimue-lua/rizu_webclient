@@ -80,6 +80,25 @@ test("adds technical strain for awkward jump angles", () => {
   assert.ok(square.technical > straight.technical + 0.5);
 });
 
+test("uses circle edges for osu cursor movement", () => {
+  const chart = (circle_size) => `Mode:0\nCircleSize:${circle_size}\n[HitObjects]\n${Array.from({ length: 101 }, (_, index) =>
+    `${index % 2 ? 306 : 206},192,${index * 100},1,0,0:0:0:0:`).join("\n")}`;
+  const large = parseOsuMetadata(chart(3), "folder", "large.osu");
+  const small = parseOsuMetadata(chart(7), "folder", "small.osu");
+
+  assert.ok(small.dexterity > large.dexterity);
+  assert.ok(small.technical > large.technical);
+});
+
+test("rates sudden cursor reversals as technical", () => {
+  const chart = (positions) => `Mode:0\nCircleSize:5\n[HitObjects]\n${positions.map(([x, y], index) =>
+    `${x},${y},${index * 150},1,0,0:0:0:0:`).join("\n")}`;
+  const straight = parseOsuMetadata(chart([[0, 0], [150, 0], [300, 0]]), "folder", "straight.osu");
+  const reversal = parseOsuMetadata(chart([[0, 0], [150, 0], [0, 0]]), "folder", "reversal.osu");
+
+  assert.ok(reversal.technical > straight.technical + 0.5);
+});
+
 test("builds stamina strain during long streams", () => {
   const chart = (count) => `Mode:0\n[HitObjects]\n${Array.from({ length: count }, (_, index) => `256,192,${index * 100},1,0,0:0:0:0:`).join("\n")}`;
   const short_stream = parseOsuMetadata(chart(21), "folder", "short.osu");
@@ -109,6 +128,17 @@ test("stores separate osu speed and dexterity skills", () => {
   assert.ok(jump_chart.dexterity > speed_chart.dexterity);
 });
 
+test("speed distinguishes short bursts from long streams", () => {
+  const chart = (count, interval) => `Mode:0\n[HitObjects]\n${Array.from({ length: count }, (_, index) =>
+    `256,192,${index * interval},1,0,0:0:0:0:`).join("\n")}`;
+  const burst = parseOsuMetadata(chart(3, 62.5), "folder", "burst.osu");
+  const stream = parseOsuMetadata(chart(49, 62.5), "folder", "stream.osu");
+  const slow_burst = parseOsuMetadata(chart(3, 150), "folder", "slow.osu");
+
+  assert.equal(slow_burst.speed, 0);
+  assert.ok(stream.speed > burst.speed * 2);
+});
+
 test("adds technical difficulty for sustained spaced streams", () => {
   const stream = (spacing) => Array.from({ length: 101 }, (_, index) =>
     `${index % 2 ? 256 + spacing / 2 : 256 - spacing / 2},192,${index * 100},1,0,0:0:0:0:`).join("\n");
@@ -117,6 +147,17 @@ test("adds technical difficulty for sustained spaced streams", () => {
 
   assert.equal(stacked.speed, spaced.speed);
   assert.ok(spaced.technical > stacked.technical * 5);
+});
+
+test("repeated long spaced streams build sustained precision strain", () => {
+  const stream = (start, count) => Array.from({ length: count }, (_, index) =>
+    `${index % 2 ? 306 : 206},192,${start + index * 94},1,0,0:0:0:0:`);
+  const chart = (objects) => `Mode:0\nCircleSize:4.2\n[HitObjects]\n${objects.join("\n")}`;
+  const short = parseOsuMetadata(chart(stream(0, 9)), "folder", "short.osu");
+  const endless_objects = Array.from({ length: 12 }, (_, index) => stream(index * 1500, 14)).flat();
+  const endless = parseOsuMetadata(chart(endless_objects), "folder", "endless.osu");
+
+  assert.ok(endless.technical > short.technical * 1.5);
 });
 
 test("discounts short osu charts", () => {
