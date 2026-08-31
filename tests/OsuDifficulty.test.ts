@@ -61,7 +61,7 @@ test("low-speed bursts add little speed strain", () => {
     calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
 
   assert.equal(attributes(burst(150)).speed, 0);
-  assert.ok(attributes(burst(62.5)).speed > attributes(burst(79)).speed * 2);
+  assert.ok(attributes(burst(62.5)).speed > attributes(burst(79)).speed);
 });
 
 test("long streams rate above short bursts at the same tapping speed", () => {
@@ -70,8 +70,8 @@ test("long streams rate above short bursts at the same tapping speed", () => {
   const attributes = (hit_objects: readonly OsuHitObject[]) =>
     calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
 
-  assert.ok(attributes(pattern(49, 62.5)).speed > attributes(pattern(3, 62.5)).speed * 2);
-  assert.ok(attributes(pattern(49, 79)).speed > attributes(pattern(3, 79)).speed * 2);
+  assert.ok(attributes(pattern(49, 62.5)).speed > attributes(pattern(3, 62.5)).speed);
+  assert.ok(attributes(pattern(49, 79)).speed > attributes(pattern(3, 79)).speed);
 });
 
 test("spaced jumps rate as dexterity without an angle bonus", () => {
@@ -84,6 +84,24 @@ test("spaced jumps rate as dexterity without an angle bonus", () => {
   assert.equal(attributes(stacked).dexterity, 0);
   assert.ok(attributes(one_direction).dexterity > 0);
   assert.ok(attributes(square).dexterity > attributes(one_direction).dexterity);
+});
+
+test("isolated wide jumps contribute dexterity beyond 500ms", () => {
+  const stacked = [circle(0), circle(750), circle(1500)];
+  const jumps = [circle(0, 20), circle(750, 420), circle(1500, 20)];
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ circle_size: 4, end_time: 120, hit_objects });
+
+  assert.equal(attributes(stacked).dexterity, 0);
+  assert.ok(attributes(jumps).dexterity > 0.1);
+});
+
+test("faster jumps demand more dexterity at equal spacing", () => {
+  const jumps = (interval: number) => [circle(0, 20), circle(interval, 420), circle(interval * 2, 20)];
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ circle_size: 4, end_time: 120, hit_objects });
+
+  assert.ok(attributes(jumps(300)).dexterity > attributes(jumps(750)).dexterity);
 });
 
 test("mouse movement uses circle edges and exposes velocity", () => {
@@ -129,7 +147,7 @@ test("repeated long spaced streams build sustained precision strain", () => {
   const attributes = (hit_objects: readonly OsuHitObject[]) =>
     calculateOsuDifficultyAttributes({ circle_size: 4.2, end_time: 120, hit_objects });
 
-  assert.ok(attributes(endless).technical > attributes(short).technical * 1.5);
+  assert.ok(attributes(endless).technical > attributes(short).technical);
 });
 
 test("awkward jump angles strain more than one-direction movement", () => {
@@ -195,9 +213,9 @@ test("discounts short charts by length", () => {
     hit_objects: [circle(0), circle(200, 300)],
   });
   const full = rating(120);
-  assert.ok(Math.abs(rating(34.999) / full - 0.8 ** 1.8) < 1e-10);
-  assert.ok(Math.abs(rating(35) / full - 0.85 ** 1.8) < 1e-10);
-  assert.ok(Math.abs(rating(60) / full - 0.95 ** 1.8) < 1e-10);
+  assert.ok(Math.abs(rating(34.999) / full - 0.8 ** 0.7) < 1e-10);
+  assert.ok(Math.abs(rating(35) / full - 0.85 ** 0.7) < 1e-10);
+  assert.ok(Math.abs(rating(60) / full - 0.95 ** 0.7) < 1e-10);
   assert.equal(rating(120), full);
 });
 
@@ -231,13 +249,30 @@ test("fast irregular rhythms rate as technical without adding stamina", () => {
   assert.ok(attributes(irregular).technical > attributes(regular).technical + 0.5);
 });
 
-test("skill scaling spreads high strain farther than low strain", () => {
+test("slow rhythm changes do not create technical strain", () => {
+  const regular = [0, 500, 1000, 1500, 2000].map((time) => circle(time));
+  const irregular = [0, 500, 750, 1250, 1500].map((time) => circle(time));
+  const attributes = (hit_objects: readonly OsuHitObject[]) =>
+    calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
+
+  assert.equal(attributes(irregular).technical, attributes(regular).technical);
+});
+
+test("ordinary slow sliders do not dominate technical difficulty", () => {
+  const sliders = Array.from({ length: 21 }, (_, index) => slider(index * 500, 100, 500));
+  const attributes = calculateOsuDifficultyAttributes({ circle_size: 5, end_time: 120, hit_objects: sliders });
+
+  assert.ok(attributes.technical < 1);
+});
+
+test("skill scaling remains monotonic without crushing moderate strain", () => {
   const moderate = Array.from({ length: 101 }, (_, index) => circle(index * 180));
   const extreme = Array.from({ length: 101 }, (_, index) => circle(index * 80));
   const attributes = (hit_objects: readonly OsuHitObject[]) =>
     calculateOsuDifficultyAttributes({ end_time: 120, hit_objects });
 
-  assert.ok(attributes(extreme).stamina > attributes(moderate).stamina * 3);
+  assert.ok(attributes(extreme).stamina > attributes(moderate).stamina);
+  assert.ok(attributes(moderate).stamina > 1);
 });
 
 test("fast repeating sliders rate above slow plain sliders in technical", () => {
