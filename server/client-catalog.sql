@@ -39,7 +39,7 @@ CREATE TABLE charts (
 	bpm_avg REAL NOT NULL,
 	difficulty REAL NOT NULL,
 	format TEXT NOT NULL,
-	chart_path TEXT NOT NULL UNIQUE,
+	chart_path TEXT NOT NULL,
 	audio_path TEXT NOT NULL,
 	audio_preview_path TEXT NOT NULL,
 	preview_seconds REAL NOT NULL,

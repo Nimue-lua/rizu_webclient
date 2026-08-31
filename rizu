@@ -7,9 +7,9 @@ readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly DEPLOY_HOST="${DEPLOY_HOST:-root@nimue.mom}"
 readonly DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/rizu}"
 readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.nimue.mom}"
-readonly LIBRARY_ROOT="${LIBRARY_ROOT:-/srv/charts.kuudere.fun}"
-readonly LIBRARY_URL="${LIBRARY_URL:-https://s3.kuudere.fun}"
-readonly LIBRARY_DIR="/media/SSD/s3"
+readonly LIBRARY_DIR="${LIBRARY_DIR:-/media/SSD/s3_test}"
+readonly LIBRARY_REMOTE="${LIBRARY_REMOTE:-catalog:rizu.catalog}"
+readonly LIBRARY_URL="${LIBRARY_URL:-https://f365adbb-729c-4400-94c9-f26a3711fec0.selstorage.ru}"
 readonly CHARTS_DIR="$LIBRARY_DIR/charts"
 readonly MIN_FREE_BYTES="${MIN_FREE_BYTES:-536870912}"
 readonly SSH_OPTIONS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=6)
@@ -19,10 +19,10 @@ usage() {
 Usage: ./rizu [command]
 
 Commands:
-  previews        Generate missing chart background previews
-  catalog         Create or replace /media/SSD/s3/catalog.sqlite
-  upload-songs    Upload chart, audio, and preview files
-  upload-catalog  Upload /media/SSD/s3/catalog.sqlite
+  previews        Generate immutable charts, audio, previews, and backgrounds
+  catalog         Create or replace catalog.sqlite and catalog.sqlite.gz
+  upload-songs    Upload immutable assets to Selectel
+  upload-catalog  Upload the gzipped catalog to Selectel
   deploy          Check, build, and deploy the application
 
 Run without a command to open the interactive menu.
@@ -49,10 +49,12 @@ require_charts() {
 generate_previews() {
   require_commands node ffmpeg
   require_charts
-  mkdir -p -- "$LIBRARY_DIR/chart-previews"
   node "$ROOT_DIR/server/cache-charts.mjs" \
     --charts "$CHARTS_DIR" \
-    --background-previews "$LIBRARY_DIR/chart-previews" \
+    --chart-assets "$LIBRARY_DIR/chart-files/v1" \
+    --audio "$LIBRARY_DIR/audio/v1" \
+    --audio-previews "$LIBRARY_DIR/audio-previews/v1" \
+    --background-previews "$LIBRARY_DIR/backgrounds/v2" \
     --skip-database
 }
 
@@ -62,6 +64,10 @@ create_catalog() {
   node "$ROOT_DIR/server/cache-charts.mjs" \
     --charts "$CHARTS_DIR" \
     --client-database "$LIBRARY_DIR/catalog.sqlite" \
+    --chart-assets "$LIBRARY_DIR/chart-files/v1" \
+    --audio "$LIBRARY_DIR/audio/v1" \
+    --audio-previews "$LIBRARY_DIR/audio-previews/v1" \
+    --background-previews "$LIBRARY_DIR/backgrounds/v2" \
     --skip-previews
 }
 
@@ -85,78 +91,55 @@ mv -- "$deploy_root.new" "$deploy_root"
 REMOTE
 }
 
-prepare_remote_library_copy() {
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$LIBRARY_ROOT" <<'REMOTE'
-set -Eeuo pipefail
-library_root="$1"
-test -d "$library_root/public"
-rm -rf -- "$library_root.new" "$library_root.old"
-cp -al -- "$library_root" "$library_root.new"
-REMOTE
-}
-
-activate_remote_library_copy() {
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$LIBRARY_ROOT" <<'REMOTE'
-set -Eeuo pipefail
-library_root="$1"
-chown -R www-data:www-data "$library_root.new"
-rm -rf -- "$library_root"
-mv -- "$library_root.new" "$library_root"
-REMOTE
-}
-
 upload_songs() {
-  require_commands node rsync ssh curl
-  require_charts
-  local stage_dir="${STAGE_DIR:-/tmp/rizu-song-upload}"
-  if [[ ! -d "$LIBRARY_DIR/chart-previews" ]]; then
-    printf 'Preview directories are missing (run previews first).\n' >&2
-    exit 1
-  fi
-  rm -rf -- "$stage_dir"
-  mkdir -p -- "$stage_dir"
+  require_commands rclone
+  local directory
+  for directory in chart-files/v1 audio/v1 audio-previews/v1 backgrounds/v2; do
+    if [[ ! -d "$LIBRARY_DIR/$directory" ]]; then
+      printf 'Generated asset directory not found: %s (run previews first)\n' "$LIBRARY_DIR/$directory" >&2
+      exit 1
+    fi
+  done
 
-  printf 'Finding referenced chart and audio files...\n'
-  node "$ROOT_DIR/server/cache-charts.mjs" \
-    --charts "$CHARTS_DIR" \
-    --asset-manifest "$stage_dir/chart-assets.list" \
-    --skip-previews \
-    --skip-database
-
-  printf 'Preparing remote song upload...\n'
-  prepare_remote_library_copy
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" \
-    "rm -rf -- '$LIBRARY_ROOT.new/public/charts' '$LIBRARY_ROOT.new/public/chart-previews' '$LIBRARY_ROOT.new/public/audio-previews'; mkdir -p -- '$LIBRARY_ROOT.new/public/charts' '$LIBRARY_ROOT.new/public/chart-previews'"
-
-  rsync -a --partial --info=progress2 \
-    --from0 --files-from="$stage_dir/chart-assets.list" \
-    --link-dest="$LIBRARY_ROOT/public/charts" \
-    -e "ssh ${SSH_OPTIONS[*]}" \
-    "$CHARTS_DIR/" "$DEPLOY_HOST:$LIBRARY_ROOT.new/public/charts/"
-  rsync -a --delete --partial --info=progress2 \
-    --link-dest="$LIBRARY_ROOT/public/chart-previews" \
-    -e "ssh ${SSH_OPTIONS[*]}" \
-    "$LIBRARY_DIR/chart-previews/" "$DEPLOY_HOST:$LIBRARY_ROOT.new/public/chart-previews/"
-  activate_remote_library_copy
-  curl -fsS "$LIBRARY_URL/" >/dev/null
-  printf 'Songs uploaded: %s\n' "$LIBRARY_URL"
+  rclone copy "$LIBRARY_DIR/chart-files/v1" "$LIBRARY_REMOTE/chart-files/v1" \
+    --metadata \
+    --metadata-set "cache-control=public, max-age=31536000, immutable" \
+    --metadata-set "content-type=text/plain; charset=utf-8" \
+    --progress
+  rclone copy "$LIBRARY_DIR/audio/v1" "$LIBRARY_REMOTE/audio/v1" \
+    --metadata \
+    --metadata-set "cache-control=public, max-age=31536000, immutable" \
+    --metadata-set "content-type=audio/webm" \
+    --progress
+  rclone copy "$LIBRARY_DIR/audio-previews/v1" "$LIBRARY_REMOTE/audio-previews/v1" \
+    --metadata \
+    --metadata-set "cache-control=public, max-age=31536000, immutable" \
+    --metadata-set "content-type=audio/webm" \
+    --progress
+  rclone copy "$LIBRARY_DIR/backgrounds/v2" "$LIBRARY_REMOTE/backgrounds/v2" \
+    --metadata \
+    --metadata-set "cache-control=public, max-age=31536000, immutable" \
+    --metadata-set "content-type=image/avif" \
+    --progress
+  printf 'Immutable assets uploaded: %s\n' "$LIBRARY_URL"
 }
 
 upload_catalog() {
-  require_commands rsync ssh curl
-  local catalog="$LIBRARY_DIR/catalog.sqlite"
+  require_commands rclone curl
+  local catalog="$LIBRARY_DIR/catalog.sqlite.gz"
   if [[ ! -f "$catalog" ]]; then
     printf 'Catalog not found: %s (run catalog first)\n' "$catalog" >&2
     exit 1
   fi
 
-  printf 'Preparing remote catalog upload...\n'
-  prepare_remote_library_copy
-  rsync -a --partial --info=progress2 \
-    -e "ssh ${SSH_OPTIONS[*]}" \
-    "$catalog" "$DEPLOY_HOST:$LIBRARY_ROOT.new/public/catalog.sqlite"
-  activate_remote_library_copy
-  curl -fsS "$LIBRARY_URL/catalog.sqlite" >/dev/null
+  rclone copyto "$catalog" "$LIBRARY_REMOTE/catalog.sqlite" \
+    --metadata \
+    --metadata-set "cache-control=no-cache" \
+    --metadata-set "content-type=application/vnd.sqlite3" \
+    --metadata-set "content-encoding=gzip" \
+    --ignore-times \
+    --progress
+  curl -fsS --compressed "$LIBRARY_URL/catalog.sqlite" >/dev/null
   printf 'Catalog uploaded: %s/catalog.sqlite\n' "$LIBRARY_URL"
 }
 
@@ -198,9 +181,9 @@ deploy_application() {
 choose_command() {
   printf '%s\n' \
     'Rizu maintenance' \
-    '1) Generate background previews for new charts' \
+    '1) Generate immutable library assets' \
     '2) Create/Update catalog.sqlite' \
-    '3) Upload songs' \
+    '3) Upload immutable assets to Selectel' \
     '4) Upload catalog.sqlite' \
     '5) Deploy application' \
     'q) Quit' >&2

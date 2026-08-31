@@ -167,7 +167,7 @@ CircleSize:4
 64,192,1000,1,0,0:0:0:0:
 `;
     await writeFile(path.join(chart_directory, "chart.osu"), chart_source);
-    await writeFile(path.join(chart_directory, "duplicate.osu"), chart_source.replace("Version:Hard", "Version:Duplicate"));
+    await writeFile(path.join(chart_directory, "duplicate.osu"), chart_source);
 
     const result = await cacheCharts({
       charts_directory,
@@ -187,6 +187,7 @@ CircleSize:4
     assert.equal(result.charts[0]?.chart_id, "456");
     assert.match(result.charts[1]?.chart_id ?? "", /^chart-[a-f0-9]{24}$/);
     assert.equal(result.charts[1]?.beatmap_id, 456);
+    assert.equal(result.charts[0]?.chart_path, result.charts[1]?.chart_path);
 
     const client = new DatabaseSync(client_database, { readOnly: true });
     try {
