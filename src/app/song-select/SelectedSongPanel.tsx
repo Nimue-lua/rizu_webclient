@@ -138,6 +138,13 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
           <SongSelectIcon name="play" /><span>AUTO</span>
         </button>
         <div className="song-hero-chart" key={selected_chart?.id ?? "no-chart"}><strong>{selected_chart?.name ?? "Loading chart..."}</strong><span>{selected_chart?.creator || "Unknown creator"}</span></div>
+        <table className="song-skill-table" aria-label="Chart skill ratings">
+          <thead><tr><th>Speed</th><th>Dexterity</th><th>Stamina</th><th>Technical</th></tr></thead>
+          <tbody><tr>
+            {[selected_chart?.speed, selected_chart?.dexterity, selected_chart?.stamina, selected_chart?.technical]
+              .map((skill, index) => <td key={index}>{skill == null ? "-" : skill.toFixed(2)}</td>)}
+          </tr></tbody>
+        </table>
         <div className="song-hero-metadata" key={selected_song?.id ?? "no-song"}><h1>{selected_song?.title ?? "Loading catalog..."}</h1><p>{selected_song?.artist ?? "Please wait"}</p></div>
       </article>
       <section className="score-list" aria-label="Scores">

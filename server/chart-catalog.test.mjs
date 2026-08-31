@@ -73,11 +73,11 @@ test("uses mode-specific difficulty calculators", () => {
   assert.ok(mania.difficulty > 0);
 });
 
-test("adds strain for alternating jump angles", () => {
-  const chart = (positions) => `Mode:0\n[HitObjects]\n${positions.map((x, index) => `${x},192,${index * 200},1,0,0:0:0:0:`).join("\n")}`;
-  const straight = parseOsuMetadata(chart([0, 150, 300]), "folder", "straight.osu");
-  const alternating = parseOsuMetadata(chart([0, 150, 0]), "folder", "alternating.osu");
-  assert.ok(alternating.difficulty > straight.difficulty + 0.5);
+test("adds technical strain for awkward jump angles", () => {
+  const chart = (positions) => `Mode:0\n[HitObjects]\n${positions.map(([x, y], index) => `${x},${y},${index * 200},1,0,0:0:0:0:`).join("\n")}`;
+  const straight = parseOsuMetadata(chart([[0, 0], [150, 0], [300, 0]]), "folder", "straight.osu");
+  const square = parseOsuMetadata(chart([[0, 0], [150, 0], [150, 150]]), "folder", "square.osu");
+  assert.ok(square.technical > straight.technical + 0.5);
 });
 
 test("builds stamina strain during long streams", () => {
@@ -87,11 +87,43 @@ test("builds stamina strain during long streams", () => {
   assert.ok(long_stream.difficulty > short_stream.difficulty + 0.2);
 });
 
+test("stores separate osu stamina and technical skills", () => {
+  const stream = Array.from({ length: 301 }, (_, index) => `256,192,${index * 100},1,0,0:0:0:0:`).join("\n");
+  const technical = [0, 150, 250, 425, 500, 640, 730]
+    .map((time) => `256,192,${time},1,0,0:0:0:0:`).join("\n");
+  const stamina_chart = parseOsuMetadata(`Mode:0\n[HitObjects]\n${stream}`, "folder", "stamina.osu");
+  const technical_chart = parseOsuMetadata(`Mode:0\n[HitObjects]\n${technical}`, "folder", "technical.osu");
+
+  assert.ok(stamina_chart.stamina > technical_chart.stamina);
+  assert.ok(technical_chart.technical > 0);
+});
+
+test("stores separate osu speed and dexterity skills", () => {
+  const stacked = [0, 100, 200, 300].map((time) => `256,192,${time},1,0,0:0:0:0:`).join("\n");
+  const jumps = [0, 100, 200, 300].map((time, index) => `${index % 2 ? 450 : 50},192,${time},1,0,0:0:0:0:`).join("\n");
+  const speed_chart = parseOsuMetadata(`Mode:0\n[HitObjects]\n${stacked}`, "folder", "speed.osu");
+  const jump_chart = parseOsuMetadata(`Mode:0\n[HitObjects]\n${jumps}`, "folder", "jumps.osu");
+
+  assert.equal(speed_chart.dexterity, 0);
+  assert.equal(speed_chart.speed, jump_chart.speed);
+  assert.ok(jump_chart.dexterity > speed_chart.dexterity);
+});
+
+test("adds technical difficulty for sustained spaced streams", () => {
+  const stream = (spacing) => Array.from({ length: 101 }, (_, index) =>
+    `${index % 2 ? 256 + spacing / 2 : 256 - spacing / 2},192,${index * 100},1,0,0:0:0:0:`).join("\n");
+  const stacked = parseOsuMetadata(`Mode:0\n[HitObjects]\n${stream(20)}`, "folder", "stacked.osu");
+  const spaced = parseOsuMetadata(`Mode:0\n[HitObjects]\n${stream(100)}`, "folder", "spaced.osu");
+
+  assert.equal(stacked.speed, spaced.speed);
+  assert.ok(spaced.technical > stacked.technical * 5);
+});
+
 test("discounts short osu charts", () => {
   const chart = (mode, end_time) => `Mode:${mode}\n[HitObjects]\n0,192,0,1,0,0:0:0:0:\n300,192,200,1,0,0:0:0:0:\n300,192,${end_time},8,0,${end_time}`;
   const short = parseOsuMetadata(chart(0, 34_999), "folder", "short.osu");
   const full = parseOsuMetadata(chart(0, 120_000), "folder", "full.osu");
-  assert.ok(Math.abs(short.difficulty / full.difficulty - 0.8) < 1e-10);
+  assert.ok(Math.abs(short.difficulty / full.difficulty - 0.8 ** 1.8) < 1e-10);
 });
 
 test("uses mania LN releases in difficulty timing", () => {
@@ -329,7 +361,7 @@ AudioFilename:song.ogg
       assert.equal(client.prepare("PRAGMA user_version").get().user_version, 11);
       assert.deepEqual(
         { ...client.prepare("SELECT circle_size, approach_rate, overall_difficulty, speed, dexterity, stamina, technical FROM charts").get() },
-        { circle_size: null, approach_rate: 5, overall_difficulty: 5, speed: null, dexterity: null, stamina: null, technical: null },
+        { circle_size: null, approach_rate: 5, overall_difficulty: 5, speed: 0, dexterity: 0, stamina: 0, technical: 0 },
       );
     } finally {
       client.close();

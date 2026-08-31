@@ -67,11 +67,18 @@ function sliderEndTime(start_time, fields, timing_points, slider_multiplier) {
 
 function computeOsuDifficulty(hit_objects, duration_seconds) {
   const objects = hit_objects.filter((object) => !object.spinner);
-  if (objects.length === 0) return 0;
+  if (objects.length === 0) return { difficulty: 0, speed: 0, dexterity: 0, stamina: 0, technical: 0 };
 
-  const strains = [];
+  const speed_strains = [];
+  const stamina_strains = [];
+  const technical_strains = [];
+  const aim_sync_strains = [];
+  const first_time = objects[0].time;
+  const movement_sections = new Map();
   let previous_delta = 0;
+  let previous_angle = 0;
   let stamina_seconds = 0;
+  let spaced_stream_length = 0;
   for (let index = 1; index < objects.length; index += 1) {
     const previous = objects[index - 1];
     const object = objects[index];
@@ -84,7 +91,8 @@ function computeOsuDifficulty(hit_objects, duration_seconds) {
       ? Math.min(Math.abs(Math.log2(delta / previous_delta)), 2) * 1.2
       : 0;
     const jump = Math.min((spacing / 150) * speed * 1.2, 5);
-    let reversal = 0;
+    let turn_angle = 0;
+    let angle_technical = 0;
     const earlier = objects[index - 2];
     if (earlier) {
       const incoming_x = previous.x - earlier.x;
@@ -93,10 +101,18 @@ function computeOsuDifficulty(hit_objects, duration_seconds) {
       const outgoing_y = object.y - previous.y;
       const incoming_distance = Math.hypot(incoming_x, incoming_y);
       if (incoming_distance > 0 && spacing > 0) {
-        const angle_factor = Math.max(0,
-          -(incoming_x * outgoing_x + incoming_y * outgoing_y) / (incoming_distance * spacing));
-        reversal = Math.min((Math.min(incoming_distance, spacing) / 150) * speed * angle_factor, 3);
+        const cosine = Math.max(-1, Math.min(1,
+          (incoming_x * outgoing_x + incoming_y * outgoing_y) / (incoming_distance * spacing)));
+        turn_angle = Math.acos(cosine);
+        const angle_factor = Math.sin(turn_angle);
+        const unpredictability = Math.min(Math.abs(turn_angle - previous_angle) / (Math.PI / 2), 1);
+        angle_technical = Math.min((Math.min(incoming_distance, spacing) / 150) * speed * angle_factor * unpredictability, 3);
       }
+    }
+    if (delta <= 500) {
+      const awkwardness = 1 + Math.sin(turn_angle) * 0.2;
+      const section = Math.floor((object.time - first_time) / 500);
+      movement_sections.set(section, (movement_sections.get(section) ?? 0) + spacing * awkwardness * 2);
     }
     const stream = delta <= 200 && spacing <= 140
       ? speed * 0.75 * (1 + Math.min(spacing / 120, 1) * 0.6)
@@ -104,9 +120,20 @@ function computeOsuDifficulty(hit_objects, duration_seconds) {
     if (delta >= 30_000) stamina_seconds = 0;
     else if (delta > 200) stamina_seconds *= 10 ** (-delta / 5000);
     if (stream > 0) stamina_seconds = Math.min(120, stamina_seconds + delta / 1000);
-    const stamina = stream > 0 ? Math.sqrt(stamina_seconds / 120) * stream * 0.8 : 0;
-    strains.push(rhythm + jump + reversal + stream + stamina);
+    const stamina = stream > 0 ? Math.sqrt(Math.min(stamina_seconds, 10) / 10) * stream * 1.5 : 0;
+    if (delta <= 200) speed_strains.push(speed * 1.5);
+    spaced_stream_length = delta > 120
+      ? 0
+      : spacing >= 70
+        ? Math.min(12, spaced_stream_length + 1)
+        : Math.max(0, spaced_stream_length - 1);
+    const aim_sync = jump * Math.min(spaced_stream_length / 12, 1) * 2.8;
+    if (aim_sync > 0) aim_sync_strains.push(aim_sync);
+    if (stamina > 0) stamina_strains.push(stamina);
+    const transition_technical = rhythm * Math.sqrt(speed) + angle_technical + aim_sync;
+    if (transition_technical > 0) technical_strains.push(transition_technical);
     previous_delta = delta;
+    previous_angle = turn_angle;
   }
 
   for (const object of objects) {
@@ -115,19 +142,39 @@ function computeOsuDifficulty(hit_objects, duration_seconds) {
     const slider_speed = object.slider_span_duration > 0
       ? slider_length / object.slider_span_duration
       : 0;
-    strains.push(
-      Math.sqrt(slider_length / 100) * 0.9
-      + slider_speed * 0.9
-      + Math.max(0, object.slider_repeats - 1) * 0.35,
-    );
+    const slider_technical = slider_speed
+      * (1.2 + Math.min(Math.sqrt(slider_length / 100) * 0.35, 1.5))
+      * (1 + Math.max(0, object.slider_repeats - 1) * 0.25);
+    if (slider_technical > 0) technical_strains.push(slider_technical);
   }
 
   const length_multiplier = duration_seconds < 35 ? 0.8 : duration_seconds < 60 ? 0.85 : duration_seconds < 120 ? 0.95 : 1;
-  if (strains.length === 0) return 0.5 * length_multiplier;
-  strains.sort((left, right) => right - left);
-  const hardest_count = Math.max(1, Math.ceil(strains.length * 0.2));
-  return (0.5 + strains.slice(0, hardest_count)
-    .reduce((sum, strain) => sum + strain, 0) / hardest_count) * length_multiplier;
+  const hardest_average = (values) => {
+    if (values.length === 0) return 0;
+    values.sort((left, right) => right - left);
+    const hardest_count = Math.max(1, Math.ceil(values.length * 0.2));
+    return values.slice(0, hardest_count).reduce((sum, strain) => sum + strain, 0) / hardest_count;
+  };
+  const scale_skill = (strain) => strain <= 10
+    ? strain ** 1.8
+    : 10 ** 1.8 + (strain - 10) * 2;
+  const movement_peak = (window) => {
+    let maximum = 0;
+    for (const index of movement_sections.keys()) {
+      let sum = 0;
+      for (let offset = 0; offset < window; offset += 1) sum += movement_sections.get(index - offset) ?? 0;
+      maximum = Math.max(maximum, sum / window);
+    }
+    return maximum;
+  };
+  const movement_peak_strain = (movement_peak(4) * 0.35 + movement_peak(10) * 0.45 + movement_peak(20) * 0.2) / 1000;
+  const movement_load = [...movement_sections.values()].reduce((sum, rate) => sum + Math.max(0, rate - 800) / 1000, 0);
+  const speed = scale_skill(hardest_average(speed_strains) * length_multiplier);
+  const dexterity = scale_skill((movement_peak_strain + Math.sqrt(movement_load) * 0.05) * 1.7 * length_multiplier);
+  const stamina = scale_skill(hardest_average(stamina_strains) * length_multiplier);
+  const technical = scale_skill(Math.max(hardest_average(technical_strains), hardest_average(aim_sync_strains)) * length_multiplier);
+  const difficulty = (speed ** 6 + dexterity ** 6 + stamina ** 6 + technical ** 6) ** (1 / 6);
+  return { difficulty, speed, dexterity, stamina, technical };
 }
 
 function computeManiaDifficulty(hit_objects, column_count, duration_seconds) {
@@ -273,15 +320,20 @@ function computeChartStats(source) {
 
   if (note_count === 0) start_time = end_time = 0;
   const duration_seconds = Math.max(0, end_time - start_time) / 1000;
+  const osu_difficulty = mode === 0 ? computeOsuDifficulty(hit_objects, duration_seconds) : null;
   return {
     duration_seconds,
     note_count,
     long_note_ratio: note_count > 0 ? long_note_count / note_count : 0,
-    difficulty: mode === 0
-      ? computeOsuDifficulty(hit_objects, duration_seconds)
+    difficulty: osu_difficulty
+      ? osu_difficulty.difficulty
       : mode === 3
         ? computeManiaDifficulty(hit_objects, readNumber(source, "CircleSize") ?? 4, duration_seconds)
         : duration_seconds > 0 ? note_count / duration_seconds : 0,
+    speed: osu_difficulty?.speed ?? null,
+    dexterity: osu_difficulty?.dexterity ?? null,
+    stamina: osu_difficulty?.stamina ?? null,
+    technical: osu_difficulty?.technical ?? null,
     ...computeBpm(timing_points, start_time, end_time),
   };
 }
