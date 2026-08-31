@@ -5,7 +5,7 @@ import { gzipSync } from "node:zlib";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 11;
 const AUDIO_PROFILE = "opus-96k-stereo-v1";
 const BACKGROUND_PROFILE = "v2";
 
@@ -15,6 +15,13 @@ function readProperty(source, name) {
 
 function readNumber(source, name) {
   const value = Number(readProperty(source, name));
+  return Number.isFinite(value) ? value : null;
+}
+
+function readOptionalNumber(source, name) {
+  const property = readProperty(source, name);
+  if (!property) return null;
+  const value = Number(property);
   return Number.isFinite(value) ? value : null;
 }
 
@@ -369,7 +376,9 @@ async function generateAudio(source_path, output_path, ffmpeg_path, preview_seco
 
 export function parseOsuMetadata(source, folder, chart_file, location = "") {
   const mode = readNumber(source, "Mode");
-  const keys = readNumber(source, "CircleSize");
+  const circle_size = readOptionalNumber(source, "CircleSize");
+  const overall_difficulty = readOptionalNumber(source, "OverallDifficulty") ?? 5;
+  const approach_rate = readOptionalNumber(source, "ApproachRate") ?? overall_difficulty;
   const audio_file = safeFileName(readProperty(source, "AudioFilename"));
   const background_file = safeFileName(readBackground(source) ?? "");
   const beatmap_id = readNumber(source, "BeatmapID");
@@ -395,7 +404,10 @@ export function parseOsuMetadata(source, folder, chart_file, location = "") {
     name: readProperty(source, "Version") || path.basename(chart_file, path.extname(chart_file)),
     creator: readProperty(source, "Creator"),
     mode,
-    keys: mode === 3 && Number.isInteger(keys) && keys > 0 ? keys : null,
+    keys: mode === 3 && Number.isInteger(circle_size) && circle_size > 0 ? circle_size : null,
+    circle_size,
+    approach_rate,
+    overall_difficulty,
     format: "osu",
     ...computeChartStats(source),
     audio_file,
@@ -567,7 +579,15 @@ function writeDatabases(client_path, client_schema, data, generated_at) {
 
     const insert_client_location = client_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
     const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_chart = client_db.prepare(`
+      INSERT INTO charts (
+        id, song_id, location_id, name, creator, mode, keys, beatmap_id,
+        duration_seconds, note_count, long_note_ratio, bpm_min, bpm_max, bpm_avg, difficulty,
+        circle_size, approach_rate, overall_difficulty, speed, dexterity, stamina, technical,
+        format, chart_path, audio_path, audio_preview_path,
+        preview_seconds, background_preview_path, chart_md5, chart_index
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
     client_db.exec("BEGIN");
     for (const location of data.locations) {
@@ -577,7 +597,9 @@ function writeDatabases(client_path, client_schema, data, generated_at) {
       insert_client_song.run(song.song_id, song.title, song.title_unicode, song.artist, song.artist_unicode, song.source, song.tags);
     }
     for (const chart of data.charts) {
-      const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty, chart.format];
+      const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty,
+        chart.circle_size, chart.approach_rate, chart.overall_difficulty,
+        chart.speed ?? null, chart.dexterity ?? null, chart.stamina ?? null, chart.technical ?? null, chart.format];
       insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats,
         chart.chart_path, chart.audio_path, chart.audio_preview_path, chart.preview_seconds, chart.background_preview_path, chart.chart_md5, chart.chart_index);
     }

@@ -24,6 +24,8 @@ BeatmapID:456
 BeatmapSetID:123
 [Difficulty]
 CircleSize:7
+ApproachRate:8
+OverallDifficulty:6
 [TimingPoints]
 0,500,4,2,1,70,1,0
 10000,400,4,2,1,70,1,0
@@ -41,6 +43,9 @@ CircleSize:7
   assert.equal(metadata.audio_file, "song.ogg");
   assert.equal(metadata.background_file, "background.jpg");
   assert.equal(metadata.keys, 7);
+  assert.equal(metadata.circle_size, 7);
+  assert.equal(metadata.approach_rate, 8);
+  assert.equal(metadata.overall_difficulty, 6);
   assert.equal(metadata.mode, 3);
   assert.equal(metadata.format, "osu");
   assert.equal(metadata.duration_seconds, 10);
@@ -319,6 +324,16 @@ AudioFilename:song.ogg
     const expected_md5 = createHash("md5").update(await readFile(path.join(chart_directory, "chart.osu"))).digest("hex");
     assert.equal(result.charts[0]?.chart_md5, expected_md5);
     await access(client_database);
+    const client = new DatabaseSync(client_database);
+    try {
+      assert.equal(client.prepare("PRAGMA user_version").get().user_version, 11);
+      assert.deepEqual(
+        { ...client.prepare("SELECT circle_size, approach_rate, overall_difficulty, speed, dexterity, stamina, technical FROM charts").get() },
+        { circle_size: null, approach_rate: 5, overall_difficulty: 5, speed: null, dexterity: null, stamina: null, technical: null },
+      );
+    } finally {
+      client.close();
+    }
     await assert.rejects(access(background_previews_directory));
   } finally {
     await rm(temporary_directory, { recursive: true, force: true });

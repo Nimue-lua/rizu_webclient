@@ -4,7 +4,7 @@ import type { ChartfileSetView, Chartview, LibraryView } from "./views";
 import { remoteAssetUrl } from "./ProviderUrl";
 import type { DownloadProgress } from "../download/Download";
 
-const CATALOG_SCHEMA_VERSION = 9;
+const CATALOG_SCHEMA_VERSION = 11;
 
 export interface Library {
   load(signal: AbortSignal, onProgress?: LibraryProgressCallback): Promise<LibraryView>;
@@ -62,7 +62,9 @@ export async function loadSqliteCatalog(bytes: Uint8Array, catalog_url: string, 
         SELECT songs.id AS song_id, songs.title, songs.artist,
           charts.id, charts.location_id, charts.name, charts.creator, charts.mode, charts.keys,
           charts.duration_seconds, charts.note_count, charts.long_note_ratio,
-          charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty, charts.format,
+          charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty,
+          charts.circle_size, charts.approach_rate, charts.overall_difficulty,
+          charts.speed, charts.dexterity, charts.stamina, charts.technical, charts.format,
           charts.audio_path, charts.audio_preview_path, charts.preview_seconds, charts.chart_path,
           charts.background_preview_path, charts.chart_md5, charts.chart_index
         FROM songs
@@ -100,6 +102,13 @@ export async function loadSqliteCatalog(bytes: Uint8Array, catalog_url: string, 
             chart_md5: String(row.chart_md5),
             chart_index: Number(row.chart_index),
             difficulty: Number(row.difficulty),
+            circle_size: row.circle_size === null ? null : Number(row.circle_size),
+            approach_rate: row.approach_rate === null ? null : Number(row.approach_rate),
+            overall_difficulty: row.overall_difficulty === null ? null : Number(row.overall_difficulty),
+            speed: row.speed === null ? null : Number(row.speed),
+            dexterity: row.dexterity === null ? null : Number(row.dexterity),
+            stamina: row.stamina === null ? null : Number(row.stamina),
+            technical: row.technical === null ? null : Number(row.technical),
             duration_seconds: Number(row.duration_seconds),
             format: String(row.format),
             id: `${source_id}:${String(row.id)}`,

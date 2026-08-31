@@ -1,4 +1,4 @@
-PRAGMA user_version = 9;
+PRAGMA user_version = 11;
 
 CREATE TABLE catalog (
 	schema_version INTEGER NOT NULL,
@@ -38,6 +38,13 @@ CREATE TABLE charts (
 	bpm_max REAL NOT NULL,
 	bpm_avg REAL NOT NULL,
 	difficulty REAL NOT NULL,
+	circle_size REAL,
+	approach_rate REAL,
+	overall_difficulty REAL,
+	speed REAL,
+	dexterity REAL,
+	stamina REAL,
+	technical REAL,
 	format TEXT NOT NULL,
 	chart_path TEXT NOT NULL,
 	audio_path TEXT NOT NULL,

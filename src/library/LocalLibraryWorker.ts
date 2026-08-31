@@ -248,6 +248,8 @@ function librarySnapshot(): LibraryView {
       background_url: null,
       bpm_avg: Number(row.tempo_avg), bpm_max: Number(row.tempo_max), bpm_min: Number(row.tempo_min),
       creator: String(row.creator || "Unknown creator"), difficulty: Number(row.level), duration_seconds: Number(row.duration),
+      circle_size: null, approach_rate: null, overall_difficulty: null,
+      speed: null, dexterity: null, stamina: null, technical: null,
       format: "osu", keys: /^\d+key$/.test(inputmode) ? Number.parseInt(inputmode) : null,
       location_id: Number(row.location_id), long_note_ratio: Number(row.notes_count) > 0
         ? Math.max(0, Number(row.judges_count) - Number(row.notes_count)) / Number(row.notes_count) : 0,

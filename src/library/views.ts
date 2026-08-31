@@ -12,6 +12,13 @@ export interface Chartview extends ChartInput {
   chart_md5: string;
   chart_index: number;
   difficulty: number;
+  circle_size: number | null;
+  approach_rate: number | null;
+  overall_difficulty: number | null;
+  speed: number | null;
+  dexterity: number | null;
+  stamina: number | null;
+  technical: number | null;
   duration_seconds: number;
   format: string;
   id: string;
