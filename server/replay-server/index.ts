@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { access, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
@@ -8,6 +9,8 @@ import { fileURLToPath } from "node:url";
 const MAX_BODY_SIZE = 5 * 1024 * 1024;
 const MAX_RESULTS = 50;
 const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+const DEFAULT_CATALOG_URL = "https://s3.kuudere.fun/catalog.sqlite";
+const DEFAULT_CATALOG_PATH = "server/replay-server/catalog.sqlite";
 
 type JsonObject = Record<string, unknown>;
 
@@ -29,6 +32,11 @@ interface ScoreRow {
   metadata_json: string;
 }
 
+interface CatalogChartRow {
+  difficulty: number;
+  mode: number;
+}
+
 interface ReplayRow {
   replay: Uint8Array;
 }
@@ -36,6 +44,8 @@ interface ReplayRow {
 interface ReplayServerOptions {
   database_path?: string;
   database?: DatabaseSync;
+  catalog_path?: string;
+  catalog?: DatabaseSync;
 }
 
 interface HttpError extends Error {
@@ -111,8 +121,28 @@ function credentials(payload: JsonObject): { name: string; password: string } {
   return { name, password };
 }
 
-function scoreFromRow(row: ScoreRow): JsonObject {
+export function playPp(difficulty: unknown, accuracy: unknown): number {
+  const safe_difficulty = typeof difficulty === "number" && Number.isFinite(difficulty)
+    ? Math.max(0, difficulty)
+    : 0;
+  const safe_accuracy = typeof accuracy === "number" && Number.isFinite(accuracy)
+    ? Math.min(1, Math.max(0, accuracy))
+    : 0;
+  return Math.round(safe_difficulty ** 2 * 8 * safe_accuracy ** 6 * 100) / 100;
+}
+
+function catalogChart(catalog: DatabaseSync, chart_md5: string, chart_index: number): CatalogChartRow | undefined {
+  return catalog.prepare(`
+    SELECT difficulty, mode FROM charts WHERE chart_md5 = ? AND chart_index = ?
+  `).get(chart_md5.toLowerCase(), chart_index) as unknown as CatalogChartRow | undefined;
+}
+
+function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
   const metadata = JSON.parse(row.metadata_json) as JsonObject;
+  const chart = typeof metadata.chart_md5 === "string" && typeof metadata.chart_index === "number"
+    ? catalogChart(catalog, metadata.chart_md5, metadata.chart_index)
+    : undefined;
+  const difficulty = chart?.difficulty ?? 0;
   return {
     ...metadata,
     id: row.id,
@@ -121,9 +151,42 @@ function scoreFromRow(row: ScoreRow): JsonObject {
     submitted_at: row.submitted_at,
     registered: row.user_id !== null,
     replay_url: `/api/scores/${row.id}/replay`,
-    difficulty: 0,
-    pp: 0,
+    difficulty,
+    pp: playPp(difficulty, metadata.accuracy),
   };
+}
+
+export async function updateCatalog(catalog_url: string, catalog_path: string): Promise<void> {
+  const response = await fetch(catalog_url);
+  if (!response.ok) throw new Error(`Catalog download returned ${response.status}`);
+
+  const temporary_path = `${catalog_path}.${process.pid}.tmp`;
+  try {
+    await writeFile(temporary_path, Buffer.from(await response.arrayBuffer()));
+    const catalog = new DatabaseSync(temporary_path, { readOnly: true });
+    try {
+      catalog.prepare("SELECT chart_md5, chart_index, difficulty, mode FROM charts LIMIT 1").get();
+    } finally {
+      catalog.close();
+    }
+    await rename(temporary_path, catalog_path);
+  } catch (reason) {
+    await rm(temporary_path, { force: true });
+    throw reason;
+  }
+}
+
+export async function prepareCatalog(catalog_url: string, catalog_path: string): Promise<void> {
+  try {
+    await updateCatalog(catalog_url, catalog_path);
+  } catch (reason) {
+    try {
+      await access(catalog_path);
+      console.warn(`Could not update replay catalog; using ${catalog_path}`, reason);
+    } catch {
+      throw reason;
+    }
+  }
 }
 
 export function openReplayDatabase(database_path: string): DatabaseSync {
@@ -187,9 +250,16 @@ const SCORE_SELECT = `
   FROM scores LEFT JOIN users ON users.id = scores.user_id
 `;
 
-export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database }: ReplayServerOptions = {}) {
+export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database,
+  catalog_path, catalog: supplied_catalog }: ReplayServerOptions = {}) {
   const database = supplied_database ?? openReplayDatabase(database_path);
+  const catalog = supplied_catalog ?? (catalog_path ? new DatabaseSync(catalog_path, { readOnly: true }) : undefined);
+  if (!catalog) {
+    if (!supplied_database) database.close();
+    throw new Error("Replay server requires a chart catalog");
+  }
   const owns_database = !supplied_database;
+  const owns_catalog = !supplied_catalog;
 
   const server = createServer(async (request, response) => {
     try {
@@ -259,12 +329,24 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           return;
         }
         const replay = Buffer.from(payload.replay, "base64");
+        const chart = catalogChart(catalog, payload.chart_md5, payload.chart_index);
+        if (!chart) {
+          json(response, 404, { error: "Chart is not in the catalog" });
+          return;
+        }
+        const expected_mode = chart.mode === 0 ? "osu" : chart.mode === 3 ? "mania" : null;
+        if (payload.mode !== expected_mode) {
+          json(response, 400, { error: "Score mode does not match the catalog chart" });
+          return;
+        }
         const user = authenticatedUser(database, request);
         const played_at = typeof payload.played_at === "string" ? payload.played_at : new Date().toISOString();
         const submitted_at = new Date().toISOString();
         const metadata = { ...payload };
         delete metadata.replay;
         delete metadata.nickname;
+        delete metadata.difficulty;
+        delete metadata.pp;
         const result = database.prepare(`
           INSERT INTO scores (chart_md5, chart_index, user_id, mode, accuracy, score, played_at,
             submitted_at, metadata_json, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -294,14 +376,14 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           ranked_users.add(row.user_id);
           return true;
         }).slice(0, boundedLimit(url.searchParams.get("limit")));
-        json(response, 200, { scores: rows.map(scoreFromRow) });
+        json(response, 200, { scores: rows.map((row) => scoreFromRow(row, catalog)) });
         return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/scores/recent") {
         const rows = database.prepare(`${SCORE_SELECT} ORDER BY scores.id DESC LIMIT ?`)
           .all(boundedLimit(url.searchParams.get("limit"))) as unknown as ScoreRow[];
-        json(response, 200, { scores: rows.map(scoreFromRow) });
+        json(response, 200, { scores: rows.map((row) => scoreFromRow(row, catalog)) });
         return;
       }
 
@@ -329,16 +411,27 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
       json(response, status, { error: status === 500 ? "Internal server error" : message });
     }
   });
-  server.on("close", () => { if (owns_database) database.close(); });
+  server.on("close", () => {
+    if (owns_database) database.close();
+    if (owns_catalog) catalog.close();
+  });
   return server;
 }
 
 const is_main = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (is_main) {
+async function main(): Promise<void> {
   const database_path = process.env.RIZU_DATABASE ?? process.argv[2] ?? "scores.sqlite";
   const port = Number(process.env.PORT ?? process.argv[3] ?? 8765);
   const host = process.env.HOST ?? "127.0.0.1";
-  createReplayServer({ database_path }).listen(port, host, () => {
+  const catalog_url = process.env.RIZU_CATALOG_URL ?? DEFAULT_CATALOG_URL;
+  const catalog_path = process.env.RIZU_CATALOG ?? DEFAULT_CATALOG_PATH;
+  await prepareCatalog(catalog_url, catalog_path);
+  createReplayServer({ database_path, catalog_path }).listen(port, host, () => {
     console.log(`Rizu API listening on http://${host}:${port}`);
   });
 }
+
+if (is_main) void main().catch((reason: unknown) => {
+  console.error(reason);
+  process.exitCode = 1;
+});
