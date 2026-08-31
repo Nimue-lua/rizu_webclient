@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { catalogUrl, DEFAULT_REMOTE_PROVIDER, remoteAssetUrl } from "../src/library/ProviderUrl";
 
-test("uses s3.kuudere.fun as the built-in provider", () => {
+test("uses Selectel as the built-in provider", () => {
   assert.deepEqual(DEFAULT_REMOTE_PROVIDER, {
     id: "builtin",
-    name: "s3.kuudere.fun",
-    description: "Europe Russia Saint Petersburg",
-    catalog_url: "https://s3.kuudere.fun/catalog.sqlite",
+    name: "Selectel catalog",
+    description: "Selectel object storage",
+    catalog_url: "https://f365adbb-729c-4400-94c9-f26a3711fec0.selstorage.ru/catalog.sqlite",
   });
 });
 

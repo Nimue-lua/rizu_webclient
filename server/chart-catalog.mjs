@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
-import { execFile, spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
-import { access, mkdir, readFile, readdir, rename, rm, stat } from "node:fs/promises";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
+import { access, copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { gzipSync } from "node:zlib";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 8;
-const execFileAsync = promisify(execFile);
+const SCHEMA_VERSION = 9;
+const AUDIO_PROFILE = "opus-96k-stereo-v1";
+const BACKGROUND_PROFILE = "v2";
 
 function readProperty(source, name) {
   return source.match(new RegExp(`^${name}:\\s*(.*?)\\r?$`, "m"))?.[1]?.trim() ?? "";
@@ -305,47 +305,66 @@ async function directoryExists(directory_path) {
   }
 }
 
-async function generateBackgroundPreview(source_path, preview_path, ffmpeg_path) {
+async function immutableFileExists(file_path) {
   try {
-    const [source_stat, preview_stat] = await Promise.all([stat(source_path), stat(preview_path)]);
-    if (preview_stat.mtimeMs >= source_stat.mtimeMs) return;
+    return (await stat(file_path)).isFile();
   } catch {
-    // A missing or unreadable preview is regenerated below.
+    return false;
   }
+}
 
-  const temporary_path = `${preview_path}.tmp.webp`;
+async function runFfmpeg(ffmpeg_path, arguments_, temporary_path, output_path) {
+  if (await immutableFileExists(output_path)) return;
   await rm(temporary_path, { force: true });
   try {
     await new Promise((resolve, reject) => {
-      const ffmpeg = spawn(ffmpeg_path, [
-        "-loglevel", "error",
-        "-y",
-        "-i", "pipe:0",
-        "-frames:v", "1",
-        "-vf", "scale=-2:445:flags=fast_bilinear",
-        "-c:v", "libwebp",
-        "-quality", "30",
-        "-compression_level", "2",
-        "-map_metadata", "-1",
-        temporary_path,
-      ], { stdio: ["pipe", "ignore", "pipe"] });
+      const ffmpeg = spawn(ffmpeg_path, ["-loglevel", "error", "-y", ...arguments_, temporary_path], {
+        stdio: ["ignore", "ignore", "pipe"],
+      });
       let stderr = "";
       ffmpeg.stderr.setEncoding("utf8");
       ffmpeg.stderr.on("data", (chunk) => { stderr += chunk; });
-      ffmpeg.stdin.on("error", (reason) => {
-        if (reason.code !== "EPIPE") reject(reason);
-      });
       ffmpeg.on("error", reject);
       ffmpeg.on("close", (code) => code === 0
         ? resolve()
         : reject(new Error(`FFmpeg exited with code ${code}: ${stderr.trim()}`)));
-      createReadStream(source_path).on("error", reject).pipe(ffmpeg.stdin);
     });
-    await rename(temporary_path, preview_path);
+    await rename(temporary_path, output_path);
   } catch (reason) {
     await rm(temporary_path, { force: true });
     throw reason;
   }
+}
+
+async function generateBackgroundPreview(source_path, preview_path, ffmpeg_path) {
+  await runFfmpeg(ffmpeg_path, [
+    "-i", source_path,
+    "-frames:v", "1",
+    "-vf", "scale=-2:800:flags=lanczos",
+    "-c:v", "libaom-av1",
+    "-still-picture", "1",
+    "-crf", "36",
+    "-cpu-used", "6",
+    "-pix_fmt", "yuv420p",
+    "-map_metadata", "-1",
+  ], `${preview_path}.tmp.avif`, preview_path);
+}
+
+async function generateAudio(source_path, output_path, ffmpeg_path, preview_seconds = null) {
+  const seek = preview_seconds === null ? [] : ["-ss", String(preview_seconds), "-t", "20"];
+  await runFfmpeg(ffmpeg_path, [
+    "-i", source_path,
+    ...seek,
+    "-map_metadata", "-1",
+    "-vn",
+    "-c:a", "libopus",
+    "-b:a", "96k",
+    "-vbr", "on",
+    "-compression_level", "10",
+    "-application", "audio",
+    "-ar", "48000",
+    "-ac", "2",
+  ], `${output_path}.tmp.webm`, output_path);
 }
 
 export function parseOsuMetadata(source, folder, chart_file, location = "") {
@@ -385,17 +404,30 @@ export function parseOsuMetadata(source, folder, chart_file, location = "") {
 }
 
 export function gameplayAssetManifest(charts) {
-  const assets = [...new Set(charts.flatMap((chart) => [chart.chart_path, chart.audio_path]))]
-    .map((asset_path) => asset_path.replace(/^charts\//, ""))
-    .sort();
+  const assets = [...new Set(charts.flatMap((chart) => [
+    chart.chart_path,
+    chart.audio_path,
+    chart.audio_preview_path,
+    chart.background_preview_path,
+  ]).filter(Boolean))].sort();
   return assets.length ? `${assets.join("\0")}\0` : "";
 }
 
-async function scanCharts(charts_directory, background_previews_directory, ffmpeg_path, generate_previews, asset_prefix) {
+async function scanCharts({
+  charts_directory,
+  chart_assets_directory,
+  audio_directory,
+  audio_previews_directory,
+  background_previews_directory,
+  ffmpeg_path,
+  generate_previews,
+  asset_prefix,
+}) {
   const locations = [];
   const songs = new Map();
   const charts = [];
   const chart_ids = new Set();
+  const audio_assets = new Map();
   let skipped = 0;
   const location_names = [];
   for (const entry of await readdir(charts_directory, { withFileTypes: true })) {
@@ -430,7 +462,9 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
         .sort();
 
       for (const chart_file of chart_files) {
-        const source = await readFile(path.join(folder_path, chart_file), "utf8");
+        const chart_source_path = path.join(folder_path, chart_file);
+        const chart_bytes = await readFile(chart_source_path);
+        const source = chart_bytes.toString("utf8");
         const metadata = parseOsuMetadata(source, folder, chart_file, location_name);
 
         if (!Number.isInteger(metadata.mode) || metadata.mode < 0 || metadata.mode > 3 || !metadata.audio_file) {
@@ -452,16 +486,46 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
           songs.set(metadata.song_id, metadata);
         }
 
+        const chart_md5 = createHash("md5").update(chart_bytes).digest("hex");
+        const chart_asset_path = path.join(chart_assets_directory, `${chart_md5}.osu`);
+        if (generate_previews && !await immutableFileExists(chart_asset_path)) {
+          await copyFile(chart_source_path, chart_asset_path);
+        }
+
+        const audio_bytes = await readFile(audio_path);
+        const audio_hash = createHash("sha256").update(audio_bytes).digest("hex");
+        const encoded_audio_name = `${audio_hash}-${AUDIO_PROFILE}.webm`;
+        const encoded_audio_path = path.join(audio_directory, encoded_audio_name);
+        let audio_asset = audio_assets.get(audio_hash);
+        if (!audio_asset) {
+          const preview_start = metadata.preview_seconds > 0
+            ? metadata.preview_seconds
+            : metadata.duration_seconds * 0.4;
+          const preview_key = createHash("sha256")
+            .update(audio_hash)
+            .update("\0")
+            .update(String(preview_start))
+            .update("\0")
+            .update(AUDIO_PROFILE)
+            .digest("hex");
+          audio_asset = { preview_start, preview_name: `${preview_key}.webm` };
+          audio_assets.set(audio_hash, audio_asset);
+        }
+        if (generate_previews && audio_asset.preview_start === (metadata.preview_seconds > 0 ? metadata.preview_seconds : metadata.duration_seconds * 0.4)) {
+          await generateAudio(audio_path, encoded_audio_path, ffmpeg_path);
+          await generateAudio(audio_path, path.join(audio_previews_directory, audio_asset.preview_name), ffmpeg_path, audio_asset.preview_start);
+        }
+
         let background_preview_path = null;
         if (background_file) {
           const source_path = path.join(folder_path, background_file);
-          const background_path = path.posix.join(asset_prefix, location_name, folder, background_file);
-          const preview_file = `${createHash("sha256").update(background_path).digest("hex").slice(0, 24)}.webp`;
+          const background_md5 = createHash("md5").update(await readFile(source_path)).digest("hex");
+          const preview_file = `${background_md5}.avif`;
           if (generate_previews) {
             await rm(`${source_path}.rizu-preview.webp`, { force: true });
             await generateBackgroundPreview(source_path, path.join(background_previews_directory, preview_file), ffmpeg_path);
           }
-          background_preview_path = path.posix.join("chart-previews", preview_file);
+          background_preview_path = path.posix.join("backgrounds", BACKGROUND_PROFILE, preview_file);
         }
 
         if (chart_ids.has(metadata.chart_id)) {
@@ -472,9 +536,12 @@ async function scanCharts(charts_directory, background_previews_directory, ffmpe
         charts.push({
           ...metadata,
           location_id,
-          chart_path: path.posix.join(asset_prefix, location_name, folder, chart_file),
-          audio_path: path.posix.join(asset_prefix, location_name, folder, metadata.audio_file),
-          background_path: background_file ? path.posix.join(asset_prefix, location_name, folder, background_file) : null,
+          chart_md5,
+          chart_index: 1,
+          chart_path: path.posix.join("chart-files", "v1", `${chart_md5}.osu`),
+          audio_path: path.posix.join("audio", "v1", encoded_audio_name),
+          audio_preview_path: path.posix.join("audio-previews", "v1", audio_asset.preview_name),
+          background_path: null,
           background_preview_path,
         });
       }
@@ -500,7 +567,7 @@ function writeDatabases(client_path, client_schema, data, generated_at) {
 
     const insert_client_location = client_db.prepare("INSERT INTO locations VALUES (?, ?, ?)");
     const insert_client_song = client_db.prepare("INSERT INTO songs VALUES (?, ?, ?, ?, ?, ?, ?)");
-      const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const insert_client_chart = client_db.prepare("INSERT INTO charts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     client_db.exec("BEGIN");
     for (const location of data.locations) {
@@ -511,7 +578,8 @@ function writeDatabases(client_path, client_schema, data, generated_at) {
     }
     for (const chart of data.charts) {
       const stats = [chart.duration_seconds, chart.note_count, chart.long_note_ratio, chart.bpm_min, chart.bpm_max, chart.bpm_avg, chart.difficulty, chart.format];
-      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats, chart.chart_path, chart.audio_path, chart.preview_seconds, chart.background_preview_path);
+      insert_client_chart.run(chart.chart_id, chart.song_id, chart.location_id, chart.name, chart.creator, chart.mode, chart.keys, chart.beatmap_id, ...stats,
+        chart.chart_path, chart.audio_path, chart.audio_preview_path, chart.preview_seconds, chart.background_preview_path, chart.chart_md5, chart.chart_index);
     }
     client_db.exec("COMMIT");
   } finally {
@@ -525,7 +593,10 @@ export async function cacheCharts({
   charts_directory,
   client_database,
   schema_directory,
-  background_previews_directory = path.join(path.dirname(charts_directory), "chart-previews"),
+  background_previews_directory = path.join(path.dirname(charts_directory), "backgrounds", BACKGROUND_PROFILE),
+  chart_assets_directory = path.join(path.dirname(charts_directory), "chart-files", "v1"),
+  audio_directory = path.join(path.dirname(charts_directory), "audio", "v1"),
+  audio_previews_directory = path.join(path.dirname(charts_directory), "audio-previews", "v1"),
   ffmpeg_path = "ffmpeg",
   asset_prefix = "charts",
   generate_previews = true,
@@ -533,18 +604,27 @@ export async function cacheCharts({
 }) {
   const client_temp = `${client_database}.tmp`;
   if (generate_previews) {
-    await mkdir(background_previews_directory, { recursive: true });
+    await Promise.all([
+      mkdir(background_previews_directory, { recursive: true }),
+      mkdir(chart_assets_directory, { recursive: true }),
+      mkdir(audio_directory, { recursive: true }),
+      mkdir(audio_previews_directory, { recursive: true }),
+    ]);
   }
   if (write_database) await rm(client_temp, { force: true });
 
   try {
-    const data = await scanCharts(charts_directory, background_previews_directory, ffmpeg_path, generate_previews, asset_prefix);
+    const data = await scanCharts({ charts_directory, chart_assets_directory, audio_directory,
+      audio_previews_directory, background_previews_directory, ffmpeg_path, generate_previews, asset_prefix });
     let version = null;
     if (write_database) {
       const client_schema = await readFile(path.join(schema_directory, "client-catalog.sql"), "utf8");
       const generated_at = Math.floor(Date.now() / 1000);
       version = writeDatabases(client_temp, client_schema, data, generated_at);
       await rename(client_temp, client_database);
+      const gzip_temp = `${client_database}.gz.tmp`;
+      await writeFile(gzip_temp, gzipSync(await readFile(client_database), { level: 9 }));
+      await rename(gzip_temp, `${client_database}.gz`);
     }
     return { ...data, version };
   } catch (reason) {

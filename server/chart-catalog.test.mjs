@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { access, chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, chmod, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -128,9 +129,9 @@ test("gameplay asset manifest excludes full backgrounds", () => {
   }]);
 
   assert.deepEqual(manifest.split("\0").filter(Boolean), [
-    "Collection/Song/audio.ogg",
-    "Collection/Song/chart.osu",
-    "Collection/Song/hard.osu",
+    "charts/Collection/Song/audio.ogg",
+    "charts/Collection/Song/chart.osu",
+    "charts/Collection/Song/hard.osu",
   ]);
 });
 
@@ -182,7 +183,7 @@ CircleSize:4
       path: "assets/Collection One",
     }]);
     assert.equal(result.charts[0]?.location_id, 1);
-    assert.equal(result.charts[0]?.chart_path, "assets/Collection One/Chart One/chart.osu");
+    assert.match(result.charts[0]?.chart_path ?? "", /^chart-files\/v1\/[a-f0-9]{32}\.osu$/);
     assert.equal(result.charts[0]?.chart_id, "456");
     assert.match(result.charts[1]?.chart_id ?? "", /^chart-[a-f0-9]{24}$/);
     assert.equal(result.charts[1]?.beatmap_id, 456);
@@ -194,11 +195,13 @@ CircleSize:4
         name: "Collection One",
         path: "assets/Collection One",
       });
-      assert.deepEqual({ ...client.prepare("SELECT location_id, chart_path, audio_path FROM charts").get() }, {
-        location_id: 1,
-        chart_path: "assets/Collection One/Chart One/chart.osu",
-        audio_path: "assets/Collection One/Chart One/song.ogg",
-      });
+      const stored = { ...client.prepare("SELECT location_id, chart_path, audio_path, audio_preview_path, chart_md5, chart_index FROM charts").get() };
+      assert.equal(stored.location_id, 1);
+      assert.match(stored.chart_path, /^chart-files\/v1\/[a-f0-9]{32}\.osu$/);
+      assert.match(stored.audio_path, /^audio\/v1\/[a-f0-9]{64}-opus-96k-stereo-v1\.webm$/);
+      assert.match(stored.audio_preview_path, /^audio-previews\/v1\/[a-f0-9]{64}\.webm$/);
+      assert.match(stored.chart_md5, /^[a-f0-9]{32}$/);
+      assert.equal(stored.chart_index, 1);
       assert.equal(client.prepare("SELECT COUNT(*) AS count FROM charts").get().count, 2);
     } finally {
       client.close();
@@ -225,8 +228,8 @@ test("stores audio and backgrounds for every chart in a set", async () => {
       ["102", "Hard", "Hard.ogg", "Hard.png"],
       ["103", "Normal", "Easy.ogg", "Easy.png"],
     ]) {
-      await writeFile(path.join(chart_directory, audio), "audio");
-      await writeFile(path.join(chart_directory, background), "background");
+      await writeFile(path.join(chart_directory, audio), audio);
+      await writeFile(path.join(chart_directory, background), background);
       await writeFile(path.join(chart_directory, `${version}.osu`), `osu file format v14
 [General]
 AudioFilename: ${audio}
@@ -258,27 +261,19 @@ CircleSize:4
 
     const client = new DatabaseSync(client_database, { readOnly: true });
     try {
-      const media = client.prepare("SELECT id, audio_path, chart_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row }));
-      assert.deepEqual(media, [{
-        id: "101",
-        audio_path: "charts/Collection/Song/Easy.ogg",
-        chart_path: "charts/Collection/Song/Easy.osu",
-        preview_seconds: 10.1,
-      }, {
-        id: "102",
-        audio_path: "charts/Collection/Song/Hard.ogg",
-        chart_path: "charts/Collection/Song/Hard.osu",
-        preview_seconds: 10.2,
-      }, {
-        id: "103",
-        audio_path: "charts/Collection/Song/Easy.ogg",
-        chart_path: "charts/Collection/Song/Normal.osu",
-        preview_seconds: 10.3,
-      }]);
+      const media = client.prepare("SELECT id, audio_path, audio_preview_path, chart_path, preview_seconds FROM charts ORDER BY id").all().map((row) => ({ ...row }));
+      assert.equal(media.length, 3);
+      assert.equal(media[0].preview_seconds, 10.1);
+      assert.equal(media[1].preview_seconds, 10.2);
+      assert.equal(media[2].preview_seconds, 10.3);
+      assert.equal(media[0].audio_path, media[2].audio_path);
+      assert.equal(media[0].audio_preview_path, media[2].audio_preview_path);
+      assert.notEqual(media[0].audio_path, media[1].audio_path);
+      for (const row of media) assert.match(row.chart_path, /^chart-files\/v1\/[a-f0-9]{32}\.osu$/);
       const previews = client.prepare("SELECT id, background_preview_path FROM charts ORDER BY id").all().map((row) => ({ ...row }));
       assert.equal(previews.length, 3);
-      assert.match(previews[0]?.background_preview_path, /^chart-previews\/[a-f0-9]{24}\.webp$/);
-      assert.match(previews[1]?.background_preview_path, /^chart-previews\/[a-f0-9]{24}\.webp$/);
+      assert.match(previews[0]?.background_preview_path, /^backgrounds\/v2\/[a-f0-9]{32}\.avif$/);
+      assert.match(previews[1]?.background_preview_path, /^backgrounds\/v2\/[a-f0-9]{32}\.avif$/);
       assert.notEqual(previews[0]?.background_preview_path, previews[1]?.background_preview_path);
       assert.equal(previews[0]?.background_preview_path, previews[2]?.background_preview_path);
     } finally {
@@ -319,7 +314,9 @@ AudioFilename:song.ogg
     });
 
     assert.equal(result.charts.length, 1);
-    assert.match(result.charts[0]?.background_preview_path ?? "", /^chart-previews\/[a-f0-9]{24}\.webp$/);
+    assert.match(result.charts[0]?.background_preview_path ?? "", /^backgrounds\/v2\/[a-f0-9]{32}\.avif$/);
+    const expected_md5 = createHash("md5").update(await readFile(path.join(chart_directory, "chart.osu"))).digest("hex");
+    assert.equal(result.charts[0]?.chart_md5, expected_md5);
     await access(client_database);
     await assert.rejects(access(background_previews_directory));
   } finally {
@@ -347,15 +344,7 @@ AudioFilename:song.ogg
 [HitObjects]
 256,192,1000,1,0,0:0:0:0:
 `);
-    await writeFile(ffmpeg_path, `#!/bin/sh
-test "$3" = "-i"
-test "$4" = "pipe:0"
-input="$(cat)"
-test "$input" = "background"
-output=""
-for argument do output="$argument"; done
-printf preview > "$output"
-`);
+    await writeFile(ffmpeg_path, "#!/bin/sh\nfor output; do :; done\nprintf preview > \"$output\"\n");
     await chmod(ffmpeg_path, 0o755);
 
     const result = await cacheCharts({

@@ -2,6 +2,7 @@ import type { ChartInput } from "../chart/Chart";
 
 export interface Chartview extends ChartInput {
   audio_url: string;
+  preview_audio_url?: string;
   background_url: string | null;
   bpm_avg: number;
   bpm_max: number;

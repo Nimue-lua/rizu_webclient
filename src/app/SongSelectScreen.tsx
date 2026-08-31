@@ -139,7 +139,11 @@ export function SongSelectScreen({
   const chart_level_sort = selection.sort_mode === "difficulty" || selection.sort_mode === "duration";
   const selected_local_media = local_preview_media?.chart_id === selected_chart?.id ? local_preview_media : null;
   const selected_background_url = selected_local_media?.background_url ?? selected_chart?.background_url ?? null;
-  const selected_preview_audio_url = selected_local_media?.audio_url ?? selected_chart?.audio_url ?? "";
+  const selected_preview_audio_url = selected_local_media?.audio_url
+    ?? selected_chart?.preview_audio_url
+    ?? selected_chart?.audio_url
+    ?? "";
+  const selected_preview_time = selected_local_media ? selected_chart?.preview_time ?? 0 : selected_chart?.preview_audio_url ? 0 : selected_chart?.preview_time ?? 0;
 
   useEffect(() => {
     setLocalPreviewMedia(null);
@@ -240,8 +244,8 @@ export function SongSelectScreen({
 
   useEffect(() => {
     if (selected_chart?.source_type === "local" && !selected_local_media) return;
-    preview_player.select(selected_song?.id ?? "", selected_preview_audio_url, selected_chart?.preview_time ?? 0);
-  }, [preview_player, selected_local_media, selected_preview_audio_url, selected_chart?.preview_time,
+    preview_player.select(selected_song?.id ?? "", selected_preview_audio_url, selected_preview_time);
+  }, [preview_player, selected_local_media, selected_preview_audio_url, selected_preview_time,
     selected_chart?.source_type, selected_song?.id]);
 
   const selectEntry = (entry: ChartSelectionEntry) => {

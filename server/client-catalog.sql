@@ -1,4 +1,4 @@
-PRAGMA user_version = 8;
+PRAGMA user_version = 9;
 
 CREATE TABLE catalog (
 	schema_version INTEGER NOT NULL,
@@ -41,12 +41,16 @@ CREATE TABLE charts (
 	format TEXT NOT NULL,
 	chart_path TEXT NOT NULL UNIQUE,
 	audio_path TEXT NOT NULL,
+	audio_preview_path TEXT NOT NULL,
 	preview_seconds REAL NOT NULL,
 	background_preview_path TEXT,
+	chart_md5 TEXT NOT NULL CHECK(length(chart_md5) = 32),
+	chart_index INTEGER NOT NULL CHECK(chart_index >= 1),
 	FOREIGN KEY (song_id) REFERENCES songs(id)
 );
 
 CREATE INDEX charts_song_id_idx ON charts(song_id);
 CREATE INDEX charts_location_id_idx ON charts(location_id);
+CREATE INDEX charts_chart_key_idx ON charts(chart_md5, chart_index);
 CREATE INDEX songs_title_idx ON songs(title COLLATE NOCASE);
 CREATE INDEX songs_artist_idx ON songs(artist COLLATE NOCASE);

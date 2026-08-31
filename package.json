@@ -6,6 +6,7 @@
   "scripts": {
     "rizu": "bash rizu",
     "dev": "vite",
+    "library:test": "node server/serve-library.mjs /media/SSD/s3_test 4174",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "test": "node --test server/*.test.mjs && tsx --test tests/*.test.ts",

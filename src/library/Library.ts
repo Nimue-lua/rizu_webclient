@@ -4,7 +4,7 @@ import type { ChartfileSetView, Chartview, LibraryView } from "./views";
 import { remoteAssetUrl } from "./ProviderUrl";
 import type { DownloadProgress } from "../download/Download";
 
-const CATALOG_SCHEMA_VERSION = 8;
+const CATALOG_SCHEMA_VERSION = 9;
 
 export interface Library {
   load(signal: AbortSignal, onProgress?: LibraryProgressCallback): Promise<LibraryView>;
@@ -63,7 +63,8 @@ export async function loadSqliteCatalog(bytes: Uint8Array, catalog_url: string, 
           charts.id, charts.location_id, charts.name, charts.creator, charts.mode, charts.keys,
           charts.duration_seconds, charts.note_count, charts.long_note_ratio,
           charts.bpm_min, charts.bpm_max, charts.bpm_avg, charts.difficulty, charts.format,
-          charts.audio_path, charts.preview_seconds, charts.chart_path, charts.background_preview_path
+          charts.audio_path, charts.audio_preview_path, charts.preview_seconds, charts.chart_path,
+          charts.background_preview_path, charts.chart_md5, charts.chart_index
         FROM songs
         JOIN charts ON charts.song_id = songs.id
         ORDER BY songs.title COLLATE NOCASE, songs.artist COLLATE NOCASE, songs.id,
@@ -89,6 +90,7 @@ export async function loadSqliteCatalog(bytes: Uint8Array, catalog_url: string, 
           }
           const chart: Chartview = {
             audio_url: remoteAssetUrl(catalog_url, row.audio_path) ?? "",
+            preview_audio_url: remoteAssetUrl(catalog_url, row.audio_preview_path) ?? "",
             background_url: remoteAssetUrl(catalog_url, row.background_preview_path),
             bpm_avg: Number(row.bpm_avg),
             bpm_max: Number(row.bpm_max),

@@ -21,7 +21,10 @@ function readValue(name, fallback) {
 
 const result = await cacheCharts({
   charts_directory,
-  background_previews_directory: readOption("--background-previews", path.join(path.dirname(charts_directory), "chart-previews")),
+  background_previews_directory: readOption("--background-previews", path.join(path.dirname(charts_directory), "backgrounds", "v2")),
+  chart_assets_directory: readOption("--chart-assets", path.join(path.dirname(charts_directory), "chart-files", "v1")),
+  audio_directory: readOption("--audio", path.join(path.dirname(charts_directory), "audio", "v1")),
+  audio_previews_directory: readOption("--audio-previews", path.join(path.dirname(charts_directory), "audio-previews", "v1")),
   client_database: readOption("--client-database", path.join(root_directory, "library/catalog.sqlite")),
   schema_directory: server_directory,
   ffmpeg_path: readValue("--ffmpeg", "ffmpeg"),

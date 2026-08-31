@@ -57,7 +57,6 @@ function ChartScreenContainer({ children, background_url, background_class }: Pr
   return (
     <div className="screen-container chart-screen-container">
       {background_url && <img className={`chart-background ${background_class}`} src={background_url} alt="" />}
-      {background_class.startsWith("gameplay-chart-background") && <div className="gameplay-background-noise" />}
       <div className="chart-screen-content">{children}</div>
     </div>
   );
