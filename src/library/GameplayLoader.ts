@@ -8,6 +8,8 @@ import { downloadArrayBuffer, type DownloadProgress } from "../download/Download
 
 export interface GameplayLocation {
   chart_id: string;
+  chart_md5: string;
+  chart_index: number;
   audio_url: string;
   artist: string;
   background_url: string | null;
@@ -33,6 +35,8 @@ interface GameplayDataBase {
   audio_buffer: AudioBuffer;
   audio_context: AudioContext;
   chart_id: string;
+  chart_md5: string;
+  chart_index: number;
   note_skin_id: string;
 }
 
@@ -105,6 +109,7 @@ export class HttpGameplayLoader implements GameplayLoader {
       const note_skin = await loadOsuStandardSkinUrl(skin_url, audio_context, signal,
         (progress) => onProgress?.({ ...progress, id: "skin", label: "Note skin" }));
       return { mode: "osu", audio_buffer, audio_context, chart, chart_id: location.chart_id,
+        chart_md5: location.chart_md5, chart_index: location.chart_index,
         note_skin_id: location.note_skin_id, note_skin };
     }
     const note_skin = await loadOsuManiaSkinUrl(skin_url, chart.column_count, signal,
@@ -122,6 +127,7 @@ export class HttpGameplayLoader implements GameplayLoader {
     note_skin.config.judgePosition = overrides?.judgePosition ?? note_skin_source.judgePosition;
     note_skin.config.comboPosition = overrides?.comboPosition ?? note_skin_source.comboPosition;
     return { mode: "mania", audio_buffer, audio_context, chart, chart_id: location.chart_id,
+      chart_md5: location.chart_md5, chart_index: location.chart_index,
       note_skin_id: location.note_skin_id, note_skin, note_skin_source };
   }
 }

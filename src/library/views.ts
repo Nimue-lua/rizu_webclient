@@ -9,6 +9,8 @@ export interface Chartview extends ChartInput {
   bpm_min: number;
   creator: string;
   chart_url: string;
+  chart_md5: string;
+  chart_index: number;
   difficulty: number;
   duration_seconds: number;
   format: string;

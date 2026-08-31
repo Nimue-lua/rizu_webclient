@@ -16,6 +16,7 @@ import {
 import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import { appSettings, settings, useSetting } from "../config/Settings";
+import { currentUser, login, logout, register, type OnlineUser } from "../replay/ReplayServer";
 import { ConfigResetButton } from "./ConfigResetButton";
 import { RangeInput } from "./RangeInput";
 
@@ -43,7 +44,6 @@ export function SettingsScreen({
   onDeleteScores,
   onExit,
 }: SettingsScreenProps) {
-  const nickname = useSetting(settings.nickname);
   const master_volume = useSetting(settings.master_volume);
   const osu_hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
   const music_offset = useSetting(settings.music_offset);
@@ -55,6 +55,11 @@ export function SettingsScreen({
   const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
   const hit_registration = useSetting(settings.mania_hit_registration);
   const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
+  const [online_user, setOnlineUser] = useState<OnlineUser | null>(null);
+  const [account_name, setAccountName] = useState("");
+  const [account_password, setAccountPassword] = useState("");
+  const [account_error, setAccountError] = useState("");
+  const [account_busy, setAccountBusy] = useState(false);
   const panel_ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -77,6 +82,24 @@ export function SettingsScreen({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onExit]);
+
+  useEffect(() => {
+    void currentUser().then(setOnlineUser).catch(() => setOnlineUser(null));
+  }, []);
+
+  const authenticate = async (action: typeof login) => {
+    setAccountBusy(true);
+    setAccountError("");
+    try {
+      const user = await action(account_name, account_password);
+      setOnlineUser(user);
+      setAccountPassword("");
+    } catch (reason) {
+      setAccountError(reason instanceof Error ? reason.message : "Account request failed");
+    } finally {
+      setAccountBusy(false);
+    }
+  };
 
   const master_volume_percent = Math.round(master_volume * 100);
   const osu_hit_sound_volume_percent = Math.round(osu_hit_sound_volume * 100);
@@ -242,11 +265,26 @@ export function SettingsScreen({
                 <UserRound aria-hidden="true" />
                 <h2>Online</h2>
               </header>
-              <label className="settings-control settings-text-control" htmlFor="settings-nickname">
-                <span>Nickname</span>
-                <input id="settings-nickname" type="text" value={nickname} placeholder="Anonymous"
-                  onChange={(event) => appSettings.set(settings.nickname, event.target.value)} />
-              </label>
+              {online_user ? <div className="settings-account-control">
+                <span>Logged in as <strong>{online_user.name}</strong></span>
+                <button type="button" onClick={() => void logout().then(() => setOnlineUser(null))}>Log out</button>
+              </div> : <div className="settings-account-form">
+                <label className="settings-control settings-text-control" htmlFor="settings-account-name">
+                  <span>Account name</span>
+                  <input id="settings-account-name" type="text" value={account_name} autoComplete="username"
+                    onChange={(event) => setAccountName(event.target.value)} />
+                </label>
+                <label className="settings-control settings-text-control" htmlFor="settings-account-password">
+                  <span>Password</span>
+                  <input id="settings-account-password" type="password" value={account_password} autoComplete="current-password"
+                    onChange={(event) => setAccountPassword(event.target.value)} />
+                </label>
+                {account_error && <p className="settings-account-error">{account_error}</p>}
+                <div className="settings-account-actions">
+                  <button type="button" disabled={account_busy} onClick={() => void authenticate(login)}>Log in</button>
+                  <button type="button" disabled={account_busy} onClick={() => void authenticate(register)}>Register</button>
+                </div>
+              </div>}
           </section>
 
           <section className="settings-section" id="settings-data">

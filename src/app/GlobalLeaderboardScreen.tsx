@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Trophy } from "lucide-react";
-import { listGlobalRankings, type GlobalRanking } from "../replay/ReplayServer";
+import { listRecentPlays, type OnlineScore } from "../replay/ReplayServer";
 
 interface GlobalLeaderboardScreenProps {
   onExit: () => void;
 }
 
 export function GlobalLeaderboardScreen({ onExit }: GlobalLeaderboardScreenProps) {
-  const [rankings, setRankings] = useState<readonly GlobalRanking[]>([]);
+  const [plays, setPlays] = useState<readonly OnlineScore[]>([]);
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
 
   useEffect(() => {
     const abort_controller = new AbortController();
-    void listGlobalRankings(abort_controller.signal).then((players) => {
-      setRankings(players);
+    void listRecentPlays(abort_controller.signal).then((scores) => {
+      setPlays(scores);
       setState("loaded");
     }).catch((error: unknown) => {
       if (abort_controller.signal.aborted) return;
-      console.error("Could not load global rankings", error);
+      console.error("Could not load recent plays", error);
       setState("error");
     });
     return () => abort_controller.abort();
@@ -34,18 +34,19 @@ export function GlobalLeaderboardScreen({ onExit }: GlobalLeaderboardScreenProps
   return (
     <section className="global-leaderboard-screen" aria-labelledby="global-leaderboard-title">
       <header className="global-leaderboard-heading">
-        <div><Trophy aria-hidden="true" /><h1 id="global-leaderboard-title">Global Leaderboard</h1></div>
+        <div><Trophy aria-hidden="true" /><h1 id="global-leaderboard-title">Recent Plays</h1></div>
         <button type="button" onClick={onExit}><ArrowLeft aria-hidden="true" />Back to song select</button>
       </header>
       <div className="global-leaderboard-table-wrap">
-        {state === "loaded" && rankings.length > 0 ? <table className="global-leaderboard-table">
-          <thead><tr><th>Rank</th><th>Player</th><th>Performance</th><th>Best plays</th></tr></thead>
-          <tbody>{rankings.map((player) => <tr key={`${player.rank}-${player.nickname}`}>
-            <td>#{player.rank}</td><td>{player.nickname}</td><td>{player.pp.toFixed(2)} pp</td><td>{player.play_count}</td>
+        {state === "loaded" && plays.length > 0 ? <table className="global-leaderboard-table">
+          <thead><tr><th>Mode</th><th>Player</th><th>Accuracy</th><th>Played</th></tr></thead>
+          <tbody>{plays.map((play) => <tr key={play.id}>
+            <td>{play.mode}</td><td>{play.nickname}</td><td>{typeof play.accuracy === "number" ? `${(play.accuracy * 100).toFixed(2)}%` : "-"}</td>
+            <td>{new Date(play.played_at).toLocaleString()}</td>
           </tr>)}</tbody>
         </table> : <div className="global-leaderboard-status">
           <Trophy aria-hidden="true" />
-          <span>{state === "loading" ? "Loading rankings..." : state === "error" ? "Could not load rankings" : "No ranked players yet"}</span>
+          <span>{state === "loading" ? "Loading recent plays..." : state === "error" ? "Could not load recent plays" : "No plays submitted yet"}</span>
         </div>}
       </div>
     </section>

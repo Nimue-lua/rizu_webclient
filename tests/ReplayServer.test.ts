@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listGlobalRankings, listOnlineScores, submitPlay } from "../src/replay/ReplayServer";
+import { listOnlineScores, listRecentPlays, submitPlay } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -23,7 +23,7 @@ test("submits score metadata and compressed replay bytes", async () => {
   let submitted_url = "";
   let submitted_init: RequestInit | undefined;
 
-  await submitPlay(play, "  Nimue  ", async (input, init) => {
+  await submitPlay(play, "0123456789abcdef0123456789abcdef", 2, async (input, init) => {
     submitted_url = String(input);
     submitted_init = init;
     return new Response(null, { status: 201 });
@@ -32,46 +32,44 @@ test("submits score metadata and compressed replay bytes", async () => {
   assert.equal(submitted_url, "/api/scores");
   assert.equal(submitted_init?.method, "POST");
   const payload = JSON.parse(String(submitted_init?.body));
-  assert.equal(payload.nickname, "Nimue");
+  assert.equal(payload.nickname, undefined);
+  assert.equal(payload.chart_md5, "0123456789abcdef0123456789abcdef");
+  assert.equal(payload.chart_index, 2);
   assert.equal(payload.score, 123456);
   assert.deepEqual(payload.judges, { perfect: 40, miss: 2 });
   assert.equal(payload.replay, "AAEC/w==");
 });
 
-test("uses Anonymous for a blank nickname and rejects server errors", async () => {
+test("rejects score submission server errors", async () => {
   const play = {
     chart_id: "chart:42", mode: "osu", played_at: "now", accuracy: null, music_rate: 1,
     score: null, grade: null, combo: null, max_combo: null, misses: 0, judges_json: "{}",
     last_judge: null, replay_base_json: "{}", replay_data: new Uint8Array(),
   } satisfies StoredPlay;
-  let nickname = "";
-
   await assert.rejects(
-    submitPlay(play, "   ", async (_input, init) => {
-      nickname = JSON.parse(String(init?.body)).nickname;
+    submitPlay(play, "0123456789abcdef0123456789abcdef", 1, async () => {
       return new Response(null, { status: 500 });
     }),
     /returned 500/,
   );
-  assert.equal(nickname, "Anonymous");
 });
 
 test("loads a chart leaderboard", async () => {
   let requested_url = "";
-  const scores = await listOnlineScores("chart:42", undefined, async (input) => {
+  const scores = await listOnlineScores("0123456789abcdef0123456789abcdef", 2, undefined, async (input) => {
     requested_url = String(input);
     return Response.json({ scores: [{ id: 1, nickname: "Nimue", accuracy: 0.99 }] });
   });
 
-  assert.equal(requested_url, "/api/leaderboard?chart_id=chart%3A42&limit=5");
+  assert.equal(requested_url, "/api/leaderboard?chart_md5=0123456789abcdef0123456789abcdef&chart_index=2&limit=5");
   assert.equal(scores[0]?.nickname, "Nimue");
 });
 
-test("loads global PP rankings", async () => {
-  const players = await listGlobalRankings(undefined, async (input) => {
-    assert.equal(String(input), "/api/rankings");
-    return Response.json({ players: [{ rank: 1, nickname: "Nimue", pp: 123.45, play_count: 2 }] });
+test("loads recent plays", async () => {
+  const scores = await listRecentPlays(undefined, async (input) => {
+    assert.equal(String(input), "/api/scores/recent?limit=50");
+    return Response.json({ scores: [{ id: 1, nickname: "Nimue", accuracy: 0.98 }] });
   });
 
-  assert.equal(players[0]?.pp, 123.45);
+  assert.equal(scores[0]?.nickname, "Nimue");
 });

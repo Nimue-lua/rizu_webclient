@@ -115,7 +115,7 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
     const abort_controller = new AbortController();
     setOnlineScores([]);
     setOnlineScoresState("loading");
-    void listOnlineScores(selected_chart.id, abort_controller.signal).then((loaded_scores) => {
+    void listOnlineScores(selected_chart.chart_md5, selected_chart.chart_index, abort_controller.signal).then((loaded_scores) => {
       setOnlineScores(loaded_scores);
       setOnlineScoresState("loaded");
     }).catch((error: unknown) => {
@@ -124,7 +124,7 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
       setOnlineScoresState("error");
     });
     return () => abort_controller.abort();
-  }, [score_source, selected_chart?.id]);
+  }, [score_source, selected_chart?.chart_md5, selected_chart?.chart_index]);
 
   return (
     <div className="song-select-column left-column">

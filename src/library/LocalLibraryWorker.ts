@@ -236,6 +236,8 @@ function librarySnapshot(): LibraryView {
     const inputmode = String(row.inputmode);
     const chart: Chartview = {
       id: `${source_id}:${String(row.hash)}:${Number(row.index)}`,
+      chart_md5: String(row.hash),
+      chart_index: Number(row.index),
       source_id,
       source_type: "local",
       audio_path: String(row.audio_path),

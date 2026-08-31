@@ -356,6 +356,11 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .global-leaderboard-table tbody tr:hover { background: var(--hover); }
 .global-leaderboard-status { display: grid; height: 100%; color: var(--muted); font-size: 18px; place-items: center; align-content: center; gap: 18px; }
 .global-leaderboard-status svg { width: 42px; height: 42px; color: var(--accent); }
+.settings-account-form { display: grid; gap: 12px; }
+.settings-account-actions, .settings-account-control { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.settings-account-actions button, .settings-account-control button { min-width: 110px; padding: 10px 16px; color: var(--text); background: var(--surface-raised); border: 1px solid var(--outline); border-radius: 4px; font-weight: 700; }
+.settings-account-control { justify-content: space-between; padding: 16px; background: var(--surface); border: 1px solid var(--outline); border-radius: 4px; }
+.settings-account-error { margin: 0; color: var(--danger); }
 
 .chart-summary { display: grid; grid-template-columns: minmax(285px, auto) minmax(260px, 1fr); min-width: 0; overflow: hidden; padding: 6px; background: var(--panel); border: 1px solid var(--outline); border-radius: 6px; }
 .chart-difficulty { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; padding: 7px 14px 7px 11px; background: linear-gradient(105deg, color-mix(in srgb, var(--difficulty-color) 8%, transparent), transparent 80%); border-left: 3px solid var(--difficulty-color); }

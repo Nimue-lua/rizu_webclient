@@ -19,7 +19,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://rizu.nimue.mom",
+        target: process.env.RIZU_API_URL ?? "http://127.0.0.1:8765",
         changeOrigin: true,
       },
     },

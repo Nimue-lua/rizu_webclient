@@ -2,7 +2,11 @@ import type { StoredPlay } from "./ReplayStore";
 
 export interface OnlineScore {
   readonly id: number;
+  readonly chart_md5: string;
+  readonly chart_index: number;
   readonly nickname: string;
+  readonly mode: "mania" | "osu";
+  readonly registered: boolean;
   readonly score: number | null;
   readonly accuracy: number | null;
   readonly grade: string | null;
@@ -12,11 +16,68 @@ export interface OnlineScore {
   readonly pp: number;
 }
 
-export interface GlobalRanking {
-  readonly rank: number;
-  readonly nickname: string;
-  readonly pp: number;
-  readonly play_count: number;
+export interface OnlineUser {
+  readonly id: number;
+  readonly name: string;
+}
+
+const TOKEN_KEY = "rizu.online.token";
+const account_listeners = new Set<() => void>();
+
+function notifyAccountChange(): void {
+  for (const listener of account_listeners) listener();
+}
+
+export function subscribeAccountChanges(listener: () => void): () => void {
+  account_listeners.add(listener);
+  return () => account_listeners.delete(listener);
+}
+
+function storage(): Storage | undefined {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function authorizationHeaders(): Record<string, string> {
+  const token = storage()?.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function accountRequest(path: string, name: string, password: string, request: typeof fetch): Promise<OnlineUser> {
+  const response = await request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, password }),
+  });
+  const result = await response.json() as { user?: OnlineUser; token?: string; error?: string };
+  if (!response.ok || !result.user || !result.token) throw new Error(result.error ?? `Replay server returned ${response.status}`);
+  storage()?.setItem(TOKEN_KEY, result.token);
+  notifyAccountChange();
+  return result.user;
+}
+
+export function register(name: string, password: string, request: typeof fetch = fetch): Promise<OnlineUser> {
+  return accountRequest("/api/register", name, password, request);
+}
+
+export function login(name: string, password: string, request: typeof fetch = fetch): Promise<OnlineUser> {
+  return accountRequest("/api/login", name, password, request);
+}
+
+export async function currentUser(request: typeof fetch = fetch): Promise<OnlineUser | null> {
+  const response = await request("/api/me", { headers: authorizationHeaders() });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  return (await response.json() as { user?: OnlineUser | null }).user ?? null;
+}
+
+export async function logout(request: typeof fetch = fetch): Promise<void> {
+  const response = await request("/api/logout", { method: "POST", headers: authorizationHeaders() });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  storage()?.removeItem(TOKEN_KEY);
+  notifyAccountChange();
 }
 
 function replayBase64(data: Uint8Array): string {
@@ -28,13 +89,14 @@ function replayBase64(data: Uint8Array): string {
   return btoa(binary);
 }
 
-export async function submitPlay(play: StoredPlay, nickname: string, request: typeof fetch = fetch): Promise<void> {
+export async function submitPlay(play: StoredPlay, chart_md5: string, chart_index: number,
+  request: typeof fetch = fetch): Promise<void> {
   const response = await request("/api/scores", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authorizationHeaders() },
     body: JSON.stringify({
-      chart_id: play.chart_id,
-      nickname: nickname.trim() || "Anonymous",
+      chart_md5,
+      chart_index,
       mode: play.mode,
       played_at: play.played_at,
       score: play.score,
@@ -52,16 +114,17 @@ export async function submitPlay(play: StoredPlay, nickname: string, request: ty
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
 }
 
-export async function listOnlineScores(chart_id: string, signal?: AbortSignal, request: typeof fetch = fetch): Promise<OnlineScore[]> {
-  const response = await request(`/api/leaderboard?chart_id=${encodeURIComponent(chart_id)}&limit=5`, { signal });
+export async function listOnlineScores(chart_md5: string, chart_index: number, signal?: AbortSignal,
+  request: typeof fetch = fetch): Promise<OnlineScore[]> {
+  const response = await request(`/api/leaderboard?chart_md5=${encodeURIComponent(chart_md5)}&chart_index=${chart_index}&limit=5`, { signal });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { scores?: unknown };
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
 }
 
-export async function listGlobalRankings(signal?: AbortSignal, request: typeof fetch = fetch): Promise<GlobalRanking[]> {
-  const response = await request("/api/rankings", { signal });
+export async function listRecentPlays(signal?: AbortSignal, request: typeof fetch = fetch): Promise<OnlineScore[]> {
+  const response = await request("/api/scores/recent?limit=50", { signal });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
-  const result = await response.json() as { players?: unknown };
-  return Array.isArray(result.players) ? result.players as GlobalRanking[] : [];
+  const result = await response.json() as { scores?: unknown };
+  return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
 }

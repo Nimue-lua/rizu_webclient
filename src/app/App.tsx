@@ -27,7 +27,7 @@ import { NoteSkinCatalog } from "../noteskin/NoteSkinCatalog";
 import { deleteNoteSkinOverrides } from "../noteskin/NoteSkinOverrides";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
-import { submitPlay } from "../replay/ReplayServer";
+import { currentUser, submitPlay, subscribeAccountChanges, type OnlineUser } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog, readLocalAsset } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
@@ -81,13 +81,13 @@ export function App() {
     () => ({ osu: "pivnoi_skoof", ...loadNoteSkinSelections() }),
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
+  const [online_user, setOnlineUser] = useState<OnlineUser | null>(null);
   const [preview_player] = useState(() => new SongPreviewPlayer());
   const active_view_transition = useRef<ViewTransition | null>(null);
   const pending_view_transition = useRef<PendingViewTransition | null>(null);
   const local_library_status = useSyncExternalStore(local_library.subscribe, local_library.getStatus);
   const remote_providers = useSyncExternalStore(remote_libraries.subscribe, remote_libraries.getSnapshot);
   const note_skin_catalog = useRef(new NoteSkinCatalog());
-  const nickname = useSetting(settings.nickname);
   const master_volume = useSetting(settings.master_volume);
   const osu_hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
   const music_offset = useSetting(settings.music_offset);
@@ -107,6 +107,12 @@ export function App() {
     base.tap_only = tap_only;
     return base;
   }, [constant_scroll, music_rate, tap_only]);
+
+  useEffect(() => {
+    const refresh = () => void currentUser().then(setOnlineUser).catch(() => setOnlineUser(null));
+    refresh();
+    return subscribeAccountChanges(refresh);
+  }, []);
 
   const transitionTo = (next_screen: Screen, kind: ViewTransitionKind = "screen", updateState?: () => void) => {
     const update = () => {
@@ -201,6 +207,8 @@ export function App() {
       note_skin_selections, available_note_skins);
     setLoadingLocation({
       chart_id: chart.id,
+      chart_md5: chart.chart_md5,
+      chart_index: chart.chart_index,
       audio_url: chart.audio_url,
       artist: song.artist,
       background_url: chart.background_url,
@@ -368,7 +376,7 @@ export function App() {
               void savePlay(play).catch((error: unknown) => {
                 console.error("Could not save gameplay replay", error);
               });
-              void submitPlay(play, nickname).catch((error: unknown) => {
+              void submitPlay(play, assets.chart_md5, assets.chart_index).catch((error: unknown) => {
                 console.error("Could not submit gameplay replay", error);
               });
             }}
@@ -421,7 +429,7 @@ export function App() {
           <SongSelectScreen
             chart_selector={chart_selector}
             preview_player={preview_player}
-            nickname={nickname.trim() || "Anonymous"}
+            nickname={online_user?.name ?? "Anonymous"}
             master_volume={master_volume}
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}
