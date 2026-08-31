@@ -1,6 +1,6 @@
 # Rizu Web Client
 
-TRY IT RIGHT NOW: https://rizu.nimue.mom/
+TRY IT RIGHT NOW: https://rizu.kuudere.fun/
 
 Original and a source of truth: https://github.com/semyon422/rizu
 
