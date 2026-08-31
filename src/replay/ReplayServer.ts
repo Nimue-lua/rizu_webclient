@@ -31,6 +31,18 @@ export interface ScoreStats {
   readonly today: number;
 }
 
+export type SkillName = "speed" | "dexterity" | "stamina" | "technical";
+
+export interface SkillRanking {
+  readonly rank: number;
+  readonly user_id: number;
+  readonly nickname: string;
+  readonly rating: number;
+  readonly play_count: number;
+}
+
+export type SkillLeaderboards = Record<SkillName, readonly SkillRanking[]>;
+
 const TOKEN_KEY = "rizu.online.token";
 const account_listeners = new Set<() => void>();
 
@@ -137,6 +149,18 @@ export async function listRecentPlays(signal?: AbortSignal, request: typeof fetc
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { scores?: unknown };
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
+}
+
+export async function listSkillLeaderboards(signal?: AbortSignal, request: typeof fetch = fetch): Promise<SkillLeaderboards> {
+  const response = await request("/api/rankings", { signal, cache: "no-store" });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  const result = await response.json() as { leaderboards?: Partial<Record<SkillName, unknown>> };
+  return {
+    speed: Array.isArray(result.leaderboards?.speed) ? result.leaderboards.speed as SkillRanking[] : [],
+    dexterity: Array.isArray(result.leaderboards?.dexterity) ? result.leaderboards.dexterity as SkillRanking[] : [],
+    stamina: Array.isArray(result.leaderboards?.stamina) ? result.leaderboards.stamina as SkillRanking[] : [],
+    technical: Array.isArray(result.leaderboards?.technical) ? result.leaderboards.technical as SkillRanking[] : [],
+  };
 }
 
 export async function loadScoreStats(signal?: AbortSignal, request: typeof fetch = fetch): Promise<ScoreStats> {

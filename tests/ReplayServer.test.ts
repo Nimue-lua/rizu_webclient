@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listOnlineScores, listRecentPlays, loadScoreStats, submitPlay } from "../src/replay/ReplayServer";
+import { listOnlineScores, listRecentPlays, listSkillLeaderboards, loadScoreStats, submitPlay } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -81,4 +81,20 @@ test("loads score statistics", async () => {
   });
 
   assert.deepEqual(stats, { total: 120, today: 7 });
+});
+
+test("loads independently ranked skill leaderboards", async () => {
+  const leaderboards = await listSkillLeaderboards(undefined, async (input, init) => {
+    assert.equal(String(input), "/api/rankings");
+    assert.equal(init?.cache, "no-store");
+    return Response.json({ leaderboards: {
+      speed: [{ rank: 1, nickname: "Fast", rating: 8 }],
+      technical: [{ rank: 1, nickname: "Tech", rating: 7 }],
+    } });
+  });
+
+  assert.equal(leaderboards.speed[0]?.nickname, "Fast");
+  assert.equal(leaderboards.technical[0]?.nickname, "Tech");
+  assert.deepEqual(leaderboards.dexterity, []);
+  assert.deepEqual(leaderboards.stamina, []);
 });

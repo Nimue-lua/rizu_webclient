@@ -275,6 +275,9 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .session-elapsed { color: var(--text); font-weight: 700; }
 .online-status { font-size: 16px; font-weight: 600; letter-spacing: .06em; }
 .header-actions { display: flex; justify-self: end; height: 100%; }
+.global-leaderboard-button { display: flex; align-items: center; gap: 8px; padding: 0 15px; color: var(--text); background: color-mix(in srgb, var(--accent) 15%, transparent); border-right: 1px solid var(--outline); border-radius: 0; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.global-leaderboard-button:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.global-leaderboard-button svg { width: 17px; height: 17px; color: var(--accent); }
 .player-info { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
 .player-info > span { display: grid; justify-items: end; gap: 2px; }
 .player-info strong { font-size: 13px; }
@@ -376,6 +379,29 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .score-details span { color: var(--grade-color); font-size: 16px; line-height: 1; white-space: nowrap; }
 .score-details b { margin-right: 12px; color: var(--text); font-weight: 400; }
 .score-details time { color: var(--muted); }
+
+.global-leaderboard-screen { display: grid; grid-row: 2 / -1; grid-template-rows: 112px minmax(0, 1fr); min-height: 0; overflow: hidden; background: var(--background); }
+.global-leaderboard-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 48px; background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 18%, var(--panel)), var(--panel) 58%); border-bottom: 1px solid var(--outline); }
+.global-leaderboard-heading > div { display: flex; align-items: center; gap: 18px; }
+.global-leaderboard-heading > div > svg { width: 38px; height: 38px; color: var(--accent); }
+.global-leaderboard-heading h1 { margin: 0; font-size: 30px; }
+.global-leaderboard-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.global-leaderboard-heading button { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; font-size: 14px; font-weight: 600; }
+.global-skill-leaderboards { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 12px; min-height: 0; padding: 24px; overflow-x: auto; }
+.global-skill-board { --skill-color: var(--accent); min-width: 230px; overflow-y: auto; background: var(--panel); border: 1px solid var(--outline); border-top: 4px solid var(--skill-color); border-radius: 7px; scrollbar-color: var(--outline) transparent; }
+.global-skill-board.dexterity { --skill-color: var(--magenta); }
+.global-skill-board.stamina { --skill-color: var(--success); }
+.global-skill-board.technical { --skill-color: var(--blue); }
+.global-skill-board h2 { position: sticky; top: 0; margin: 0; padding: 17px 18px; background: var(--surface); color: var(--skill-color); font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
+.global-skill-board ol { margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.global-skill-board li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 54px; padding: 8px 14px; border-bottom: 1px solid var(--divider); }
+.global-skill-board li:hover { background: var(--hover); }
+.global-skill-board li b { color: var(--skill-color); }
+.global-skill-board li span { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.global-skill-board li strong { color: var(--skill-color); font-size: 17px; }
+.global-skill-board > p { padding: 36px 18px; color: var(--muted); text-align: center; }
+.global-leaderboard-status { display: grid; color: var(--muted); font-size: 18px; place-items: center; align-content: center; gap: 18px; }
+.global-leaderboard-status svg { width: 42px; height: 42px; color: var(--accent); }
 
 .settings-account-form { display: grid; gap: 12px; }
 .settings-account-actions, .settings-account-control { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }

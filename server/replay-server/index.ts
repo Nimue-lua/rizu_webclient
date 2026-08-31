@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const MAX_BODY_SIZE = 5 * 1024 * 1024;
 const MAX_RESULTS = 50;
+const SKILL_PLAY_COUNT = 20;
 const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_CATALOG_URL = "https://s3.kuudere.fun/catalog.sqlite";
 const DEFAULT_CATALOG_PATH = "server/replay-server/catalog.sqlite";
@@ -34,11 +35,25 @@ interface ScoreRow {
 
 interface CatalogChartRow {
   difficulty: number;
+  speed: number | null;
+  dexterity: number | null;
+  stamina: number | null;
+  technical: number | null;
   mode: number;
   keys: number | null;
   name: string;
   title: string;
   artist: string;
+}
+
+const SKILLS = ["speed", "dexterity", "stamina", "technical"] as const;
+type Skill = typeof SKILLS[number];
+
+interface RankedSkillPlay {
+  user_id: number;
+  nickname: string;
+  chart_id: string;
+  rating: number;
 }
 
 interface ReplayRow {
@@ -66,6 +81,7 @@ function json(response: ServerResponse, status: number, value: unknown): void {
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "no-store",
     "Content-Length": Buffer.byteLength(body),
     "Content-Type": "application/json; charset=utf-8",
   }).end(body);
@@ -135,12 +151,85 @@ export function playPp(difficulty: unknown, accuracy: unknown): number {
   return Math.round(safe_difficulty ** 2 * 8 * safe_accuracy ** 6 * 100) / 100;
 }
 
+export function skillRating(difficulty: unknown, accuracy: unknown): number {
+  const safe_difficulty = typeof difficulty === "number" && Number.isFinite(difficulty)
+    ? Math.max(0, difficulty)
+    : 0;
+  const safe_accuracy = typeof accuracy === "number" && Number.isFinite(accuracy)
+    ? Math.min(1, Math.max(0, accuracy))
+    : 0;
+  if (safe_accuracy <= 0.8) return 0;
+  if (safe_accuracy === 0.9) return safe_difficulty * 0.5;
+  if (safe_accuracy === 0.95) return safe_difficulty;
+  if (safe_accuracy <= 0.9) return safe_difficulty * (safe_accuracy - 0.8) * 5;
+  if (safe_accuracy <= 0.95) return safe_difficulty * (0.5 + (safe_accuracy - 0.9) * 10);
+  if (safe_accuracy < 1) return safe_difficulty + (safe_accuracy - 0.95) * 40;
+  return safe_difficulty + 2;
+}
+
 function catalogChart(catalog: DatabaseSync, chart_md5: string, chart_index: number): CatalogChartRow | undefined {
   return catalog.prepare(`
-    SELECT charts.difficulty, charts.mode, charts.keys, charts.name, songs.title, songs.artist
+    SELECT charts.difficulty, charts.speed, charts.dexterity, charts.stamina, charts.technical,
+      charts.mode, charts.keys, charts.name, songs.title, songs.artist
     FROM charts JOIN songs ON songs.id = charts.song_id
     WHERE charts.chart_md5 = ? AND charts.chart_index = ?
   `).get(chart_md5.toLowerCase(), chart_index) as unknown as CatalogChartRow | undefined;
+}
+
+function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Record<Skill, JsonObject[]> {
+  const rows = database.prepare(`${SCORE_SELECT}
+    WHERE scores.user_id IS NOT NULL AND scores.accuracy IS NOT NULL
+  `).all() as unknown as ScoreRow[];
+  const plays: Record<Skill, RankedSkillPlay[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
+
+  for (const row of rows) {
+    const metadata = JSON.parse(row.metadata_json) as JsonObject;
+    if (typeof metadata.chart_md5 !== "string" || typeof metadata.chart_index !== "number" ||
+      typeof metadata.accuracy !== "number" || !Number.isFinite(metadata.accuracy)) continue;
+    const chart = catalogChart(catalog, metadata.chart_md5, metadata.chart_index);
+    if (!chart) continue;
+    const chart_id = `${metadata.chart_md5.toLowerCase()}:${metadata.chart_index}`;
+    for (const skill of SKILLS) {
+      const difficulty = chart[skill];
+      if (difficulty === null || !Number.isFinite(difficulty)) continue;
+      plays[skill].push({
+        user_id: row.user_id as number,
+        nickname: row.user_name ?? "Unknown player",
+        chart_id,
+        rating: skillRating(difficulty, metadata.accuracy),
+      });
+    }
+  }
+
+  const leaderboards: Record<Skill, JsonObject[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
+  for (const skill of SKILLS) {
+    const best_plays = new Map<string, RankedSkillPlay>();
+    for (const play of plays[skill]) {
+      const key = `${play.user_id}:${play.chart_id}`;
+      if (play.rating > (best_plays.get(key)?.rating ?? -1)) best_plays.set(key, play);
+    }
+    const players = new Map<number, { nickname: string; ratings: number[] }>();
+    for (const play of best_plays.values()) {
+      const player = players.get(play.user_id) ?? { nickname: play.nickname, ratings: [] };
+      player.ratings.push(play.rating);
+      players.set(play.user_id, player);
+    }
+    const ranking = [...players.entries()].map(([user_id, player]) => {
+      player.ratings.sort((left, right) => right - left);
+      const top_ratings = player.ratings.slice(0, SKILL_PLAY_COUNT);
+      return {
+        user_id,
+        nickname: player.nickname,
+        rating: Math.round(top_ratings.reduce((sum, value) => sum + value, 0) / SKILL_PLAY_COUNT * 100) / 100,
+        play_count: top_ratings.length,
+      };
+    }).filter((player) => player.rating > 0)
+      .sort((left, right) => right.rating - left.rating || left.nickname.localeCompare(right.nickname))
+      .slice(0, MAX_RESULTS)
+      .map((player, index) => ({ ...player, rank: index + 1 }));
+    leaderboards[skill] = ranking;
+  }
+  return leaderboards;
 }
 
 function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
@@ -175,7 +264,7 @@ export async function updateCatalog(catalog_url: string, catalog_path: string): 
     await writeFile(temporary_path, Buffer.from(await response.arrayBuffer()));
     const catalog = new DatabaseSync(temporary_path, { readOnly: true });
     try {
-      catalog.prepare("SELECT chart_md5, chart_index, difficulty, mode FROM charts LIMIT 1").get();
+      catalog.prepare("SELECT chart_md5, chart_index, difficulty, speed, dexterity, stamina, technical, mode FROM charts LIMIT 1").get();
     } finally {
       catalog.close();
     }
@@ -192,7 +281,12 @@ export async function prepareCatalog(catalog_url: string, catalog_path: string):
   } catch (reason) {
     try {
       await access(catalog_path);
-      console.warn(`Could not update replay catalog; using ${catalog_path}`, reason);
+      const catalog = new DatabaseSync(catalog_path, { readOnly: true });
+      try {
+        catalog.prepare("SELECT chart_md5, chart_index, difficulty, speed, dexterity, stamina, technical, mode FROM charts LIMIT 1").get();
+      } finally {
+        catalog.close();
+      }
     } catch {
       throw reason;
     }
@@ -387,6 +481,11 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           return true;
         }).slice(0, boundedLimit(url.searchParams.get("limit")));
         json(response, 200, { scores: rows.map((row) => scoreFromRow(row, catalog)) });
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/rankings") {
+        json(response, 200, { leaderboards: skillLeaderboards(database, catalog) });
         return;
       }
 

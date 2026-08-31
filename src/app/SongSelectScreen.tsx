@@ -19,6 +19,7 @@ import { LibrarySourcesScreen } from "./LibrarySourcesScreen";
 import type { LocalLibraryStatus } from "../library/LocalLibraryStore";
 import type { RemoteProviderView } from "../library/RemoteLibraryStore";
 import type { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
+import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
 
 const ROW_HEIGHT = 82;
 const BACKGROUND_DEBOUNCE_MS = 200;
@@ -111,6 +112,7 @@ export function SongSelectScreen({
   const [filters_open, setFiltersOpen] = useState(false);
   const [skins_open, setSkinsOpen] = useState(false);
   const [library_sources_open, setLibrarySourcesOpen] = useState(false);
+  const [global_leaderboard_open, setGlobalLeaderboardOpen] = useState(false);
   const [stored_plays, setStoredPlays] = useState<readonly StoredPlay[]>([]);
   const [local_preview_media, setLocalPreviewMedia] = useState<LocalPreviewMedia | null>(null);
 
@@ -349,9 +351,9 @@ export function SongSelectScreen({
       changeMusicRateFromKeyboard(event);
     }}>
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
-        onSettings={onSettings}
+        onSettings={onSettings} onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)}
         onOpenLibrarySources={() => setLibrarySourcesOpen(true)} onRefreshLibrary={onRefreshLibrary} library_scanning={local_library_status.scanning} />
-      {library_sources_open ? <LibrarySourcesScreen local_status={local_library_status} remote_providers={remote_providers}
+      {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> : library_sources_open ? <LibrarySourcesScreen local_status={local_library_status} remote_providers={remote_providers}
           onAddLocal={onAddLocalLibrary} onAddRemote={onAddRemoteLibrary} onExit={() => setLibrarySourcesOpen(false)} /> : <>
         <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
           onQueryChange={(query) => { chart_selector.setQuery(query); scroll_top_ref.current = 0; if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}

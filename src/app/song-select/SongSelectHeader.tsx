@@ -8,15 +8,17 @@ interface SongSelectHeaderProps {
   onOpenLibrarySources: () => void;
   onRefreshLibrary: () => void;
   library_scanning: boolean;
+  onGlobalLeaderboard: () => void;
 }
 
 export function SongSelectHeader({ nickname, date_text, session_duration, onSettings,
-  onOpenLibrarySources, onRefreshLibrary, library_scanning }: SongSelectHeaderProps) {
+  onOpenLibrarySources, onRefreshLibrary, library_scanning, onGlobalLeaderboard }: SongSelectHeaderProps) {
   return (
     <header className="song-select-header">
       <div className="game-brand"><img src="/rizu-logo.svg" alt="" /><span>RIZU.SU | WEBCLIENT | {__GIT_HASH__}</span></div>
       <div className="session-info"><time>{date_text}</time><span className="session-elapsed">{session_duration}</span><span className="online-status">OFFLINE</span></div>
       <nav className="header-actions" aria-label="Account and settings">
+        <button className="global-leaderboard-button" onClick={onGlobalLeaderboard}><SongSelectIcon name="trophy" />Rankings</button>
         <div className="player-info"><span><strong>{nickname}</strong></span><i /></div>
         <div className="header-icon-dock">
           <button aria-label="Settings" onClick={onSettings}><SongSelectIcon name="settings" /></button>

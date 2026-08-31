@@ -1,8 +1,8 @@
 export const DEFAULT_REMOTE_PROVIDER = {
   id: "builtin",
-  name: "Local catalog",
-  description: "/media/SSD/s3_test",
-  catalog_url: "http://localhost:4174/catalog.sqlite",
+  name: "s3.kuudere.fun",
+  description: "Europe Russia",
+  catalog_url: "https://s3.kuudere.fun/catalog.sqlite",
 } as const;
 
 export function catalogUrl(value: string): string {

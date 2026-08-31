@@ -6,7 +6,10 @@ After=network.target
 Type=simple
 DynamicUser=yes
 StateDirectory=rizu-replay
-ExecStart=/usr/bin/python3 -u /srv/rizu-replay/replay_server.py --database /var/lib/rizu-replay/scores.sqlite3 --catalog /srv/charts.kuudere.fun/public/catalog.sqlite
+Environment=RIZU_DATABASE=/var/lib/rizu-replay/scores.sqlite3
+Environment=RIZU_CATALOG=/var/lib/rizu-replay/catalog.sqlite
+Environment=RIZU_CATALOG_URL=
+ExecStart=/opt/node-v24.20.0/bin/node /srv/rizu-replay/index.ts
 Restart=on-failure
 NoNewPrivileges=yes
 PrivateTmp=yes

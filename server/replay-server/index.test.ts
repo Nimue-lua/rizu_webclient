@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, test } from "node:test";
-import { openReplayDatabase, createReplayServer, playPp } from "./index.ts";
+import { openReplayDatabase, createReplayServer, playPp, skillRating } from "./index.ts";
 
 interface ApiResult {
   [key: string]: any;
@@ -19,12 +19,13 @@ beforeEach(async () => {
   catalog = new DatabaseSync(":memory:");
   catalog.exec(`
     CREATE TABLE songs (id TEXT PRIMARY KEY, title TEXT, artist TEXT);
-    CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, mode INTEGER, keys INTEGER, name TEXT, song_id TEXT);
+    CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, speed REAL, dexterity REAL,
+      stamina REAL, technical REAL, mode INTEGER, keys INTEGER, name TEXT, song_id TEXT);
     INSERT INTO songs VALUES ('song-1', 'First Song', 'First Artist');
     INSERT INTO songs VALUES ('song-2', 'Second Song', 'Second Artist');
-    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 3, 4, 'Hard', 'song-1');
-    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 7, 'Challenge', 'song-2');
-    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 0, NULL, 'Insane', 'song-1');
+    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 8, 2, 4, 1, 3, 4, 'Hard', 'song-1');
+    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 9, 5, 7, 3, 7, 'Challenge', 'song-2');
+    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 0, NULL, 'Insane', 'song-1');
   `);
   server = createReplayServer({ database, catalog });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -87,6 +88,18 @@ test("registers and logs in a case-insensitive user", async () => {
   assert.equal(me.result.user.name, "Nimue");
 });
 
+test("interpolates score skill rating through the accuracy curve", () => {
+  const closeTo = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-12);
+  closeTo(skillRating(8, 1), 10);
+  closeTo(skillRating(8, 0.975), 9);
+  closeTo(skillRating(8, 0.95), 8);
+  closeTo(skillRating(8, 0.925), 6);
+  closeTo(skillRating(8, 0.9), 4);
+  closeTo(skillRating(8, 0.85), 2);
+  closeTo(skillRating(8, 0.8), 0);
+  closeTo(skillRating(8, 0.7), 0);
+});
+
 test("shows only a registered user's best chart score and every anonymous score", async () => {
   const { result: registration } = await auth("/register", "Player");
   await submit({ token: registration.token, accuracy: 0.8, score: 800 });
@@ -129,6 +142,28 @@ test("counts all scores and scores submitted today", async () => {
 
   const { result } = await request("/scores/stats");
   assert.deepEqual(result, { total: 2, today: 1 });
+});
+
+test("builds each skill leaderboard from its own top 20 chart scores", async () => {
+  const { result: first } = await auth("/register", "SpeedPlayer");
+  const { result: second } = await auth("/register", "DexPlayer");
+  await submit({ token: first.token, accuracy: 1 });
+  await submit({ token: first.token, accuracy: 0.5, chart_md5: "22222222222222222222222222222222" });
+  await submit({ token: first.token, accuracy: 0.9 });
+  await submit({ token: second.token, accuracy: 1, chart_md5: "22222222222222222222222222222222" });
+  await submit({ accuracy: 1 });
+
+  const { result } = await request("/rankings");
+  assert.deepEqual(result.leaderboards.speed.map((player: ApiResult) => [player.rank, player.nickname, player.rating, player.play_count]), [
+    [1, "SpeedPlayer", 0.5, 2],
+    [2, "DexPlayer", 0.25, 1],
+  ]);
+  assert.deepEqual(result.leaderboards.dexterity.map((player: ApiResult) => [player.rank, player.nickname, player.rating, player.play_count]), [
+    [1, "DexPlayer", 0.55, 1],
+    [2, "SpeedPlayer", 0.2, 2],
+  ]);
+  assert.equal(result.leaderboards.stamina[0].nickname, "DexPlayer");
+  assert.equal(result.leaderboards.technical[0].nickname, "DexPlayer");
 });
 
 test("rejects scores for unknown charts and mismatched modes", async () => {
