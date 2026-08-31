@@ -11,6 +11,11 @@ export interface OnlineScore {
   readonly accuracy: number | null;
   readonly grade: string | null;
   readonly played_at: string;
+  readonly submitted_at: string;
+  readonly title: string;
+  readonly artist: string;
+  readonly chart_name: string;
+  readonly keys: number | null;
   readonly replay_base: unknown;
   readonly difficulty: number;
   readonly pp: number;
@@ -19,6 +24,11 @@ export interface OnlineScore {
 export interface OnlineUser {
   readonly id: number;
   readonly name: string;
+}
+
+export interface ScoreStats {
+  readonly total: number;
+  readonly today: number;
 }
 
 const TOKEN_KEY = "rizu.online.token";
@@ -127,4 +137,14 @@ export async function listRecentPlays(signal?: AbortSignal, request: typeof fetc
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { scores?: unknown };
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
+}
+
+export async function loadScoreStats(signal?: AbortSignal, request: typeof fetch = fetch): Promise<ScoreStats> {
+  const response = await request("/api/scores/stats", { signal });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  const result = await response.json() as Partial<ScoreStats>;
+  return {
+    total: typeof result.total === "number" ? result.total : 0,
+    today: typeof result.today === "number" ? result.today : 0,
+  };
 }

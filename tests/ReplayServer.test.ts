@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listOnlineScores, listRecentPlays, submitPlay } from "../src/replay/ReplayServer";
+import { listOnlineScores, listRecentPlays, loadScoreStats, submitPlay } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -72,4 +72,13 @@ test("loads recent plays", async () => {
   });
 
   assert.equal(scores[0]?.nickname, "Nimue");
+});
+
+test("loads score statistics", async () => {
+  const stats = await loadScoreStats(undefined, async (input) => {
+    assert.equal(String(input), "/api/scores/stats");
+    return Response.json({ total: 120, today: 7 });
+  });
+
+  assert.deepEqual(stats, { total: 120, today: 7 });
 });

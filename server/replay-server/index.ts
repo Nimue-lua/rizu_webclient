@@ -35,6 +35,10 @@ interface ScoreRow {
 interface CatalogChartRow {
   difficulty: number;
   mode: number;
+  keys: number | null;
+  name: string;
+  title: string;
+  artist: string;
 }
 
 interface ReplayRow {
@@ -133,7 +137,9 @@ export function playPp(difficulty: unknown, accuracy: unknown): number {
 
 function catalogChart(catalog: DatabaseSync, chart_md5: string, chart_index: number): CatalogChartRow | undefined {
   return catalog.prepare(`
-    SELECT difficulty, mode FROM charts WHERE chart_md5 = ? AND chart_index = ?
+    SELECT charts.difficulty, charts.mode, charts.keys, charts.name, songs.title, songs.artist
+    FROM charts JOIN songs ON songs.id = charts.song_id
+    WHERE charts.chart_md5 = ? AND charts.chart_index = ?
   `).get(chart_md5.toLowerCase(), chart_index) as unknown as CatalogChartRow | undefined;
 }
 
@@ -152,6 +158,10 @@ function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
     registered: row.user_id !== null,
     replay_url: `/api/scores/${row.id}/replay`,
     difficulty,
+    keys: chart?.keys ?? null,
+    chart_name: chart?.name ?? "Unknown difficulty",
+    title: chart?.title ?? "Unknown title",
+    artist: chart?.artist ?? "Unknown artist",
     pp: playPp(difficulty, metadata.accuracy),
   };
 }
@@ -384,6 +394,16 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const rows = database.prepare(`${SCORE_SELECT} ORDER BY scores.id DESC LIMIT ?`)
           .all(boundedLimit(url.searchParams.get("limit"))) as unknown as ScoreRow[];
         json(response, 200, { scores: rows.map((row) => scoreFromRow(row, catalog)) });
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/scores/stats") {
+        const counts = database.prepare(`
+          SELECT COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE DATE(submitted_at) = DATE('now')) AS today
+          FROM scores
+        `).get() as { total: number; today: number };
+        json(response, 200, counts);
         return;
       }
 

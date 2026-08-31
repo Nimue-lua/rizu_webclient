@@ -18,10 +18,13 @@ beforeEach(async () => {
   database = openReplayDatabase(":memory:");
   catalog = new DatabaseSync(":memory:");
   catalog.exec(`
-    CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, mode INTEGER);
-    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 3);
-    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3);
-    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 0);
+    CREATE TABLE songs (id TEXT PRIMARY KEY, title TEXT, artist TEXT);
+    CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, mode INTEGER, keys INTEGER, name TEXT, song_id TEXT);
+    INSERT INTO songs VALUES ('song-1', 'First Song', 'First Artist');
+    INSERT INTO songs VALUES ('song-2', 'Second Song', 'Second Artist');
+    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 3, 4, 'Hard', 'song-1');
+    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 7, 'Challenge', 'song-2');
+    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 0, NULL, 'Insane', 'song-1');
   `);
   server = createReplayServer({ database, catalog });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -112,7 +115,20 @@ test("lists recent plays newest first without deduplicating users", async () => 
     ["11111111111111111111111111111111", 1, "Player"],
   ]);
   assert.equal(result.scores[0].difficulty, 10);
+  assert.equal(result.scores[0].artist, "Second Artist");
+  assert.equal(result.scores[0].title, "Second Song");
+  assert.equal(result.scores[0].keys, 7);
+  assert.equal(result.scores[0].chart_name, "Challenge");
   assert.equal(result.scores[0].pp, playPp(10, 0.9));
+});
+
+test("counts all scores and scores submitted today", async () => {
+  await submit({ accuracy: 0.8 });
+  await submit({ accuracy: 0.9 });
+  database.prepare("UPDATE scores SET submitted_at = '2020-01-01T00:00:00.000Z' WHERE id = 1").run();
+
+  const { result } = await request("/scores/stats");
+  assert.deepEqual(result, { total: 2, today: 1 });
 });
 
 test("rejects scores for unknown charts and mismatched modes", async () => {

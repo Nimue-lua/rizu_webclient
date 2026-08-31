@@ -11,11 +11,12 @@ interface SongSelectFooterProps {
   onOpenInputs: () => void;
   onOpenModifiers: () => void;
   onOpenSkins: () => void;
+  onExit: () => void;
   onPlay: () => void;
 }
 
 export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_available, tap_only,
-  onMusicRateChange, onOpenInputs, onOpenModifiers, onOpenSkins, onPlay }: SongSelectFooterProps) {
+  onMusicRateChange, onOpenInputs, onOpenModifiers, onOpenSkins, onExit, onPlay }: SongSelectFooterProps) {
   const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const speed_progress = (music_rate - 0.25) / 3.75;
   const speed_style = {
@@ -33,7 +34,7 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
 
   return (
     <footer className="song-select-footer">
-      <button className="back-control" type="button"><SongSelectIcon name="undo" /><span>BACK</span></button>
+      <button className="back-control" type="button" onClick={onExit}><SongSelectIcon name="undo" /><span>BACK</span></button>
       <nav className="loadout-controls" aria-label="Loadout">
         <button className={`mods${constant_scroll || tap_only ? " active" : ""}`} aria-haspopup="dialog" onClick={onOpenModifiers}><SongSelectIcon name="puzzle" /><span>MODS</span><b>{Number(constant_scroll) + Number(tap_only)}</b></button>
         <button className="mutators"><SongSelectIcon name="zap" /><span>MUTATORS</span><b>0</b></button>

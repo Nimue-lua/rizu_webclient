@@ -14,7 +14,6 @@ import { SongSelectFooter } from "./song-select/SongSelectFooter";
 import { SongSelectHeader } from "./song-select/SongSelectHeader";
 import { completedGameplayFromStoredPlay, listPlaysByChart, type StoredPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
-import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
 import { readLocalFile } from "../library/LocalLibraryStore";
 import { LibrarySourcesScreen } from "./LibrarySourcesScreen";
 import type { LocalLibraryStatus } from "../library/LocalLibraryStore";
@@ -38,6 +37,7 @@ interface SongSelectScreenProps {
   preview_player: SongPreviewPlayer;
   onAutoplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   onReplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }, playback: CompletedGameplay) => void;
+  onExit: () => void;
   onSettings: () => void;
   master_volume: number;
   music_rate: number;
@@ -74,6 +74,7 @@ export function SongSelectScreen({
   preview_player,
   onAutoplay,
   onReplay,
+  onExit,
   onSettings,
   master_volume,
   music_rate,
@@ -109,7 +110,6 @@ export function SongSelectScreen({
   const [modifiers_open, setModifiersOpen] = useState(false);
   const [filters_open, setFiltersOpen] = useState(false);
   const [skins_open, setSkinsOpen] = useState(false);
-  const [global_leaderboard_open, setGlobalLeaderboardOpen] = useState(false);
   const [library_sources_open, setLibrarySourcesOpen] = useState(false);
   const [stored_plays, setStoredPlays] = useState<readonly StoredPlay[]>([]);
   const [local_preview_media, setLocalPreviewMedia] = useState<LocalPreviewMedia | null>(null);
@@ -297,7 +297,7 @@ export function SongSelectScreen({
       target instanceof HTMLInputElement && target.type !== "range" ||
       target instanceof HTMLElement && target.isContentEditable) return;
     if (input_bindings_open || modifiers_open || filters_open || skins_open ||
-      global_leaderboard_open || library_sources_open) return;
+      library_sources_open) return;
     event.preventDefault();
     const offset = event.key === "[" ? -0.05 : 0.05;
     onMusicRateChange(Math.min(4, Math.max(0.25, Math.round((music_rate + offset) * 100) / 100)));
@@ -349,10 +349,9 @@ export function SongSelectScreen({
       changeMusicRateFromKeyboard(event);
     }}>
       <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
-        onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)} onSettings={onSettings}
+        onSettings={onSettings}
         onOpenLibrarySources={() => setLibrarySourcesOpen(true)} onRefreshLibrary={onRefreshLibrary} library_scanning={local_library_status.scanning} />
-      {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> :
-        library_sources_open ? <LibrarySourcesScreen local_status={local_library_status} remote_providers={remote_providers}
+      {library_sources_open ? <LibrarySourcesScreen local_status={local_library_status} remote_providers={remote_providers}
           onAddLocal={onAddLocalLibrary} onAddRemote={onAddRemoteLibrary} onExit={() => setLibrarySourcesOpen(false)} /> : <>
         <LibraryToolbar selection={selection} onLocationChange={selectLocation} onOpenFilters={() => setFiltersOpen(true)}
           onQueryChange={(query) => { chart_selector.setQuery(query); scroll_top_ref.current = 0; if (viewport_ref.current) viewport_ref.current.scrollTop = 0; }}
@@ -378,7 +377,7 @@ export function SongSelectScreen({
 
         <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
           onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
-          onOpenSkins={() => setSkinsOpen(true)} onPlay={() => selected_chart && playChart(selected_chart)}
+          onOpenSkins={() => setSkinsOpen(true)} onExit={onExit} onPlay={() => selected_chart && playChart(selected_chart)}
         />
       </>}
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}

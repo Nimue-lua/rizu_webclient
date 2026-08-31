@@ -453,8 +453,12 @@ export function App() {
             }}
             onPlay={beginLoading}
             onAutoplay={(chart, bindings, song) => beginLoading(chart, bindings, song, null, false, true)}
-            onReplay={(chart, bindings, song, requested_playback) => beginLoading(chart, bindings, song, requested_playback)}
-            onSettings={() => setSettingsOpen(true)}
+             onReplay={(chart, bindings, song, requested_playback) => beginLoading(chart, bindings, song, requested_playback)}
+             onExit={() => {
+               preview_player.stop();
+               transitionTo("welcome");
+             }}
+             onSettings={() => setSettingsOpen(true)}
             onMusicRateChange={changeMusicRate}
             onConstantScrollChange={changeConstantScroll}
             onTapOnlyChange={changeTapOnly}
