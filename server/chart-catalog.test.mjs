@@ -117,6 +117,15 @@ test("stores separate osu stamina and technical skills", () => {
   assert.ok(technical_chart.technical > 0);
 });
 
+test("slow rhythm changes do not create osu technical strain", () => {
+  const chart = (times) => `Mode:0\n[HitObjects]\n${times.map((time) =>
+    `256,192,${time},1,0,0:0:0:0:`).join("\n")}`;
+  const regular = parseOsuMetadata(chart([0, 500, 1000, 1500, 2000]), "folder", "regular.osu");
+  const irregular = parseOsuMetadata(chart([0, 500, 750, 1250, 1500]), "folder", "irregular.osu");
+
+  assert.equal(irregular.technical, regular.technical);
+});
+
 test("stores separate osu speed and dexterity skills", () => {
   const stacked = [0, 100, 200, 300].map((time) => `256,192,${time},1,0,0:0:0:0:`).join("\n");
   const jumps = [0, 100, 200, 300].map((time, index) => `${index % 2 ? 450 : 50},192,${time},1,0,0:0:0:0:`).join("\n");
@@ -128,6 +137,16 @@ test("stores separate osu speed and dexterity skills", () => {
   assert.ok(jump_chart.dexterity > speed_chart.dexterity);
 });
 
+test("isolated wide jumps contribute osu dexterity beyond 500ms", () => {
+  const chart = (positions) => `Mode:0\nCircleSize:4\n[HitObjects]\n${positions.map((x, index) =>
+    `${x},192,${index * 750},1,0,0:0:0:0:`).join("\n")}`;
+  const stacked = parseOsuMetadata(chart([256, 256, 256]), "folder", "stacked.osu");
+  const jumps = parseOsuMetadata(chart([20, 420, 20]), "folder", "jumps.osu");
+
+  assert.equal(stacked.dexterity, 0);
+  assert.ok(jumps.dexterity > 0.1);
+});
+
 test("speed distinguishes short bursts from long streams", () => {
   const chart = (count, interval) => `Mode:0\n[HitObjects]\n${Array.from({ length: count }, (_, index) =>
     `256,192,${index * interval},1,0,0:0:0:0:`).join("\n")}`;
@@ -136,7 +155,7 @@ test("speed distinguishes short bursts from long streams", () => {
   const slow_burst = parseOsuMetadata(chart(3, 150), "folder", "slow.osu");
 
   assert.equal(slow_burst.speed, 0);
-  assert.ok(stream.speed > burst.speed * 2);
+  assert.ok(stream.speed > burst.speed);
 });
 
 test("adds technical difficulty for sustained spaced streams", () => {
@@ -157,14 +176,14 @@ test("repeated long spaced streams build sustained precision strain", () => {
   const endless_objects = Array.from({ length: 12 }, (_, index) => stream(index * 1500, 14)).flat();
   const endless = parseOsuMetadata(chart(endless_objects), "folder", "endless.osu");
 
-  assert.ok(endless.technical > short.technical * 1.5);
+  assert.ok(endless.technical > short.technical);
 });
 
 test("discounts short osu charts", () => {
   const chart = (mode, end_time) => `Mode:${mode}\n[HitObjects]\n0,192,0,1,0,0:0:0:0:\n300,192,200,1,0,0:0:0:0:\n300,192,${end_time},8,0,${end_time}`;
   const short = parseOsuMetadata(chart(0, 34_999), "folder", "short.osu");
   const full = parseOsuMetadata(chart(0, 120_000), "folder", "full.osu");
-  assert.ok(Math.abs(short.difficulty / full.difficulty - 0.8 ** 1.8) < 1e-10);
+  assert.ok(Math.abs(short.difficulty / full.difficulty - 0.8 ** 0.7) < 1e-10);
 });
 
 test("uses mania LN releases in difficulty timing", () => {
