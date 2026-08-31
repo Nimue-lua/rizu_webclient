@@ -17,15 +17,14 @@ function hardestAverage(strains: number[]): number {
 }
 
 function scaleSkill(strain: number): number {
-  const curved_limit = 10 ** 1.8;
-  return strain <= 10 ? strain ** 1.8 : curved_limit + (strain - 10) * 2;
+  return strain > 0 ? strain ** 0.7 * 2.25 : 0;
 }
 
 function aggregateSkills(skills: readonly number[]): number {
   return Math.hypot(...skills);
 }
 
-function movementDifficulty(section_rates: ReadonlyMap<number, number>): number {
+function movementDifficulty(section_rates: ReadonlyMap<number, number>, jump_strains: number[]): number {
   const peak = (window: number) => {
     let maximum = 0;
     for (const index of section_rates.keys()) {
@@ -37,7 +36,9 @@ function movementDifficulty(section_rates: ReadonlyMap<number, number>): number 
   };
   const peak_strain = (peak(4) * 0.35 + peak(10) * 0.45 + peak(20) * 0.2) / 1000;
   const sustained_load = [...section_rates.values()].reduce((sum, rate) => sum + Math.max(0, rate - 800) / 1000, 0);
-  return (peak_strain + Math.sqrt(sustained_load) * 0.05) * 1.7;
+  const sustained_difficulty = (peak_strain + Math.sqrt(sustained_load) * 0.05) * 1.7;
+  const jump_difficulty = hardestAverage(jump_strains);
+  return Math.max(sustained_difficulty, jump_difficulty);
 }
 
 function sustainedAimSyncDifficulty(section_strains: ReadonlyMap<number, number>): number {
@@ -56,6 +57,7 @@ export function calculateOsuDifficultyAttributes(
   const stamina_strains: number[] = [];
   const technical_strains: number[] = [];
   const aim_sync_strains: number[] = [];
+  const jump_strains: number[] = [];
   const first_time = objects[0]!.absolute_time;
   const movement_sections = new Map<number, number>();
   const aim_sync_sections = new Map<number, number>();
@@ -77,8 +79,14 @@ export function calculateOsuDifficultyAttributes(
     const rhythm = previous_delta > 0
       ? Math.min(Math.abs(Math.log2(delta / previous_delta)), 2) * 1.2
       : 0;
+    const rhythm_technical = delta <= 150 && previous_delta <= 150
+      ? rhythm * Math.sqrt(speed) * 0.6
+      : 0;
     const jump = Math.min((spacing / 150) * speed * 1.2, 5);
     const angle_technical = Math.min((spacing / 150) * speed * movement.turn_difficulty, 3);
+    if (delta <= 800 && spacing >= 50) {
+      jump_strains.push(Math.min(movement.velocity * movement.awkwardness * 1.3, 5));
+    }
     if (delta <= 500) {
       const section = Math.floor((object.absolute_time - first_time) / 0.5);
       movement_sections.set(section, (movement_sections.get(section) ?? 0) + spacing * movement.awkwardness * 2);
@@ -110,7 +118,7 @@ export function calculateOsuDifficultyAttributes(
       aim_sync_sections.set(section, (aim_sync_sections.get(section) ?? 0) + aim_sync);
     }
     if (stamina > 0) stamina_strains.push(stamina);
-    const transition_technical = rhythm * Math.sqrt(speed) + angle_technical + aim_sync;
+    const transition_technical = rhythm_technical + angle_technical + aim_sync;
     if (transition_technical > 0) technical_strains.push(transition_technical);
     previous_delta = delta;
   }
@@ -129,7 +137,7 @@ export function calculateOsuDifficultyAttributes(
   const duration = Math.max(0, chart.end_time - (chart.hit_objects[0]?.absolute_time ?? 0));
   const length_multiplier = duration < 35 ? 0.8 : duration < 60 ? 0.85 : duration < 120 ? 0.95 : 1;
   const speed = scaleSkill(hardestAverage(speed_strains) * length_multiplier);
-  const dexterity = scaleSkill(movementDifficulty(movement_sections) * length_multiplier);
+  const dexterity = scaleSkill(movementDifficulty(movement_sections, jump_strains) * length_multiplier);
   const stamina = scaleSkill(hardestAverage(stamina_strains) * length_multiplier);
   const technical_strain = Math.max(hardestAverage(technical_strains), hardestAverage(aim_sync_strains))
     + sustainedAimSyncDifficulty(aim_sync_sections);
