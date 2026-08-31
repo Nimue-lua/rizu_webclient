@@ -9,7 +9,7 @@ readonly DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/rizu}"
 readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.nimue.mom}"
 readonly LIBRARY_DIR="${LIBRARY_DIR:-/media/SSD/s3_test}"
 readonly LIBRARY_REMOTE="${LIBRARY_REMOTE:-catalog:rizu.catalog}"
-readonly LIBRARY_URL="${LIBRARY_URL:-https://f365adbb-729c-4400-94c9-f26a3711fec0.selstorage.ru}"
+readonly LIBRARY_URL="${LIBRARY_URL:-https://s3.kuudere.fun}"
 readonly CHARTS_DIR="$LIBRARY_DIR/charts"
 readonly MIN_FREE_BYTES="${MIN_FREE_BYTES:-536870912}"
 readonly SSH_OPTIONS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=6)
