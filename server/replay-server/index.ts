@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,44 @@ const MAX_BODY_SIZE = 5 * 1024 * 1024;
 const MAX_RESULTS = 50;
 const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 
-function json(response, status, value) {
+type JsonObject = Record<string, unknown>;
+
+interface UserRow {
+  id: number;
+  name: string;
+}
+
+interface LoginRow extends UserRow {
+  password_hash: string;
+}
+
+interface ScoreRow {
+  id: number;
+  user_id: number | null;
+  user_name: string | null;
+  played_at: string;
+  submitted_at: string;
+  metadata_json: string;
+}
+
+interface ReplayRow {
+  replay: Uint8Array;
+}
+
+interface ReplayServerOptions {
+  database_path?: string;
+  database?: DatabaseSync;
+}
+
+interface HttpError extends Error {
+  status: number;
+}
+
+function httpError(message: string, status: number): HttpError {
+  return Object.assign(new Error(message), { status });
+}
+
+function json(response: ServerResponse, status: number, value: unknown): void {
   const body = JSON.stringify(value);
   response.writeHead(status, {
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
@@ -20,15 +57,15 @@ function json(response, status, value) {
   }).end(body);
 }
 
-function tokenHash(token) {
+function tokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function passwordHash(password, salt = randomBytes(16)) {
+function passwordHash(password: string, salt = randomBytes(16)): string {
   return `${salt.toString("hex")}:${scryptSync(password, salt, 32).toString("hex")}`;
 }
 
-function passwordMatches(password, stored) {
+function passwordMatches(password: string, stored: string): boolean {
   const [salt_hex, expected_hex] = stored.split(":");
   if (!salt_hex || !expected_hex) return false;
   const expected = Buffer.from(expected_hex, "hex");
@@ -36,45 +73,46 @@ function passwordMatches(password, stored) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-function boundedLimit(value, fallback = MAX_RESULTS) {
+function boundedLimit(value: string | null | undefined, fallback = MAX_RESULTS): number {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   return Number.isInteger(parsed) ? Math.min(Math.max(parsed, 1), MAX_RESULTS) : fallback;
 }
 
-async function readJson(request) {
+async function readJson(request: IncomingMessage): Promise<JsonObject> {
   const content_length = Number(request.headers["content-length"] ?? 0);
   if (!Number.isInteger(content_length) || content_length <= 0 || content_length > MAX_BODY_SIZE) {
-    throw Object.assign(new Error("Request body must be between 1 byte and 5 MiB"), { status: 413 });
+    throw httpError("Request body must be between 1 byte and 5 MiB", 413);
   }
-  const chunks = [];
+  const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of request) {
-    size += chunk.length;
-    if (size > MAX_BODY_SIZE) throw Object.assign(new Error("Request body is too large"), { status: 413 });
-    chunks.push(chunk);
+    const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+    size += bytes.length;
+    if (size > MAX_BODY_SIZE) throw httpError("Request body is too large", 413);
+    chunks.push(bytes);
   }
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as JsonObject;
   } catch {
-    throw Object.assign(new Error("Request body must be valid JSON"), { status: 400 });
+    throw httpError("Request body must be valid JSON", 400);
   }
 }
 
-function credentials(payload) {
-  const name = typeof payload?.name === "string" ? payload.name.trim() : "";
-  const password = typeof payload?.password === "string" ? payload.password : "";
+function credentials(payload: JsonObject): { name: string; password: string } {
+  const name = typeof payload.name === "string" ? payload.name.trim() : "";
+  const password = typeof payload.password === "string" ? payload.password : "";
   if (name.length < 2 || name.length > 24) {
-    throw Object.assign(new Error("Name must contain between 2 and 24 characters"), { status: 400 });
+    throw httpError("Name must contain between 2 and 24 characters", 400);
   }
   if (password.length < 6 || password.length > 200) {
-    throw Object.assign(new Error("Password must contain between 6 and 200 characters"), { status: 400 });
+    throw httpError("Password must contain between 6 and 200 characters", 400);
   }
   return { name, password };
 }
 
-function scoreFromRow(row) {
-  const metadata = JSON.parse(row.metadata_json);
+function scoreFromRow(row: ScoreRow): JsonObject {
+  const metadata = JSON.parse(row.metadata_json) as JsonObject;
   return {
     ...metadata,
     id: row.id,
@@ -88,7 +126,7 @@ function scoreFromRow(row) {
   };
 }
 
-export function openReplayDatabase(database_path) {
+export function openReplayDatabase(database_path: string): DatabaseSync {
   const database = new DatabaseSync(database_path);
   database.exec(`
     PRAGMA foreign_keys = ON;
@@ -125,17 +163,17 @@ export function openReplayDatabase(database_path) {
   return database;
 }
 
-function authenticatedUser(database, request) {
+function authenticatedUser(database: DatabaseSync, request: IncomingMessage): UserRow | null {
   const match = request.headers.authorization?.match(/^Bearer (\S+)$/);
   if (!match) return null;
   return database.prepare(`
     SELECT users.id, users.name
     FROM sessions JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ? AND sessions.expires_at > ?
-  `).get(tokenHash(match[1]), Math.floor(Date.now() / 1000)) ?? null;
+  `).get(tokenHash(match[1]), Math.floor(Date.now() / 1000)) as unknown as UserRow | undefined ?? null;
 }
 
-function createSession(database, user_id) {
+function createSession(database: DatabaseSync, user_id: number): string {
   const token = randomBytes(32).toString("base64url");
   database.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(Math.floor(Date.now() / 1000));
   database.prepare("INSERT INTO sessions VALUES (?, ?, ?)").run(
@@ -149,7 +187,7 @@ const SCORE_SELECT = `
   FROM scores LEFT JOIN users ON users.id = scores.user_id
 `;
 
-export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database } = {}) {
+export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database }: ReplayServerOptions = {}) {
   const database = supplied_database ?? openReplayDatabase(database_path);
   const owns_database = !supplied_database;
 
@@ -190,7 +228,8 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
 
       if (request.method === "POST" && url.pathname === "/api/login") {
         const { name, password } = credentials(await readJson(request));
-        const user = database.prepare("SELECT id, name, password_hash FROM users WHERE name = ? COLLATE NOCASE").get(name);
+        const user = database.prepare("SELECT id, name, password_hash FROM users WHERE name = ? COLLATE NOCASE")
+          .get(name) as unknown as LoginRow | undefined;
         if (!user || !passwordMatches(password, user.password_hash)) {
           json(response, 401, { error: "Invalid name or password" });
           return;
@@ -200,8 +239,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
       }
 
       if (request.method === "GET" && url.pathname === "/api/me") {
-        const user = authenticatedUser(database, request);
-        json(response, 200, { user });
+        json(response, 200, { user: authenticatedUser(database, request) });
         return;
       }
 
@@ -214,8 +252,8 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
 
       if (request.method === "POST" && url.pathname === "/api/scores") {
         const payload = await readJson(request);
-        if (typeof payload?.chart_md5 !== "string" || !/^[a-f\d]{32}$/i.test(payload.chart_md5) ||
-          !Number.isInteger(payload.chart_index) || payload.chart_index < 1 ||
+        if (typeof payload.chart_md5 !== "string" || !/^[a-f\d]{32}$/i.test(payload.chart_md5) ||
+          !Number.isInteger(payload.chart_index) || typeof payload.chart_index !== "number" || payload.chart_index < 1 ||
           (payload.mode !== "mania" && payload.mode !== "osu") || typeof payload.replay !== "string") {
           json(response, 400, { error: "Score requires chart_md5, chart_index, mode, and Base64 replay" });
           return;
@@ -248,8 +286,8 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const ranked_rows = database.prepare(`${SCORE_SELECT}
           WHERE scores.chart_md5 = ? AND scores.chart_index = ?
           ORDER BY scores.accuracy DESC, scores.score DESC, scores.id ASC
-        `).all(chart_md5.toLowerCase(), chart_index);
-        const ranked_users = new Set();
+        `).all(chart_md5.toLowerCase(), chart_index) as unknown as ScoreRow[];
+        const ranked_users = new Set<number>();
         const rows = ranked_rows.filter((row) => {
           if (row.user_id === null) return true;
           if (ranked_users.has(row.user_id)) return false;
@@ -262,14 +300,15 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
 
       if (request.method === "GET" && url.pathname === "/api/scores/recent") {
         const rows = database.prepare(`${SCORE_SELECT} ORDER BY scores.id DESC LIMIT ?`)
-          .all(boundedLimit(url.searchParams.get("limit")));
+          .all(boundedLimit(url.searchParams.get("limit"))) as unknown as ScoreRow[];
         json(response, 200, { scores: rows.map(scoreFromRow) });
         return;
       }
 
       const replay_match = request.method === "GET" && url.pathname.match(/^\/api\/scores\/(\d+)\/replay$/);
       if (replay_match) {
-        const row = database.prepare("SELECT replay FROM scores WHERE id = ?").get(Number(replay_match[1]));
+        const row = database.prepare("SELECT replay FROM scores WHERE id = ?")
+          .get(Number(replay_match[1])) as unknown as ReplayRow | undefined;
         if (!row) {
           json(response, 404, { error: "Replay not found" });
           return;
@@ -286,7 +325,8 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
     } catch (reason) {
       const status = reason && typeof reason === "object" && "status" in reason ? Number(reason.status) : 500;
       if (status === 500) console.error(reason);
-      json(response, status, { error: status === 500 ? "Internal server error" : String(reason.message) });
+      const message = reason instanceof Error ? reason.message : String(reason);
+      json(response, status, { error: status === 500 ? "Internal server error" : message });
     }
   });
   server.on("close", () => { if (owns_database) database.close(); });

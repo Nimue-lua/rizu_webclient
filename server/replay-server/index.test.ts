@@ -1,30 +1,37 @@
 import assert from "node:assert/strict";
+import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, test } from "node:test";
-import { openReplayDatabase, createReplayServer } from "./replay-server.mjs";
+import { openReplayDatabase, createReplayServer } from "./index.ts";
 
-let database;
-let server;
-let base_url;
+interface ApiResult {
+  [key: string]: any;
+}
+
+let database: DatabaseSync;
+let server: Server;
+let base_url: string;
 
 beforeEach(async () => {
   database = openReplayDatabase(":memory:");
   server = createReplayServer({ database });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  base_url = `http://127.0.0.1:${server.address().port}/api`;
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  base_url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 });
 
 afterEach(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   database.close();
 });
 
-async function request(path, options = {}) {
+async function request(path: string, options: RequestInit = {}) {
   const response = await fetch(`${base_url}${path}`, options);
-  const result = await response.json();
+  const result = await response.json() as ApiResult;
   return { response, result };
 }
 
-async function auth(path, name, password = "secret1") {
+async function auth(path: string, name: string, password = "secret1") {
   return request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -32,8 +39,17 @@ async function auth(path, name, password = "secret1") {
   });
 }
 
+interface Submission {
+  token?: string;
+  accuracy: number;
+  score?: number;
+  chart_md5?: string;
+  chart_index?: number;
+  mode?: "mania" | "osu";
+}
+
 async function submit({ token, accuracy, score = 0,
-  chart_md5 = "11111111111111111111111111111111", chart_index = 1, mode = "mania" }) {
+  chart_md5 = "11111111111111111111111111111111", chart_index = 1, mode = "mania" }: Submission) {
   const result = await request("/scores", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -67,7 +83,7 @@ test("shows only a registered user's best chart score and every anonymous score"
   await submit({ accuracy: 0.7, score: 700 });
 
   const { result } = await request("/leaderboard?chart_md5=11111111111111111111111111111111&chart_index=1");
-  assert.deepEqual(result.scores.map((play) => [play.nickname, play.accuracy, play.registered]), [
+  assert.deepEqual(result.scores.map((play: ApiResult) => [play.nickname, play.accuracy, play.registered]), [
     ["Player", 0.95, true],
     ["Anonymous", 0.9, false],
     ["Anonymous", 0.7, false],
@@ -80,7 +96,7 @@ test("lists recent plays newest first without deduplicating users", async () => 
   await submit({ accuracy: 0.9, chart_md5: "22222222222222222222222222222222" });
 
   const { result } = await request("/scores/recent?limit=2");
-  assert.deepEqual(result.scores.map((play) => [play.chart_md5, play.chart_index, play.nickname]), [
+  assert.deepEqual(result.scores.map((play: ApiResult) => [play.chart_md5, play.chart_index, play.nickname]), [
     ["22222222222222222222222222222222", 1, "Anonymous"],
     ["11111111111111111111111111111111", 1, "Player"],
   ]);
