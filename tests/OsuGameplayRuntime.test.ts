@@ -84,7 +84,10 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
       cursor_renderers.push(cursor_renderer);
       return {
       clientToPlayfield: (point, bounds) => ({ x: point.x - bounds.left, y: point.y - bounds.top }),
-      draw: (_chart, _circle_states, _first_active_index, _transients, _time, _state, cursor) => cursor_states.push(cursor),
+      draw: (_chart, _circle_states, _first_active_index, _transients, _time, _state, cursor) => {
+        cursor_states.push(cursor);
+        return { draw_calls: 1, command_count: 1, vertex_count: 6, buffer_upload_count: 1, slider_pass_count: 0 };
+      },
       destroy: () => { destroy_calls += 1; },
       };
     },

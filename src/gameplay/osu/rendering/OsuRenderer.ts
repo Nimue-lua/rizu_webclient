@@ -16,6 +16,7 @@ import type { OsuSliderPath } from "../OsuSliderPath";
 import { osuCircleDiameter } from "../OsuCircleGeometry";
 import { WebGlSliderGraphics } from "./WebGlSliderGraphics";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
+import type { GameplayRenderStats } from "../../renderer/GameplayRenderStats";
 
 export interface OsuGameplayRenderer {
   clientToPlayfield(point: Point, bounds: ClientBounds): Point;
@@ -23,7 +24,7 @@ export interface OsuGameplayRenderer {
     circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState,
     slider_states?: readonly OsuSliderPresentationState[], spinner_state?: OsuSpinnerPresentationState | null,
-    progress?: number | null): number;
+    progress?: number | null): GameplayRenderStats;
   destroy(): void;
 }
 
@@ -71,7 +72,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState,
     slider_states: readonly OsuSliderPresentationState[] | undefined = undefined,
-    spinner_state: OsuSpinnerPresentationState | null = null, progress: number | null = null): number {
+    spinner_state: OsuSpinnerPresentationState | null = null, progress: number | null = null): GameplayRenderStats {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
     this.slider_draw_calls = 0;
@@ -100,7 +101,13 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.active_viewport = null;
     this.active_frame = null;
     this.graphics.submit(commands);
-    return this.graphics.drawCallCount + this.slider_draw_calls;
+    return {
+      draw_calls: this.graphics.drawCallCount + this.slider_draw_calls,
+      command_count: this.graphics.commandCount,
+      vertex_count: this.graphics.vertexCount,
+      buffer_upload_count: this.graphics.bufferUploadCount,
+      slider_pass_count: this.slider_draw_calls,
+    };
   }
 
   private createViewport(width: number, height: number): OsuViewport {

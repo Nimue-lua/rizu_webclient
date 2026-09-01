@@ -7,6 +7,7 @@ import { ManiaPlayfieldRenderer } from "./ManiaPlayfieldRenderer";
 import type { NoteSkin } from "../../../noteskin/NoteSkin";
 import type { SpriteDrawCommand } from "../../renderer/Sprite";
 import { WebGlSpriteGraphics } from "../../renderer/WebGlSpriteGraphics";
+import type { GameplayRenderStats } from "../../renderer/GameplayRenderStats";
 
 export class ManiaRenderer {
   private readonly playfield: ManiaPlayfieldRenderer;
@@ -32,7 +33,8 @@ export class ManiaRenderer {
   }
 
   draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number> = [], state: GameplayPresentationState, progress: number | null = null): number {
+    pressed_columns: ArrayLike<number> = [], state: GameplayPresentationState,
+    progress: number | null = null): GameplayRenderStats {
     this.validateColumnCount(column_count);
     const frame = this.graphics.getFrame();
     const layout = this.playfield.getLayout(frame.logical_width);
@@ -57,7 +59,13 @@ export class ManiaRenderer {
     this.hud.drawProgress(progress, getGameplayHudLayout(layout.width));
     this.active_commands = null;
     this.graphics.submit(commands);
-    return this.graphics.drawCallCount;
+    return {
+      draw_calls: this.graphics.drawCallCount,
+      command_count: this.graphics.commandCount,
+      vertex_count: this.graphics.vertexCount,
+      buffer_upload_count: this.graphics.bufferUploadCount,
+      slider_pass_count: 0,
+    };
   }
 
   destroy(): void {

@@ -81,6 +81,9 @@ export class WebGlSpriteGraphics {
   private readonly sprites = new Map<Sprite, UploadedSprite>();
   private readonly textures: WebGLTexture[] = [];
   private draw_calls = 0;
+  private command_count = 0;
+  private vertex_count = 0;
+  private buffer_upload_count = 0;
   private destroyed = false;
 
   constructor(canvas: HTMLCanvasElement, skin: SpriteSkin,
@@ -171,6 +174,9 @@ export class WebGlSpriteGraphics {
   beginFrame(frame: GameplayFrame): void {
     const gl = this.gl;
     this.draw_calls = 0;
+    this.command_count = 0;
+    this.vertex_count = 0;
+    this.buffer_upload_count = 0;
     gl.viewport(0, 0, frame.framebuffer_width, frame.framebuffer_height);
     gl.clearColor(...BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -183,6 +189,7 @@ export class WebGlSpriteGraphics {
 
   submit(commands: readonly SpriteDrawCommand[]): void {
     const gl = this.gl;
+    this.command_count += commands.length;
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vertex_array);
     gl.activeTexture(gl.TEXTURE0);
@@ -244,13 +251,18 @@ export class WebGlSpriteGraphics {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+    this.buffer_upload_count += 1;
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
     this.draw_calls += 1;
+    this.vertex_count += vertices.length / VERTEX_FLOATS;
   }
 
   get drawCallCount(): number { return this.draw_calls; }
+  get commandCount(): number { return this.command_count; }
+  get vertexCount(): number { return this.vertex_count; }
+  get bufferUploadCount(): number { return this.buffer_upload_count; }
 
   private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand, uploaded: UploadedSprite): void {
     const progress = Math.max(-1, Math.min(1, command.circularProgress ?? 0));

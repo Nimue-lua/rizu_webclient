@@ -124,6 +124,9 @@ test("batches ordered sprite commands that share an atlas", () => {
   const vertices = fake.calls.uploaded_vertices[0]!;
   assert.notEqual(vertices[2], vertices[6 * 8 + 2]);
   assert.equal(vertices[2], vertices[2 * 6 * 8 + 2]);
+  assert.equal(graphics.commandCount, 6);
+  assert.equal(graphics.vertexCount, 36);
+  assert.equal(graphics.bufferUploadCount, 1);
   dom.restore();
 });
 

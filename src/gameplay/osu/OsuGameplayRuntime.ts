@@ -287,13 +287,13 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const slider_states = this.rules_engine.slider_states;
     const spinner_state = this.rules_engine.spinner_state;
     const draw_start = this.dependencies.performance_now();
-    const draw_calls = this.renderer.draw(this.chart, this.rules_engine.circle_states,
+    const render_stats = this.renderer.draw(this.chart, this.rules_engine.circle_states,
       first_active_index, this.rules_engine.circle_transients, song_time,
       this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
       slider_states, spinner_state,
       getGameplayProgress(song_time, this.progress_range));
     const draw_ms = this.dependencies.performance_now() - draw_start;
-    this.performance_sample?.({ timestamp, update_ms, draw_ms, draw_calls });
+    this.performance_sample?.({ timestamp, update_ms, draw_ms, ...render_stats });
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;

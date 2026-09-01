@@ -3,6 +3,10 @@ export interface GameplayPerformanceSample {
   readonly update_ms: number;
   readonly draw_ms: number;
   readonly draw_calls: number;
+  readonly command_count: number;
+  readonly vertex_count: number;
+  readonly buffer_upload_count: number;
+  readonly slider_pass_count: number;
 }
 
 export class GameplayPerformanceGraph {
@@ -17,6 +21,10 @@ export class GameplayPerformanceGraph {
   private stats_sample_count = 0;
   private previous_timestamp: number | null = null;
   private draw_calls = 0;
+  private command_count = 0;
+  private vertex_count = 0;
+  private buffer_upload_count = 0;
+  private slider_pass_count = 0;
   private next_label_update = Number.NEGATIVE_INFINITY;
   private label_fps = "--";
   private label_frame = "0.00";
@@ -26,6 +34,10 @@ export class GameplayPerformanceGraph {
   private label_low_one = "--";
   private label_heap = "";
   private label_draw_calls = 0;
+  private label_command_count = 0;
+  private label_vertex_count = 0;
+  private label_buffer_upload_count = 0;
+  private label_slider_pass_count = 0;
   private update_total = 0;
   private draw_total = 0;
   private timing_sample_count = 0;
@@ -37,6 +49,10 @@ export class GameplayPerformanceGraph {
     const frame_ms = this.previous_timestamp === null ? 0 : sample.timestamp - this.previous_timestamp;
     const heap_bytes = readHeapBytes();
     this.draw_calls = sample.draw_calls;
+    this.command_count = sample.command_count;
+    this.vertex_count = sample.vertex_count;
+    this.buffer_upload_count = sample.buffer_upload_count;
+    this.slider_pass_count = sample.slider_pass_count;
     this.update_total += sample.update_ms;
     this.draw_total += sample.draw_ms;
     this.timing_sample_count += 1;
@@ -70,7 +86,7 @@ export class GameplayPerformanceGraph {
     context.textBaseline = "top";
 
     context.fillStyle = "rgba(0, 0, 0, 0.72)";
-    context.fillRect(6, 6, Math.min(logical_width - 12, 790), 27);
+    context.fillRect(6, 6, Math.min(logical_width - 12, 790), 42);
     context.fillStyle = "#fff";
     context.fillText(`FPS ${this.label_fps}  frame ${this.label_frame}ms`, 12, 12);
     context.fillStyle = "#44e5ff";
@@ -82,7 +98,11 @@ export class GameplayPerformanceGraph {
     context.fillStyle = "#fff";
     context.fillText(`drawcalls ${this.label_draw_calls}`, 510, 12);
     context.fillText(`1% low ${this.label_low_one}`, 630, 12);
-    if (this.label_heap) context.fillText(`JS heap ${this.label_heap} MiB`, 12, 27);
+    context.fillText(`commands ${this.label_command_count}`, 12, 27);
+    context.fillText(`vertices ${this.label_vertex_count}`, 145, 27);
+    context.fillText(`buffer uploads ${this.label_buffer_upload_count}`, 285, 27);
+    context.fillText(`slider passes ${this.label_slider_pass_count}`, 470, 27);
+    if (this.label_heap) context.fillText(`JS heap ${this.label_heap} MiB`, 630, 27);
   }
 
   private pushFrameBucket(frame_ms: number): void {
@@ -109,6 +129,10 @@ export class GameplayPerformanceGraph {
     this.label_low_one = this.lowFps(1);
     this.label_heap = heap_bytes > 0 ? (heap_bytes / (1024 * 1024)).toFixed(1) : "";
     this.label_draw_calls = this.draw_calls;
+    this.label_command_count = this.command_count;
+    this.label_vertex_count = this.vertex_count;
+    this.label_buffer_upload_count = this.buffer_upload_count;
+    this.label_slider_pass_count = this.slider_pass_count;
     this.update_total = 0;
     this.draw_total = 0;
     this.timing_sample_count = 0;
