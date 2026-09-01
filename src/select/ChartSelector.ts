@@ -124,6 +124,19 @@ export class ChartSelector {
     this.update({ selected_chart_id: chart_id });
   }
 
+  selectChartIdentity(chart_md5: string, chart_index: number): boolean {
+    const normalized_md5 = chart_md5.toLowerCase();
+    for (const song of this.snapshot.songs) {
+      const chart = song.charts.find((candidate) =>
+        candidate.chart_md5.toLowerCase() === normalized_md5 && candidate.chart_index === chart_index
+      );
+      if (!chart) continue;
+      this.update({ selected_song_id: song.id, selected_chart_id: chart.id });
+      return true;
+    }
+    return false;
+  }
+
   selectEntry(entry: ChartSelectionEntry): void {
     if (entry.chart) {
       this.update({ selected_song_id: entry.song.id, selected_chart_id: entry.chart.id });

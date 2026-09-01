@@ -12,6 +12,8 @@ function chart(id: string, difficulty: number, duration_seconds: number, locatio
     bpm_max: 120,
     bpm_min: 120,
     chart_url: "",
+    chart_md5: id.padEnd(32, "0"),
+    chart_index: 1,
     creator: `Creator ${id}`,
     difficulty,
     duration_seconds,
@@ -85,6 +87,17 @@ test("selects and navigates exact sibling charts in chart modes", async () => {
   selector.scrollLevel(3);
   assert.equal(selector.getSelectedChart()?.id, "zeta-hard");
   assert.equal(selector.getSelectedSong()?.charts.length, 2);
+});
+
+test("selects a chart by its portable catalog identity", async () => {
+  const selector = await loadedSelector();
+  const target = songs[0]!.charts[0]!;
+
+  assert.equal(selector.selectChartIdentity(target.chart_md5.toUpperCase(), target.chart_index), true);
+  assert.equal(selector.getSelectedSong()?.id, "zeta");
+  assert.equal(selector.getSelectedChart()?.id, "zeta-easy");
+  assert.equal(selector.selectChartIdentity("ffffffffffffffffffffffffffffffff", 1), false);
+  assert.equal(selector.getSelectedChart()?.id, "zeta-easy");
 });
 
 test("applies chart filters before flattening", async () => {

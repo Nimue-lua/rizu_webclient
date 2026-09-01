@@ -20,6 +20,7 @@ import type { LocalLibraryStatus } from "../library/LocalLibraryStore";
 import type { RemoteProviderView } from "../library/RemoteLibraryStore";
 import type { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
 import { GlobalLeaderboardScreen } from "./GlobalLeaderboardScreen";
+import { chartLinkHash } from "./ChartLink";
 
 const ROW_HEIGHT = 82;
 const BACKGROUND_DEBOUNCE_MS = 200;
@@ -146,6 +147,12 @@ export function SongSelectScreen({
     ?? selected_chart?.audio_url
     ?? "";
   const selected_preview_time = selected_local_media ? selected_chart?.preview_time ?? 0 : selected_chart?.preview_audio_url ? 0 : selected_chart?.preview_time ?? 0;
+
+  useEffect(() => {
+    if (!selected_chart) return;
+    const hash = chartLinkHash(selected_chart);
+    if (window.location.hash !== hash) window.history.replaceState(window.history.state, "", hash);
+  }, [selected_chart?.chart_index, selected_chart?.chart_md5]);
 
   useEffect(() => {
     setLocalPreviewMedia(null);

@@ -33,6 +33,7 @@ import { LocalLibraryCatalog, readLocalAsset } from "../library/LocalLibraryStor
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
 import { SongPreviewPlayer } from "../audio/SongPreviewPlayer";
 import type { GameplayBackgroundState } from "../gameplay/GameplaySession";
+import { parseChartLink } from "./ChartLink";
 
 type Screen = "welcome" | "catalog-loading" | "song-select" | "loading" | "gameplay" | "result";
 type ViewTransitionKind = "screen" | "song-loading" | "loading-gameplay" | "gameplay-result";
@@ -63,7 +64,8 @@ function ChartScreenContainer({ children, background_url, background_class }: Pr
 }
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>("welcome");
+  const linked_chart = useRef(parseChartLink(window.location.hash));
+  const [screen, setScreen] = useState<Screen>(() => linked_chart.current ? "catalog-loading" : "welcome");
   const [settings_open, setSettingsOpen] = useState(false);
   const [score_storage_revision, setScoreStorageRevision] = useState(0);
   const [audio_context, setAudioContext] = useState<AudioContext | null>(null);
@@ -322,7 +324,12 @@ export function App() {
           <CatalogLoadingScreen
             chart_selector={chart_selector}
             local_library={local_library}
-            onLoaded={() => transitionTo("song-select")}
+            onLoaded={() => {
+              const identity = linked_chart.current;
+              if (identity) chart_selector.selectChartIdentity(identity.chart_md5, identity.chart_index);
+              linked_chart.current = null;
+              transitionTo("song-select");
+            }}
           />
         </ScreenContainer>
       );
