@@ -20,14 +20,15 @@ beforeEach(async () => {
   catalog.exec(`
     CREATE TABLE songs (id TEXT PRIMARY KEY, title TEXT, artist TEXT);
     CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, speed REAL, dexterity REAL,
-      stamina REAL, technical REAL, mode INTEGER, keys INTEGER, name TEXT, song_id TEXT);
+      stamina REAL, technical REAL, mode INTEGER, keys INTEGER, name TEXT, background_preview_path TEXT, song_id TEXT);
     INSERT INTO songs VALUES ('song-1', 'First Song', 'First Artist');
     INSERT INTO songs VALUES ('song-2', 'Second Song', 'Second Artist');
-    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 8, 2, 4, 1, 3, 4, 'Hard', 'song-1');
-    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 9, 5, 7, 3, 7, 'Challenge', 'song-2');
-    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 0, NULL, 'Insane', 'song-1');
+    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 8, 2, 4, 1, 3, 4, 'Hard', 'backgrounds/v2/first.avif', 'song-1');
+    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 9, 5, 7, 3, 7, 'Challenge', NULL, 'song-2');
+    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 0, NULL, 'Insane', NULL, 'song-1');
   `);
-  server = createReplayServer({ database, catalog });
+  server = createReplayServer({ database, catalog, app_html: "<!doctype html><html><head><title>Rizu</title></head><body></body></html>",
+    asset_base_url: "https://assets.example/" });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base_url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 });
@@ -43,6 +44,29 @@ async function request(path: string, options: RequestInit = {}) {
   const result = await response.json() as ApiResult;
   return { response, result };
 }
+
+test("serves chart pages with catalog Open Graph metadata", async () => {
+  const response = await fetch(`${base_url.replace(/\/api$/, "")}/chart/11111111111111111111111111111111/1`, {
+    headers: { "X-Forwarded-Host": "rizu.example", "X-Forwarded-Proto": "https" },
+  });
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8");
+  assert.match(body, /<title>First Artist - First Song \| Rizu<\/title>/);
+  assert.match(body, /property="og:title" content="First Artist - First Song"/);
+  assert.match(body, /property="og:description" content="Hard - 5\.00 difficulty"/);
+  assert.match(body, /property="og:image" content="https:\/\/assets\.example\/backgrounds\/v2\/first\.avif"/);
+  assert.match(body, /property="og:url" content="https:\/\/rizu\.example\/chart\/11111111111111111111111111111111\/1"/);
+});
+
+test("serves the web client without chart metadata for charts outside the server catalog", async () => {
+  const response = await fetch(`${base_url.replace(/\/api$/, "")}/chart/99999999999999999999999999999999/1`);
+  const body = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(body, /<title>Rizu<\/title>/);
+  assert.doesNotMatch(body, /property="og:title"/);
+});
 
 async function auth(path: string, name: string, password = "secret1") {
   return request(path, {

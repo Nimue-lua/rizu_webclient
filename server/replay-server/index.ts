@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { access, rename, rm, writeFile } from "node:fs/promises";
+import { access, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
@@ -34,6 +34,7 @@ interface ScoreRow {
 }
 
 interface CatalogChartRow {
+  background_preview_path: string | null;
   difficulty: number;
   speed: number | null;
   dexterity: number | null;
@@ -65,6 +66,8 @@ interface ReplayServerOptions {
   database?: DatabaseSync;
   catalog_path?: string;
   catalog?: DatabaseSync;
+  app_html?: string;
+  asset_base_url?: string;
 }
 
 interface HttpError extends Error {
@@ -85,6 +88,35 @@ function json(response: ServerResponse, status: number, value: unknown): void {
     "Content-Length": Buffer.byteLength(body),
     "Content-Type": "application/json; charset=utf-8",
   }).end(body);
+}
+
+function htmlEscape(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  })[character] as string);
+}
+
+function chartPageHtml(template: string, chart: CatalogChartRow, page_url: string, image_url: string | null): string {
+  const title = `${chart.artist} - ${chart.title}`;
+  const description = `${chart.name} - ${chart.difficulty.toFixed(2)} difficulty`;
+  const metadata = [
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="Rizu">`,
+    `<meta property="og:title" content="${htmlEscape(title)}">`,
+    `<meta property="og:description" content="${htmlEscape(description)}">`,
+    `<meta property="og:url" content="${htmlEscape(page_url)}">`,
+    ...(image_url ? [
+      `<meta property="og:image" content="${htmlEscape(image_url)}">`,
+      `<meta name="twitter:card" content="summary_large_image">`,
+    ] : []),
+  ].join("\n    ");
+  return template
+    .replace(/<title>.*?<\/title>/s, `<title>${htmlEscape(title)} | Rizu</title>`)
+    .replace("</head>", `    ${metadata}\n  </head>`);
 }
 
 function tokenHash(token: string): string {
@@ -160,7 +192,7 @@ export function skillRating(difficulty: unknown, accuracy: unknown): number {
 function catalogChart(catalog: DatabaseSync, chart_md5: string, chart_index: number): CatalogChartRow | undefined {
   return catalog.prepare(`
     SELECT charts.difficulty, charts.speed, charts.dexterity, charts.stamina, charts.technical,
-      charts.mode, charts.keys, charts.name, songs.title, songs.artist
+      charts.mode, charts.keys, charts.name, charts.background_preview_path, songs.title, songs.artist
     FROM charts JOIN songs ON songs.id = charts.song_id
     WHERE charts.chart_md5 = ? AND charts.chart_index = ?
   `).get(chart_md5.toLowerCase(), chart_index) as unknown as CatalogChartRow | undefined;
@@ -345,7 +377,7 @@ const SCORE_SELECT = `
 `;
 
 export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database,
-  catalog_path, catalog: supplied_catalog }: ReplayServerOptions = {}) {
+  catalog_path, catalog: supplied_catalog, app_html, asset_base_url }: ReplayServerOptions = {}) {
   const database = supplied_database ?? openReplayDatabase(database_path);
   const catalog = supplied_catalog ?? (catalog_path ? new DatabaseSync(catalog_path, { readOnly: true }) : undefined);
   if (!catalog) {
@@ -367,6 +399,30 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
       }
 
       const url = new URL(request.url ?? "/", "http://localhost");
+      const chart_page_match = request.method === "GET" && url.pathname.match(/^\/chart\/([a-f\d]{32})\/(\d+)\/?$/i);
+      if (chart_page_match) {
+        const chart = catalogChart(catalog, chart_page_match[1], Number(chart_page_match[2]));
+        if (!app_html) {
+          response.writeHead(503, { "Content-Type": "text/plain; charset=utf-8" }).end("Web client is unavailable");
+          return;
+        }
+        const forwarded_proto = request.headers["x-forwarded-proto"];
+        const protocol = forwarded_proto === "http" || forwarded_proto === "https" ? forwarded_proto : "https";
+        const forwarded_host = request.headers["x-forwarded-host"];
+        const host = typeof forwarded_host === "string" ? forwarded_host : request.headers.host ?? "rizu.kuudere.fun";
+        const page_url = `${protocol}://${host}${url.pathname}`;
+        const image_url = chart?.background_preview_path && asset_base_url
+          ? new URL(chart.background_preview_path, asset_base_url).href
+          : null;
+        const body = chart ? chartPageHtml(app_html, chart, page_url, image_url) : app_html;
+        response.writeHead(200, {
+          "Cache-Control": "public, max-age=300",
+          "Content-Length": Buffer.byteLength(body),
+          "Content-Type": "text/html; charset=utf-8",
+        }).end(body);
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/health") {
         json(response, 200, { ok: true });
         return;
@@ -534,8 +590,10 @@ async function main(): Promise<void> {
   const host = process.env.HOST ?? "127.0.0.1";
   const catalog_url = process.env.RIZU_CATALOG_URL ?? DEFAULT_CATALOG_URL;
   const catalog_path = process.env.RIZU_CATALOG ?? DEFAULT_CATALOG_PATH;
+  const app_html_path = process.env.RIZU_WEB_INDEX ?? "/srv/rizu/dist/index.html";
   await prepareCatalog(catalog_url, catalog_path);
-  createReplayServer({ database_path, catalog_path }).listen(port, host, () => {
+  const app_html = await readFile(app_html_path, "utf8");
+  createReplayServer({ database_path, catalog_path, app_html, asset_base_url: new URL(".", catalog_url).href }).listen(port, host, () => {
     console.log(`Rizu API listening on http://${host}:${port}`);
   });
 }

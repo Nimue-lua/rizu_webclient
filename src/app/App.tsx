@@ -64,7 +64,7 @@ function ChartScreenContainer({ children, background_url, background_class }: Pr
 }
 
 export function App() {
-  const linked_chart = useRef(parseChartLink(window.location.hash));
+  const linked_chart = useRef(parseChartLink(window.location.pathname, window.location.hash));
   const [screen, setScreen] = useState<Screen>(() => linked_chart.current ? "catalog-loading" : "welcome");
   const [settings_open, setSettingsOpen] = useState(false);
   const [score_storage_revision, setScoreStorageRevision] = useState(0);
