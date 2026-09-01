@@ -7,6 +7,7 @@ import { OsuPlayfieldRenderer } from "./OsuPlayfieldRenderer";
 import type { OsuStandardSkin } from "../../../noteskin/osu/OsuSkin";
 import type { SpriteDrawCommand } from "../../renderer/Sprite";
 import { WebGlSpriteGraphics } from "../../renderer/WebGlSpriteGraphics";
+import type { GameplayFrame } from "../../renderer/GameplayFrame";
 import { OsuViewport, type ClientBounds, type Point } from "../OsuViewport";
 import type { OsuCursorState } from "../OsuInputEvent";
 import type { OsuCircleTransient } from "../OsuCirclePresentation";
@@ -33,7 +34,10 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private readonly graphics: WebGlSpriteGraphics;
   private readonly slider_graphics: WebGlSliderGraphics;
   private readonly hud: GameplayHudRenderer;
+  private readonly commands: SpriteDrawCommand[] = [];
   private active_commands: SpriteDrawCommand[] | null = null;
+  private active_viewport: OsuViewport | null = null;
+  private active_frame: GameplayFrame | null = null;
   private readonly skin: OsuStandardSkin;
   private readonly x_flip: boolean;
   private readonly y_flip: boolean;
@@ -69,25 +73,17 @@ export class OsuRenderer implements OsuGameplayRenderer {
     spinner_state: OsuSpinnerPresentationState | null = null, progress: number | null = null): void {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
-    const commands: SpriteDrawCommand[] = [];
+    const commands = this.commands;
+    commands.length = 0;
     this.active_commands = commands;
-    const write = (x: number, y: number, width: number, height: number,
-      color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
-      flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number) => {
-      commands.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
-        rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
-    };
     const viewport = this.createViewport(frame.logical_width, frame.logical_height);
+    this.active_viewport = viewport;
+    this.active_frame = frame;
     this.hud.drawHpBar();
-    this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write,
-      this.sliderPath, (slider, _path, alpha, color) => {
-        this.graphics.submit(commands);
-        commands.length = 0;
-        this.slider_graphics.draw(slider, viewport, frame,
-          this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha);
-      }, slider_states, spinner_state);
+    this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time,
+      this.writeCommand, this.sliderPath, this.drawSlider, slider_states, spinner_state);
     this.combo.draw(state.combo, state.comboAnimationAge, state.comboAnimationFrom,
-      8, frame.logical_height - 8, write);
+      8, frame.logical_height - 8, this.writeCommand);
     this.hud.drawScore(state.hud, getGameplayHudLayout(frame.logical_width));
     this.hud.drawProgress(progress, getGameplayHudLayout(frame.logical_width));
     if (this.draw_cursor) {
@@ -95,10 +91,12 @@ export class OsuRenderer implements OsuGameplayRenderer {
       const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
       const cursor_width = this.skin.cursor.sourceSize.w * viewport.scale * cursor_scale;
       const cursor_height = this.skin.cursor.sourceSize.h * viewport.scale * cursor_scale;
-      write(cursor_center.x - cursor_width / 2, cursor_center.y - cursor_height / 2,
+      this.writeCommand(cursor_center.x - cursor_width / 2, cursor_center.y - cursor_height / 2,
         cursor_width, cursor_height, [1, 1, 1, 1], this.skin.cursor);
     }
     this.active_commands = null;
+    this.active_viewport = null;
+    this.active_frame = null;
     this.graphics.submit(commands);
   }
 
@@ -114,6 +112,25 @@ export class OsuRenderer implements OsuGameplayRenderer {
   }
 
   private readonly sliderPath = (slider: OsuSlider): OsuSliderPath | undefined => this.slider_paths.get(slider);
+
+  private readonly writeCommand = (x: number, y: number, width: number, height: number,
+    color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
+    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number): void => {
+    this.active_commands?.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
+      rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
+  };
+
+  private readonly drawSlider = (slider: OsuSlider, _path: OsuSliderPath, alpha: number,
+    color: readonly [number, number, number, number]): void => {
+    const commands = this.active_commands;
+    const viewport = this.active_viewport;
+    const frame = this.active_frame;
+    if (!commands || !viewport || !frame) return;
+    this.graphics.submit(commands);
+    commands.length = 0;
+    this.slider_graphics.draw(slider, viewport, frame,
+      this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha);
+  };
 
   destroy(): void {
     this.slider_graphics.destroy();

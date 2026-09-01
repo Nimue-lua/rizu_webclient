@@ -19,19 +19,34 @@ export function drawCircle(skin: OsuStandardSkin, viewport: OsuViewport, positio
 
 function drawComboNumber(skin: OsuStandardSkin, center: Point, combo_number: number, diameter: number,
   alpha: number, write: SpriteQuadWriter): void {
-  const digits = String(combo_number).split("").map((digit) => skin.hitCircleGlyphs?.[digit]).filter(Boolean);
-  if (digits.length === 0) return;
+  const glyphs = skin.hitCircleGlyphs;
+  if (!glyphs) return;
+  const number = Math.max(0, Math.floor(combo_number));
+  let divisor = 1;
+  while (divisor <= number / 10) divisor *= 10;
+  let glyph_count = 0;
+  let native_width = 0;
+  for (let current = divisor; current >= 1; current /= 10) {
+    const glyph = glyphs[Math.floor(number / current) % 10];
+    if (!glyph) continue;
+    native_width += glyph.sourceSize.w;
+    glyph_count += 1;
+  }
+  if (glyph_count === 0) return;
   const scale = diameter / OSU_HIT_OBJECT_TEXTURE_SIZE * 0.8;
   const overlap = skin.hitCircleOverlap ?? -2;
-  const width = digits.reduce((total, digit, index) =>
-    total + digit!.sourceSize.w - (index > 0 ? overlap : 0), 0) * scale;
-  const height = digits[0]!.sourceSize.h * scale;
+  const width = (native_width - overlap * (glyph_count - 1)) * scale;
   let x = center.x - width / 2;
-  for (const [index, digit] of digits.entries()) {
-    if (index > 0) x -= overlap * scale;
-    const digit_width = digit!.sourceSize.w * scale;
-    write(x, center.y - height / 2, digit_width, digit!.sourceSize.h * scale, [1, 1, 1, alpha], digit!);
+  let emitted = 0;
+  for (let current = divisor; current >= 1; current /= 10) {
+    const glyph = glyphs[Math.floor(number / current) % 10];
+    if (!glyph) continue;
+    if (emitted > 0) x -= overlap * scale;
+    const digit_width = glyph.sourceSize.w * scale;
+    const digit_height = glyph.sourceSize.h * scale;
+    write(x, center.y - digit_height / 2, digit_width, digit_height, [1, 1, 1, alpha], glyph);
     x += digit_width;
+    emitted += 1;
   }
 }
 

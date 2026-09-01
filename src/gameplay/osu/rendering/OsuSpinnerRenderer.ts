@@ -3,32 +3,25 @@ import { drawBitmapText } from "../../renderer/BitmapTextRenderer";
 import type { SpriteQuadWriter } from "../../renderer/Sprite";
 import type { OsuSpinnerPresentationState } from "../OsuSliderPresentation";
 import type { OsuViewport } from "../OsuViewport";
+import type { Sprite } from "../../renderer/Sprite";
 
 export function drawSpinner(skin: OsuStandardSkin, viewport: OsuViewport,
   state: OsuSpinnerPresentationState, write: SpriteQuadWriter): void {
   const center = viewport.playfieldToScreen({ x: 256, y: 192 });
-  const addCentered = (sprite: OsuStandardSkin["spinnerCircle"], rotation = 0, scale = 1) => {
-    if (!sprite) return;
-    const width = sprite.sourceSize.w * viewport.scale * scale;
-    const height = sprite.sourceSize.h * viewport.scale * scale;
-    write(center.x - width / 2, center.y - height / 2, width, height, [1, 1, 1, state.opacity], sprite,
-      false, undefined, false, rotation);
-  };
   const legacy = skin.spinnerCircle !== undefined;
   if (legacy) {
-    addCentered(skin.spinnerBackground);
-    addCentered(skin.spinnerCircle, state.rotation_radians);
-    addCentered(skin.spinnerMetre);
+    drawCentered(skin.spinnerBackground, center.x, center.y, viewport.scale, state.opacity, write);
+    drawCentered(skin.spinnerCircle, center.x, center.y, viewport.scale, state.opacity, write, state.rotation_radians);
+    drawCentered(skin.spinnerMetre, center.x, center.y, viewport.scale, state.opacity, write);
   } else {
-    const layers = [skin.spinnerBottom, skin.spinnerMiddle, skin.spinnerTop].filter(Boolean);
-    const layered_scale = layers.length === 0 ? 1 : Math.min(1,
-      512 / Math.max(...layers.map((sprite) => sprite!.sourceSize.w)),
-      384 / Math.max(...layers.map((sprite) => sprite!.sourceSize.h)));
-    addCentered(skin.spinnerBottom, 0, layered_scale);
-    addCentered(skin.spinnerMiddle, 0, layered_scale);
-    addCentered(skin.spinnerTop, state.rotation_radians, layered_scale);
+    const layered_scale = spinnerLayerScale(skin.spinnerBottom, skin.spinnerMiddle, skin.spinnerTop);
+    drawCentered(skin.spinnerBottom, center.x, center.y, viewport.scale * layered_scale, state.opacity, write);
+    drawCentered(skin.spinnerMiddle, center.x, center.y, viewport.scale * layered_scale, state.opacity, write);
+    drawCentered(skin.spinnerTop, center.x, center.y, viewport.scale * layered_scale, state.opacity, write,
+      state.rotation_radians);
   }
-  addCentered(skin.spinnerApproachCircle, 0, 1.86 - 1.76 * state.duration_progress);
+  drawCentered(skin.spinnerApproachCircle, center.x, center.y,
+    viewport.scale * (1.86 - 1.76 * state.duration_progress), state.opacity, write);
 
   const rpm_background = skin.spinnerRpm;
   const eased_fade_in = 1 - (1 - state.fade_in_progress) * (1 - state.fade_in_progress);
@@ -41,4 +34,22 @@ export function drawSpinner(skin: OsuStandardSkin, viewport: OsuViewport,
   }
   drawBitmapText(skin.sprites, String(Math.round(state.rpm)), skin.scoreGlyphs, skin.scoreOverlap,
     center.x + 80 * viewport.scale, y + 3 * viewport.scale, 0.9 * viewport.scale, "right", write, state.opacity);
+}
+
+function drawCentered(sprite: Sprite | undefined, center_x: number, center_y: number, scale: number,
+  opacity: number, write: SpriteQuadWriter, rotation = 0): void {
+  if (!sprite) return;
+  const width = sprite.sourceSize.w * scale;
+  const height = sprite.sourceSize.h * scale;
+  write(center_x - width / 2, center_y - height / 2, width, height, [1, 1, 1, opacity], sprite,
+    false, undefined, false, rotation);
+}
+
+function spinnerLayerScale(bottom: Sprite | undefined, middle: Sprite | undefined, top: Sprite | undefined): number {
+  let max_width = 0;
+  let max_height = 0;
+  if (bottom) { max_width = bottom.sourceSize.w; max_height = bottom.sourceSize.h; }
+  if (middle) { max_width = Math.max(max_width, middle.sourceSize.w); max_height = Math.max(max_height, middle.sourceSize.h); }
+  if (top) { max_width = Math.max(max_width, top.sourceSize.w); max_height = Math.max(max_height, top.sourceSize.h); }
+  return max_width === 0 || max_height === 0 ? 1 : Math.min(1, 512 / max_width, 384 / max_height);
 }
