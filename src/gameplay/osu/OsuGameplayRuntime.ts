@@ -18,6 +18,7 @@ import { resolveOsuStandardTimingValues } from "../timing/TimingValuesFactory";
 import { Timings } from "../timing/Timings";
 import { replayTick, replayValue, type CompletedGameplay, type OsuRecordedReplay } from "../../replay/RecordedReplay";
 import { osuApproachPreempt } from "./OsuCircleGeometry";
+import type { GameplayPerformanceSample } from "../GameplayPerformance";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;
@@ -81,7 +82,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
     private readonly playback_replay?: OsuRecordedReplay,
     private readonly initial_lead_in = 0,
-    private readonly background_state_change?: (state: GameplayBackgroundState) => void) {
+    private readonly background_state_change?: (state: GameplayBackgroundState) => void,
+    private readonly performance_sample?: (sample: GameplayPerformanceSample) => void) {
     this.dependencies = dependencies;
     this.music_rate = replay_base.rate;
     this.music_offset_time = music_offset / 1000 * this.music_rate;
@@ -275,19 +277,41 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
       this.rules_engine.setInput(this.cursor_position.x, this.cursor_position.y,
         this.action_sources.primary > 0 || this.action_sources.secondary > 0, song_time);
     }
+    const update_start = this.dependencies.performance_now();
     this.rules_engine.update(song_time);
+    const update_ms = this.dependencies.performance_now() - update_start;
     this.playHitSounds();
-      this.renderer.draw(this.chart, this.rules_engine.circle_states,
-      this.rules_engine.first_active_circle_index, this.rules_engine.circle_transients, song_time,
+    const first_active_index = this.rules_engine.first_active_circle_index;
+    const slider_states = this.rules_engine.slider_states;
+    const spinner_state = this.rules_engine.spinner_state;
+    const draw_start = this.dependencies.performance_now();
+    this.renderer.draw(this.chart, this.rules_engine.circle_states,
+      first_active_index, this.rules_engine.circle_transients, song_time,
       this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
-      this.rules_engine.slider_states, this.rules_engine.spinner_state,
+      slider_states, spinner_state,
       getGameplayProgress(song_time, this.progress_range));
+    const draw_ms = this.dependencies.performance_now() - draw_start;
+    this.performance_sample?.({ timestamp, update_ms, draw_ms,
+      visible_objects: this.visibleObjectCount(song_time, first_active_index) + slider_states.length +
+        (spinner_state?.active ? 1 : 0) });
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;
     }
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   };
+
+  private visibleObjectCount(song_time: number, first_active_index: number): number {
+    const visible_until = song_time + osuApproachPreempt(this.chart.approach_rate);
+    let low = first_active_index;
+    let high = this.chart.hit_objects.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.chart.hit_objects[middle]!.absolute_time <= visible_until) low = middle + 1;
+      else high = middle;
+    }
+    return low - first_active_index;
+  }
 
   private updateBackgroundState(song_time: number): void {
     const first_object_time = this.chart.hit_objects[0]?.absolute_time ?? Infinity;

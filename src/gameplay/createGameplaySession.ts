@@ -13,6 +13,7 @@ import type { OsuSliderRendererMode } from "./osu/rendering/WebGlSliderGraphics"
 import type { OsuCursorRendererMode } from "./osu/OsuHardwareCursor";
 import { createManiaAutoplayReplay, createOsuAutoplayReplay } from "./AutoplayReplay";
 import { applyOsuHitObjectStacking } from "./osu/OsuHitObjectStacking";
+import type { GameplayPerformanceSample } from "./GameplayPerformance";
 
 export interface GameplaySessionOptions {
   canvas: HTMLCanvasElement;
@@ -32,6 +33,7 @@ export interface GameplaySessionOptions {
   playback?: CompletedGameplay;
   finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
   background_state_change?: (state: GameplayBackgroundState) => void;
+  performance_sample?: (sample: GameplayPerformanceSample) => void;
 }
 
 export interface GameplaySessionFactoryDependencies {
@@ -46,11 +48,11 @@ const default_dependencies: GameplaySessionFactoryDependencies = {
   create_mania: (options) => new ManiaGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.music_offset, options.scroll_speed, options.replay_base, options.input_bindings,
     options.hit_registration, options.finish, undefined, options.playback_replay, options.initial_lead_in,
-    options.background_state_change),
+    options.background_state_change, options.performance_sample),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.osu_cursor_renderer, options.replay_base,
     options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay, options.initial_lead_in,
-    options.background_state_change),
+    options.background_state_change, options.performance_sample),
 };
 
 export function createGameplaySession(options: GameplaySessionOptions,

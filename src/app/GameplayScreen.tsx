@@ -18,6 +18,7 @@ import {
   saveManiaHitPositionOverride,
   saveManiaJudgePositionOverride,
 } from "../noteskin/NoteSkinOverrides";
+import { GameplayPerformanceGraph } from "../gameplay/GameplayPerformance";
 
 const mania_hit_position = numberSetting("noteskin.mania.hit_position", 402, 0, 480, 1);
 const mania_column_start = numberSetting("noteskin.mania.column_start", 136, 0, 854, 1);
@@ -161,12 +162,15 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
   const finish = useEffectEvent(onFinish);
   const backgroundStateChange = useEffectEvent((state: GameplayBackgroundState) => onBackgroundStateChange?.(state));
   const canvas_ref = useRef<HTMLCanvasElement>(null);
+  const performance_canvas_ref = useRef<HTMLCanvasElement>(null);
+  const performance_graph_ref = useRef<GameplayPerformanceGraph | null>(null);
   const session_ref = useRef<GameplaySession | null>(null);
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
   const osu_input_ref = useRef<OsuPointerInput | null>(null);
   const restart_timeout_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [restart_revision, setRestartRevision] = useState(0);
   const [restart_holding, setRestartHolding] = useState(false);
+  const [performance_graph_visible, setPerformanceGraphVisible] = useState(false);
 
   const cancelRestartHold = () => {
     if (restart_timeout_ref.current !== null) clearTimeout(restart_timeout_ref.current);
@@ -186,6 +190,11 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "F3") {
+        event.preventDefault();
+        setPerformanceGraphVisible((visible) => !visible);
+        return;
+      }
       if (event.code !== "Backquote") return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -211,12 +220,15 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
 
   useEffect(() => {
     const canvas = canvas_ref.current;
-    if (!canvas) return;
+    const performance_canvas = performance_canvas_ref.current;
+    if (!canvas || !performance_canvas) return;
+    performance_graph_ref.current = new GameplayPerformanceGraph(performance_canvas);
 
     const effective_cursor_renderer = playback?.replay.mode === "osu" ? "webgl" : osu_cursor_renderer;
     const binding = createGameplaySession({ canvas, data: assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed,
       cursor_scale, osu_cursor_renderer: effective_cursor_renderer, osu_slider_renderer, replay_base, input_bindings,
-      hit_registration, autoplay, playback, initial_lead_in, finish, background_state_change: backgroundStateChange });
+      hit_registration, autoplay, playback, initial_lead_in, finish, background_state_change: backgroundStateChange,
+      performance_sample: (sample) => performance_graph_ref.current?.push(sample) });
     session_ref.current = binding.session;
     mania_input_ref.current = !playback && !autoplay && binding.mode === "mania" ? binding.pointer_input : null;
     osu_input_ref.current = !playback && !autoplay && binding.mode === "osu" ? binding.pointer_input : null;
@@ -244,6 +256,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       session_ref.current = null;
       mania_input_ref.current = null;
       osu_input_ref.current = null;
+      performance_graph_ref.current = null;
       binding.session.destroy();
     };
   }, [assets, autoplay, cursor_scale, hit_registration, initial_lead_in, input_bindings, master_volume, music_offset, osu_cursor_renderer,
@@ -271,6 +284,8 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
         onLostPointerCapture={(event) => osu_input_ref.current?.cancelPointer(event.pointerId, event.timeStamp)}
         onContextMenu={(event) => assets.mode === "osu" && event.preventDefault()}
       />
+      <canvas ref={performance_canvas_ref} className={`gameplay-performance-graph${performance_graph_visible ? "" : " hidden"}`}
+        aria-hidden="true" />
       {!playback && !autoplay && assets.mode === "mania" &&
         <ManiaTouchControls column_count={assets.chart.column_count} input_ref={mania_input_ref} />}
       {note_skin_editor && <NoteSkinEditorPanel assets={assets} />}

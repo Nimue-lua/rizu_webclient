@@ -10,6 +10,7 @@ import { AudioGameplayClock } from "../AudioGameplayClock";
 import { WebAudioPlayback } from "../audio/WebAudioPlayback";
 import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInputEvent,
   type ManiaRecordedReplay } from "../../replay/RecordedReplay";
+import type { GameplayPerformanceSample } from "../GameplayPerformance";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -73,7 +74,8 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
     private readonly playback_replay?: ManiaRecordedReplay,
     private readonly initial_lead_in = 0,
-    private readonly background_state_change?: (state: GameplayBackgroundState) => void) {
+    private readonly background_state_change?: (state: GameplayBackgroundState) => void,
+    private readonly performance_sample?: (sample: GameplayPerformanceSample) => void) {
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
@@ -251,11 +253,16 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     const song_time = this.clock.timeAt(timestamp).monotonic;
     this.updateBackgroundState(song_time);
     this.applyReplayEvents(song_time);
+    const update_start = this.dependencies.performance_now();
     this.rules_engine.update(song_time, range.past, range.future);
+    const update_ms = this.dependencies.performance_now() - update_start;
     const score = this.rules_engine.score;
+    const draw_start = this.dependencies.performance_now();
     this.renderer.draw(this.data.chart.column_count, this.rules_engine.visible_notes, visual_scroll_speed,
       this.pressed_columns, this.hud_state.update(score, timestamp / 1000),
       getGameplayProgress(song_time, this.progress_range));
+    const draw_ms = this.dependencies.performance_now() - draw_start;
+    this.performance_sample?.({ timestamp, update_ms, draw_ms, visible_objects: this.rules_engine.visible_notes.length });
     if (song_time >= this.gameplay_end_time) {
       this.finishGameplay();
       return;
