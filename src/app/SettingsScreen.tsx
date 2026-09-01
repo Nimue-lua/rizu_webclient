@@ -13,7 +13,6 @@ import {
   scrollSpeedToCanonical,
   scrollSpeedToDisplay,
 } from "../gameplay/mania/ScrollSpeed";
-import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import { appSettings, settings, useSetting } from "../config/Settings";
 import { currentUser, login, logout, register, type OnlineUser } from "../replay/ReplayServer";
@@ -52,7 +51,6 @@ export function SettingsScreen({
   const cursor_scale = useSetting(settings.cursor_scale);
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
-  const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
   const hit_registration = useSetting(settings.mania_hit_registration);
   const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
   const [online_user, setOnlineUser] = useState<OnlineUser | null>(null);
@@ -242,14 +240,6 @@ export function SettingsScreen({
                   value={Math.round(cursor_scale * 100)} style={sliderStyle(cursor_scale * 100, 25, 200)}
                   onValueChange={(value) => appSettings.set(settings.cursor_scale, value / 100)} />
               </div>
-              <label className="settings-control settings-select-control" htmlFor="settings-osu-slider-renderer">
-                <span>osu! slider renderer</span>
-                <select id="settings-osu-slider-renderer" value={osu_slider_renderer}
-                  onChange={(event) => appSettings.set(settings.osu_slider_renderer, event.target.value as OsuSliderRendererMode)}>
-                  <option value="direct">Normal</option>
-                  <option value="stable">Stable experimental</option>
-                </select>
-              </label>
               <label className="settings-control settings-select-control" htmlFor="settings-osu-cursor-renderer">
                 <span>osu! cursor renderer</span>
                 <select id="settings-osu-cursor-renderer" value={osu_cursor_renderer}

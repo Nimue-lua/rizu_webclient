@@ -9,7 +9,6 @@ import { ManiaGameplayRuntime } from "./mania/ManiaGameplayRuntime";
 import { OsuGameplayRuntime } from "./osu/OsuGameplayRuntime";
 import type { GameplayBackgroundState, GameplaySession, GameplaySessionBinding, ManiaPointerInput, OsuPointerInput } from "./GameplaySession";
 import type { CompletedGameplay, ManiaRecordedReplay, OsuRecordedReplay } from "../replay/RecordedReplay";
-import type { OsuSliderRendererMode } from "./osu/rendering/WebGlSliderGraphics";
 import type { OsuCursorRendererMode } from "./osu/OsuHardwareCursor";
 import { createManiaAutoplayReplay, createOsuAutoplayReplay } from "./AutoplayReplay";
 import { applyOsuHitObjectStacking } from "./osu/OsuHitObjectStacking";
@@ -24,7 +23,6 @@ export interface GameplaySessionOptions {
   scroll_speed: number;
   cursor_scale: number;
   osu_cursor_renderer: OsuCursorRendererMode;
-  osu_slider_renderer: OsuSliderRendererMode;
   replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
@@ -51,7 +49,7 @@ const default_dependencies: GameplaySessionFactoryDependencies = {
     options.background_state_change, options.performance_sample),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.osu_cursor_renderer, options.replay_base,
-    options.osu_slider_renderer, options.input_bindings, options.finish, undefined, options.playback_replay, options.initial_lead_in,
+    options.input_bindings, options.finish, undefined, options.playback_replay, options.initial_lead_in,
     options.background_state_change, options.performance_sample),
 };
 

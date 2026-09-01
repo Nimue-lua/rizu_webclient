@@ -3,7 +3,7 @@ import test from "node:test";
 import type { OsuSlider } from "../src/chart/Chart";
 import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
 import { OsuViewport } from "../src/gameplay/osu/OsuViewport";
-import { osuSliderRendererMode, stableBodyTransform, WebGlSliderGraphics } from "../src/gameplay/osu/rendering/WebGlSliderGraphics";
+import { WebGlSliderGraphics } from "../src/gameplay/osu/rendering/WebGlSliderGraphics";
 
 function createSlider(): OsuSlider {
   return {
@@ -88,60 +88,4 @@ test("uploads each slider once, draws indexed geometry, and destroys owned buffe
   assert.equal(fake.calls.deleted_buffers, 2);
   assert.equal(fake.calls.deleted_arrays, 1);
   assert.equal(fake.calls.deleted_programs, 1);
-});
-
-test("selects the experimental stable renderer explicitly", () => {
-  assert.equal(osuSliderRendererMode(null), "direct");
-  assert.equal(osuSliderRendererMode("unknown"), "direct");
-  assert.equal(osuSliderRendererMode("stable"), "stable");
-  const fake = createGl();
-  const graphics = new WebGlSliderGraphics({ getContext: () => fake.gl } as unknown as HTMLCanvasElement, "stable");
-  assert.match(fake.calls.shader_sources[2]!, /texture_position = corner;/);
-  const slider = createSlider();
-  assert.equal(graphics.upload(slider, OsuSliderPath.create(slider, 14), 20), true);
-  graphics.draw(slider, new OsuViewport(640, 480), {
-    framebuffer_width: 640, framebuffer_height: 480, logical_width: 640, logical_height: 480,
-  }, [1, 0, 0, 1], [1, 1, 1, 1], 1);
-  assert.deepEqual(fake.calls.scissors, []);
-  assert.equal(fake.calls.framebuffers, 1);
-  assert.equal(fake.calls.textures, 1);
-  assert.equal(fake.calls.renderbuffers, 1);
-  assert.equal(fake.calls.draws, 1);
-  assert.equal(fake.calls.array_draws, 1);
-  assert.ok(fake.calls.uniform1.includes(-1));
-  assert.deepEqual(fake.calls.viewports, [[0, 0, 146, 46], [0, 0, 640, 480]]);
-  graphics.draw(slider, new OsuViewport(640, 480), {
-    framebuffer_width: 640, framebuffer_height: 480, logical_width: 640, logical_height: 480,
-  }, [1, 0, 0, 1], [1, 1, 1, 1], 1);
-  assert.equal(fake.calls.framebuffers, 1);
-  graphics.destroy();
-});
-
-test("caps modern WebGL viewport limits to stable's historical 16384 pixels", () => {
-  const fake = createGl(32_768);
-  const graphics = new WebGlSliderGraphics({ getContext: () => fake.gl } as unknown as HTMLCanvasElement, "stable");
-  const slider: OsuSlider = { ...createSlider(), pixel_length: 20_000,
-    control_points: [{ x: 20_000, y: 0 }] };
-  assert.equal(graphics.upload(slider, OsuSliderPath.create(slider, 14), 20), true);
-  graphics.draw(slider, new OsuViewport(640, 480), {
-    framebuffer_width: 640, framebuffer_height: 480, logical_width: 640, logical_height: 480,
-  }, [1, 0, 0, 1], [1, 1, 1, 1], 1);
-  assert.deepEqual(fake.calls.viewports[0], [0, 0, 16_384, 46]);
-  graphics.destroy();
-});
-
-test("emulates stable viewport clamping without a slider framebuffer", () => {
-  const viewport = new OsuViewport(640, 480);
-  const frame = { framebuffer_width: 640, framebuffer_height: 480, logical_width: 640, logical_height: 480 };
-  const horizontal = stableBodyTransform(
-    { left: -29_958, top: -20.5, right: 488.5, bottom: 398.5 }, 36.5, viewport, frame, [16_384, 16_384]);
-  assert.equal(horizontal.origin_x, 0);
-  assert.ok(Math.abs(horizontal.scale_x - 16_384 / 30_456) < 0.0001);
-  assert.equal(horizontal.scale_y, 1);
-
-  const vertical = stableBodyTransform(
-    { left: 48.5, top: -30_021.5, right: 467.5, bottom: 423.5 }, 36.5, viewport, frame, [16_384, 16_384]);
-  assert.equal(vertical.origin_y, 0);
-  assert.equal(vertical.scale_x, 1);
-  assert.equal(vertical.scale_y, 1);
 });

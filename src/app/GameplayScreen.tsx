@@ -6,7 +6,6 @@ import type { GameplayBackgroundState, GameplaySession, ManiaPointerInput, OsuPo
 import { createGameplaySession } from "../gameplay/createGameplaySession";
 import { bindOsuPointerAim, osuPointerMovementEvent } from "../gameplay/osu/OsuPointerAimBinding";
 import { ManiaTouchControls } from "./ManiaTouchControls";
-import type { OsuSliderRendererMode } from "../gameplay/osu/rendering/WebGlSliderGraphics";
 import { bindOsuHardwareCursor, type OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
 import { numberSetting } from "../config/Config";
@@ -35,7 +34,6 @@ interface GameplayScreenProps {
   cursor_scale: number;
   osu_cursor_renderer: OsuCursorRendererMode;
   osu_raw_input: boolean;
-  osu_slider_renderer: OsuSliderRendererMode;
   replay_base: ManiaReplayBase;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
@@ -156,7 +154,7 @@ function NoteSkinEditorPanel({ assets }: { assets: GameplayData }) {
 }
 
 export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed, cursor_scale,
-  osu_cursor_renderer, osu_raw_input, osu_slider_renderer, replay_base, input_bindings, hit_registration,
+  osu_cursor_renderer, osu_raw_input, replay_base, input_bindings, hit_registration,
   autoplay = false, playback, note_skin_editor = false, initial_lead_in = 0, onFinish,
   onBackgroundStateChange }: GameplayScreenProps) {
   const finish = useEffectEvent(onFinish);
@@ -226,7 +224,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
 
     const effective_cursor_renderer = playback?.replay.mode === "osu" ? "webgl" : osu_cursor_renderer;
     const binding = createGameplaySession({ canvas, data: assets, master_volume, osu_hit_sound_volume, music_offset, scroll_speed,
-      cursor_scale, osu_cursor_renderer: effective_cursor_renderer, osu_slider_renderer, replay_base, input_bindings,
+      cursor_scale, osu_cursor_renderer: effective_cursor_renderer, replay_base, input_bindings,
       hit_registration, autoplay, playback, initial_lead_in, finish, background_state_change: backgroundStateChange,
       performance_sample: (sample) => performance_graph_ref.current?.push(sample) });
     session_ref.current = binding.session;
@@ -260,7 +258,7 @@ export function GameplayScreen({ assets, master_volume, osu_hit_sound_volume, mu
       binding.session.destroy();
     };
   }, [assets, autoplay, cursor_scale, hit_registration, initial_lead_in, input_bindings, master_volume, music_offset, osu_cursor_renderer,
-    osu_raw_input, osu_hit_sound_volume, osu_slider_renderer, playback, replay_base, restart_revision, scroll_speed]);
+    osu_raw_input, osu_hit_sound_volume, playback, replay_base, restart_revision, scroll_speed]);
 
   return (
     <main className={`gameplay-screen${note_skin_editor ? " note-skin-editor-open" : ""}${restart_holding ? " restart-holding" : ""}`}>

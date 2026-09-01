@@ -95,7 +95,6 @@ export function App() {
   const cursor_scale = useSetting(settings.cursor_scale);
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
-  const osu_slider_renderer = useSetting(settings.osu_slider_renderer);
   const hit_registration = useSetting(settings.mania_hit_registration);
   const music_rate = useSetting(settings.music_rate);
   const constant_scroll = useSetting(settings.constant_scroll);
@@ -342,7 +341,6 @@ export function App() {
             cursor_scale={cursor_scale}
             osu_cursor_renderer={osu_cursor_renderer}
             osu_raw_input={osu_raw_input}
-            osu_slider_renderer={osu_slider_renderer}
             replay_base={replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}

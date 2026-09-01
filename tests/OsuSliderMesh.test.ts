@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuSlider } from "../src/chart/Chart";
 import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
-import { createOsuSliderMesh, createOsuStableLinearMesh } from "../src/gameplay/osu/rendering/OsuSliderMesh";
+import { createOsuSliderMesh } from "../src/gameplay/osu/rendering/OsuSliderMesh";
 
 function straightSlider(): OsuSlider {
   return {
@@ -71,13 +71,4 @@ test("uses outer wedges instead of full circles along smooth curves", () => {
   assert.ok(point_count > 3);
   assert.ok(mesh.indices.length < point_count * 12 + full_disks_at_every_point_indices);
   assert.ok([...mesh.vertices].every(Number.isFinite));
-});
-
-test("preserves every segment of stable image-style linear sliders", () => {
-  const slider: OsuSlider = { ...straightSlider(), pixel_length: 20 + Math.sqrt(200),
-    control_points: [{ x: 10, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 10 }, { x: 30, y: 10 }] };
-  const mesh = createOsuStableLinearMesh(slider, 2);
-  assert.equal(mesh.vertices.length, 3 * 6 * 3);
-  assert.equal(mesh.indices.length, 3 * 12);
-  assert.deepEqual(mesh.bounds, { left: -2, top: -2, right: 32, bottom: 12 });
 });
