@@ -21,6 +21,7 @@ function createGl() {
     deleted_programs: 0,
     draw_textures: [] as object[],
     uploaded_vertices: [] as Float32Array[],
+    buffer_allocations: [] as number[],
     current_texture: null as object | null,
     uploaded_images: [] as object[],
   };
@@ -46,7 +47,10 @@ function createGl() {
     getParameter: () => 4096, getError: () => 0,
     deleteTexture(texture: object) { calls.deleted_textures.push(texture); }, enable() {}, blendFunc() {},
     viewport() {}, clearColor() {}, clear() {}, useProgram() {}, uniform2f() {}, uniform1i() {},
-    bufferData(_target: number, data: Float32Array) { calls.uploaded_vertices.push(data); },
+    bufferData(_target: number, size: number) { calls.buffer_allocations.push(size); },
+    bufferSubData(_target: number, _offset: number, data: Float32Array, source_offset: number, length: number) {
+      calls.uploaded_vertices.push(data.slice(source_offset, source_offset + length));
+    },
     drawArrays() { if (calls.current_texture) calls.draw_textures.push(calls.current_texture); },
   } as unknown as WebGL2RenderingContext;
   return { gl, calls };
@@ -106,6 +110,24 @@ test("rotates sprite geometry around its center by an arbitrary angle", () => {
   dom.restore();
 });
 
+test("emits axis-aligned quads without changing rotation texture mapping", () => {
+  const dom = installCanvasStub();
+  const sprite = createSprite("axis-aligned");
+  const fake = createGl();
+  const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
+    getContext: () => fake.gl } as unknown as HTMLCanvasElement;
+  const graphics = new WebGlSpriteGraphics(canvas, { sprites: { sprite } }, () => 1);
+
+  graphics.submit([{ ...command(sprite), x: 10, y: 20, width: 20, height: 10, rotateCounterClockwise: true }]);
+
+  const vertices = fake.calls.uploaded_vertices[0]!;
+  assert.deepEqual([vertices[0], vertices[1], vertices[8], vertices[9], vertices[16], vertices[17]],
+    [10, 20, 30, 20, 10, 30]);
+  assert.equal(vertices[2], vertices[10]);
+  assert.notEqual(vertices[3], vertices[11]);
+  dom.restore();
+});
+
 test("batches ordered sprite commands that share an atlas", () => {
   const dom = installCanvasStub();
   const first = createSprite("first");
@@ -127,6 +149,26 @@ test("batches ordered sprite commands that share an atlas", () => {
   assert.equal(graphics.commandCount, 6);
   assert.equal(graphics.vertexCount, 36);
   assert.equal(graphics.bufferUploadCount, 1);
+  dom.restore();
+});
+
+test("retains sprite vertex buffer capacity between submissions", () => {
+  const dom = installCanvasStub();
+  const sprite = createSprite("retained");
+  const fake = createGl();
+  const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
+    getContext: () => fake.gl } as unknown as HTMLCanvasElement;
+  const graphics = new WebGlSpriteGraphics(canvas, { sprites: { sprite } }, () => 1);
+
+  graphics.submit(Array.from({ length: 65 }, () => command(sprite)));
+  graphics.submit(Array.from({ length: 100 }, () => command(sprite)));
+  graphics.submit([command(sprite)]);
+
+  assert.equal(fake.calls.buffer_allocations.length, 1);
+  assert.equal(fake.calls.uploaded_vertices.length, 3);
+  assert.equal(fake.calls.uploaded_vertices[0]!.length, 65 * 6 * 8);
+  assert.equal(fake.calls.uploaded_vertices[1]!.length, 100 * 6 * 8);
+  assert.equal(fake.calls.uploaded_vertices[2]!.length, 6 * 8);
   dom.restore();
 });
 

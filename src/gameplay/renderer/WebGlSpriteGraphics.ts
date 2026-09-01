@@ -4,6 +4,8 @@ import type { Sprite, SpriteDrawCommand, SpriteSkin } from "./Sprite";
 
 const BACKGROUND_COLOR = [0, 0, 0, 0] as const;
 const VERTEX_FLOATS = 8;
+const QUAD_VERTICES = 6;
+const INITIAL_VERTEX_FLOAT_CAPACITY = VERTEX_FLOATS * QUAD_VERTICES * 64;
 const MAX_ATLAS_SIZE = 4096;
 
 interface UploadedSprite {
@@ -80,6 +82,8 @@ export class WebGlSpriteGraphics {
   private readonly sampler: WebGLUniformLocation;
   private readonly sprites = new Map<Sprite, UploadedSprite>();
   private readonly textures: WebGLTexture[] = [];
+  private vertex_staging = new Float32Array(INITIAL_VERTEX_FLOAT_CAPACITY);
+  private vertex_buffer_capacity = 0;
   private draw_calls = 0;
   private command_count = 0;
   private vertex_count = 0;
@@ -201,7 +205,7 @@ export class WebGlSpriteGraphics {
       if (!uploaded) throw new Error("Gameplay sprite texture was not uploaded");
       let end = start + 1;
       while (end < commands.length && this.sprites.get(commands[end]!.sprite)?.texture === uploaded.texture) end += 1;
-      this.submitBatch(uploaded.texture, commands.slice(start, end));
+      this.submitBatch(uploaded.texture, commands, start, end);
       start = end;
     }
   }
@@ -215,48 +219,115 @@ export class WebGlSpriteGraphics {
     this.gl.deleteProgram(this.program);
   }
 
-  private submitBatch(texture: WebGLTexture, commands: readonly SpriteDrawCommand[]): void {
-    const vertices: number[] = [];
-    for (const command of commands) {
+  private submitBatch(texture: WebGLTexture, commands: readonly SpriteDrawCommand[], start: number, end: number): void {
+    let float_count = 0;
+    for (let index = start; index < end; index += 1) {
+      const command = commands[index]!;
       if (command.width <= 0 || command.height <= 0) continue;
       const uploaded = this.sprites.get(command.sprite);
       if (!uploaded) throw new Error("Gameplay sprite texture was not uploaded");
       if (command.circularProgress !== undefined) {
-        this.addCircularProgressVertices(vertices, command, uploaded);
+        float_count = this.addCircularProgressVertices(float_count, command, uploaded);
         continue;
       }
-      let top_left = [uploaded.u0, command.flipY ? uploaded.v1 : uploaded.v0];
-      let top_right = [uploaded.u1, command.flipY ? uploaded.v1 : uploaded.v0];
-      let bottom_left = [uploaded.u0, command.flipY ? uploaded.v0 : uploaded.v1];
-      let bottom_right = [uploaded.u1, command.flipY ? uploaded.v0 : uploaded.v1];
-      if (command.rotateCounterClockwise) {
-        [top_left, top_right, bottom_left, bottom_right] = [top_right, bottom_right, top_left, bottom_left];
-      }
-      const center_x = command.x + command.width / 2;
-      const center_y = command.y + command.height / 2;
-      const cosine = Math.cos(command.rotationRadians);
-      const sine = Math.sin(command.rotationRadians);
-      const corners = [[command.x, command.y, ...top_left],
-        [command.x + command.width, command.y, ...top_right], [command.x, command.y + command.height, ...bottom_left],
-        [command.x, command.y + command.height, ...bottom_left], [command.x + command.width, command.y, ...top_right],
-        [command.x + command.width, command.y + command.height, ...bottom_right]];
-      for (const [px, py, u, v] of corners) {
-        const dx = px! - center_x;
-        const dy = py! - center_y;
-        vertices.push(center_x + dx * cosine - dy * sine, center_y + dx * sine + dy * cosine,
-          u!, v!, ...command.color);
-      }
+      this.ensureVertexCapacity(float_count + VERTEX_FLOATS * QUAD_VERTICES);
+      float_count = command.rotationRadians === 0
+        ? this.addAxisAlignedQuad(float_count, command, uploaded)
+        : this.addRotatedQuad(float_count, command, uploaded);
     }
-    if (vertices.length === 0) return;
+    if (float_count === 0) return;
     const gl = this.gl;
+    const byte_count = float_count * Float32Array.BYTES_PER_ELEMENT;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+    if (byte_count > this.vertex_buffer_capacity) {
+      this.vertex_buffer_capacity = this.vertex_staging.byteLength;
+      gl.bufferData(gl.ARRAY_BUFFER, this.vertex_buffer_capacity, gl.DYNAMIC_DRAW);
+    }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertex_staging, 0, float_count);
     this.buffer_upload_count += 1;
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
+    gl.drawArrays(gl.TRIANGLES, 0, float_count / VERTEX_FLOATS);
     this.draw_calls += 1;
-    this.vertex_count += vertices.length / VERTEX_FLOATS;
+    this.vertex_count += float_count / VERTEX_FLOATS;
+  }
+
+  private addAxisAlignedQuad(offset: number, command: SpriteDrawCommand, uploaded: UploadedSprite): number {
+    const top_v = command.flipY ? uploaded.v1 : uploaded.v0;
+    const bottom_v = command.flipY ? uploaded.v0 : uploaded.v1;
+    const top_left_u = command.rotateCounterClockwise ? uploaded.u1 : uploaded.u0;
+    const top_right_v = command.rotateCounterClockwise ? bottom_v : top_v;
+    const bottom_left_v = command.rotateCounterClockwise ? top_v : bottom_v;
+    const bottom_right_u = command.rotateCounterClockwise ? uploaded.u0 : uploaded.u1;
+    const left = command.x;
+    const top = command.y;
+    const right = left + command.width;
+    const bottom = top + command.height;
+    offset = this.addVertex(offset, left, top, top_left_u, top_v, command.color);
+    offset = this.addVertex(offset, right, top, uploaded.u1, top_right_v, command.color);
+    offset = this.addVertex(offset, left, bottom, uploaded.u0, bottom_left_v, command.color);
+    offset = this.addVertex(offset, left, bottom, uploaded.u0, bottom_left_v, command.color);
+    offset = this.addVertex(offset, right, top, uploaded.u1, top_right_v, command.color);
+    return this.addVertex(offset, right, bottom, bottom_right_u, bottom_v, command.color);
+  }
+
+  private addRotatedQuad(offset: number, command: SpriteDrawCommand, uploaded: UploadedSprite): number {
+    const top_v = command.flipY ? uploaded.v1 : uploaded.v0;
+    const bottom_v = command.flipY ? uploaded.v0 : uploaded.v1;
+    const top_left_u = command.rotateCounterClockwise ? uploaded.u1 : uploaded.u0;
+    const top_right_u = uploaded.u1;
+    const top_right_v = command.rotateCounterClockwise ? bottom_v : top_v;
+    const bottom_left_u = uploaded.u0;
+    const bottom_left_v = command.rotateCounterClockwise ? top_v : bottom_v;
+    const bottom_right_u = command.rotateCounterClockwise ? uploaded.u0 : uploaded.u1;
+    const center_x = command.x + command.width / 2;
+    const center_y = command.y + command.height / 2;
+    const cosine = Math.cos(command.rotationRadians);
+    const sine = Math.sin(command.rotationRadians);
+    const half_width = command.width / 2;
+    const half_height = command.height / 2;
+    const left_x = center_x - half_width * cosine + half_height * sine;
+    const left_y = center_y - half_width * sine - half_height * cosine;
+    const top_x = center_x + half_width * cosine + half_height * sine;
+    const top_y = center_y + half_width * sine - half_height * cosine;
+    const bottom_x = center_x - half_width * cosine - half_height * sine;
+    const bottom_y = center_y - half_width * sine + half_height * cosine;
+    const right_x = center_x + half_width * cosine - half_height * sine;
+    const right_y = center_y + half_width * sine + half_height * cosine;
+    offset = this.addVertex(offset, left_x, left_y, top_left_u, top_v, command.color);
+    offset = this.addVertex(offset, top_x, top_y, top_right_u, top_right_v, command.color);
+    offset = this.addVertex(offset, bottom_x, bottom_y, bottom_left_u, bottom_left_v, command.color);
+    offset = this.addVertex(offset, bottom_x, bottom_y, bottom_left_u, bottom_left_v, command.color);
+    offset = this.addVertex(offset, top_x, top_y, top_right_u, top_right_v, command.color);
+    return this.addVertex(offset, right_x, right_y, bottom_right_u, bottom_v, command.color);
+  }
+
+  private addVertex(offset: number, x: number, y: number, u: number, v: number,
+    color: readonly [number, number, number, number]): number {
+    const vertices = this.vertex_staging;
+    vertices[offset] = x;
+    vertices[offset + 1] = y;
+    vertices[offset + 2] = u;
+    vertices[offset + 3] = v;
+    vertices[offset + 4] = color[0];
+    vertices[offset + 5] = color[1];
+    vertices[offset + 6] = color[2];
+    vertices[offset + 7] = color[3];
+    return offset + VERTEX_FLOATS;
+  }
+
+  private ensureVertexCapacity(required: number): void {
+    if (required <= this.vertex_staging.length) return;
+    const capacity = this.grownCapacity(this.vertex_staging.length, required);
+    const staging = new Float32Array(capacity);
+    staging.set(this.vertex_staging);
+    this.vertex_staging = staging;
+  }
+
+  private grownCapacity(current: number, required: number): number {
+    let capacity = Math.max(1, current);
+    while (capacity < required) capacity *= 2;
+    return capacity;
   }
 
   get drawCallCount(): number { return this.draw_calls; }
@@ -264,9 +335,9 @@ export class WebGlSpriteGraphics {
   get vertexCount(): number { return this.vertex_count; }
   get bufferUploadCount(): number { return this.buffer_upload_count; }
 
-  private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand, uploaded: UploadedSprite): void {
+  private addCircularProgressVertices(offset: number, command: SpriteDrawCommand, uploaded: UploadedSprite): number {
     const progress = Math.max(-1, Math.min(1, command.circularProgress ?? 0));
-    if (progress === 0) return;
+    if (progress === 0) return offset;
     const center_x = command.x + command.width / 2;
     const center_y = command.y + command.height / 2;
     const radius = Math.min(command.width, command.height) / 2;
@@ -276,16 +347,23 @@ export class WebGlSpriteGraphics {
     const angle_max = Math.max(start_angle, end_angle);
     const segments = 40;
     const step = Math.PI * 2 / segments;
-    const color = command.color;
-    const vertex = (x: number, y: number) => vertices.push(x, y,
-      uploaded.u0 + (x - command.x) / command.width * (uploaded.u1 - uploaded.u0),
-      uploaded.v0 + (y - command.y) / command.height * (uploaded.v1 - uploaded.v0), ...color);
+    this.ensureVertexCapacity(offset + Math.ceil(Math.abs(progress) * segments) * 3 * VERTEX_FLOATS);
     for (let angle = angle_min; angle < angle_max;) {
       const next = Math.min(angle + step, angle_max);
-      vertex(center_x, center_y);
-      vertex(center_x + Math.cos(angle) * radius, center_y + Math.sin(angle) * radius);
-      vertex(center_x + Math.cos(next) * radius, center_y + Math.sin(next) * radius);
+      offset = this.addCircularProgressVertex(offset, center_x, center_y, command, uploaded);
+      offset = this.addCircularProgressVertex(offset, center_x + Math.cos(angle) * radius,
+        center_y + Math.sin(angle) * radius, command, uploaded);
+      offset = this.addCircularProgressVertex(offset, center_x + Math.cos(next) * radius,
+        center_y + Math.sin(next) * radius, command, uploaded);
       angle = next;
     }
+    return offset;
+  }
+
+  private addCircularProgressVertex(offset: number, x: number, y: number, command: SpriteDrawCommand,
+    uploaded: UploadedSprite): number {
+    return this.addVertex(offset, x, y,
+      uploaded.u0 + (x - command.x) / command.width * (uploaded.u1 - uploaded.u0),
+      uploaded.v0 + (y - command.y) / command.height * (uploaded.v1 - uploaded.v0), command.color);
   }
 }
