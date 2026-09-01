@@ -25,6 +25,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly sliderEndCircleOverlay: Sprite | null;
   readonly reverseArrow: Sprite;
   readonly sliderTick: Sprite;
+  readonly followPointFrames: readonly Sprite[];
+  readonly animationFramerate: number | null;
   readonly spinnerBackground?: Sprite;
   readonly spinnerCircle?: Sprite;
   readonly spinnerMetre?: Sprite;
@@ -270,6 +272,7 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
   const hit_circle_glyph_names = resolveFontGlyphs(fonts.HitCirclePrefix ?? "default", available, defaults);
   const judgments = resolveStandardJudgments(available, defaults);
   const slider_ball_names = resolveSliderBallFrames(available, defaults);
+  const follow_point_names = resolveAnimationFrameNames("followpoint", available, defaults);
   const cursor_name = available.has("cursor") || defaults.has("cursor") ? "cursor" : "hitcircleoverlay";
   const slider_end_names = resolveSliderEndSpriteNames(new Set(available.keys()), new Set(defaults.keys()));
   const spinner_names = ["spinner-background", "spinner-circle", "spinner-metre", "spinner-approachcircle",
@@ -278,7 +281,8 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", "sliderfollowcircle",
     "sliderscorepoint", "scorebar-bg", "scorebar-colour", "circularmetre", cursor_name, slider_end_names.circle,
     ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
-    ...slider_ball_names, ...spinner_names, ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
+    ...slider_ball_names, ...spinner_names, ...follow_point_names,
+    ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
     ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
     const file = available.get(name) ?? defaults.get(name);
@@ -333,6 +337,8 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     sliderEndCircleOverlay: slider_end_names.overlay ? sprites[slider_end_names.overlay]! : null,
     reverseArrow: sprites.reversearrow!,
     sliderTick: sprites.sliderscorepoint!,
+    followPointFrames: follow_point_names.map((name) => sprites[name]!),
+    animationFramerate: positiveNumberValue(ini.sections.General ?? {}, "AnimationFramerate"),
     spinnerBackground: sprites["spinner-background"],
     spinnerCircle: sprites["spinner-circle"],
     spinnerMetre: sprites["spinner-metre"],
@@ -376,6 +382,25 @@ export function resolveSliderBallFrameNames(available: ReadonlySet<string>, defa
   for (let frame = 0; source.has(`sliderb${frame}`); frame += 1) frames.push(`sliderb${frame}`);
   if (frames.length === 0 && source.has("sliderb")) frames.push("sliderb");
   return frames;
+}
+
+export function resolveAnimationFrameNames(name: string, available: ReadonlyMap<string, SpriteFile>,
+  defaults: ReadonlyMap<string, SpriteFile>): string[] {
+  const frameNames = (source: ReadonlyMap<string, SpriteFile>) => {
+    const frames: string[] = [];
+    for (let frame = 0; source.has(`${name}-${frame}`); frame += 1) frames.push(`${name}-${frame}`);
+    return frames;
+  };
+  const available_frames = frameNames(available);
+  if (available_frames.length > 0) return available_frames;
+  if (available.has(name)) return [name];
+  const default_frames = frameNames(defaults);
+  return default_frames.length > 0 ? default_frames : defaults.has(name) ? [name] : [];
+}
+
+function positiveNumberValue(section: SkinIniSection, key: string): number | null {
+  const value = Number(section[key]);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function resolveSliderBallFrames(available: ReadonlyMap<string, SpriteFile>, defaults: ReadonlyMap<string, SpriteFile>): string[] {

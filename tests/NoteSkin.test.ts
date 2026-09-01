@@ -5,6 +5,7 @@ import {
   optionalColorValue,
   parseOsuManiaConfig,
   parseSkinIni,
+  resolveAnimationFrameNames,
   resolveSliderBallFrameNames,
   resolveSliderEndSpriteNames,
   resolveOsuManiaTail,
@@ -32,6 +33,17 @@ test("discovers contiguous slider ball animation frames with static fallback", (
     ["sliderb0", "sliderb1"]);
   assert.deepEqual(resolveSliderBallFrameNames(new Set(["sliderb"]), new Set(["sliderb0"])), ["sliderb"]);
   assert.deepEqual(resolveSliderBallFrameNames(new Set(), new Set(["sliderb0", "sliderb1"])), ["sliderb0", "sliderb1"]);
+});
+
+test("discovers dashed animation frames before static and default sprites", () => {
+  const file = {} as never;
+  assert.deepEqual(resolveAnimationFrameNames("followpoint",
+    new Map([["followpoint-0", file], ["followpoint-1", file], ["followpoint-3", file], ["followpoint", file]]),
+    new Map([["followpoint", file]])), ["followpoint-0", "followpoint-1"]);
+  assert.deepEqual(resolveAnimationFrameNames("followpoint", new Map([["followpoint", file]]), new Map()),
+    ["followpoint"]);
+  assert.deepEqual(resolveAnimationFrameNames("followpoint", new Map(),
+    new Map([["followpoint-0", file], ["followpoint-1", file]])), ["followpoint-0", "followpoint-1"]);
 });
 
 test("resolves osu slider end sprites without falling back to the hit circle overlay", () => {

@@ -84,6 +84,73 @@ test("draws only the supplied active circle range", () => {
   assert.equal(quads.length, 6);
 });
 
+test("draws osu follow points between same-combo objects", () => {
+  const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const follow_point = { sourceSize: { w: 16, h: 22 } } as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: circle, hitCircleOverlay: circle, approachCircle: circle,
+    followPointFrames: [follow_point], comboColor: [1, 1, 1, 1] } as unknown as OsuStandardSkin;
+  const objects = [
+    { kind: "circle" as const, x: 100, y: 100, absolute_time: 1, new_combo: false, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } },
+    { kind: "circle" as const, x: 300, y: 100, absolute_time: 2, new_combo: false, hit_sound: 0,
+      hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } },
+  ];
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 2, drain_length_seconds: 2, end_time: 2, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: objects } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(2), 1, [], 1.44,
+    (...quad) => quads.push(quad));
+
+  const points = quads.filter((quad) => quad[5] === follow_point);
+  assert.equal(points.length, 4);
+  assert.ok(points.every((point) => point[4][3] > 0));
+  assert.ok(points.every((point) => point[9] === 0));
+});
+
+test("does not draw follow points across combo breaks or spinners", () => {
+  const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const follow_point = { sourceSize: { w: 16, h: 22 } } as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: circle, hitCircleOverlay: circle, approachCircle: circle,
+    followPointFrames: [follow_point], comboColor: [1, 1, 1, 1] } as unknown as OsuStandardSkin;
+  const sample = { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" };
+  const objects = [
+    { kind: "circle" as const, x: 50, y: 100, absolute_time: 1, new_combo: false, hit_sound: 0, hit_sample: sample },
+    { kind: "circle" as const, x: 200, y: 100, absolute_time: 2, new_combo: true, hit_sound: 0, hit_sample: sample },
+    { kind: "spinner" as const, x: 256, y: 192, absolute_time: 3, end_time: 4,
+      new_combo: false, hit_sound: 0, hit_sample: sample },
+    { kind: "circle" as const, x: 400, y: 100, absolute_time: 5, new_combo: false, hit_sound: 0, hit_sample: sample },
+  ];
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 4, drain_length_seconds: 5, end_time: 5, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: objects } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(4), 0, [], 2,
+    (...quad) => quads.push(quad));
+  assert.equal(quads.some((quad) => quad[5] === follow_point), false);
+});
+
+test("starts each follow-point animation at its fade-in time", () => {
+  const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
+  const frames = Array.from({ length: 4 }, () => ({ sourceSize: { w: 16, h: 22 } })) as
+    unknown as OsuStandardSkin["followPointFrames"];
+  const skin = { hitCircle: circle, hitCircleOverlay: circle, approachCircle: circle,
+    followPointFrames: frames, animationFramerate: 10, comboColor: [1, 1, 1, 1] } as unknown as OsuStandardSkin;
+  const sample = { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" };
+  const objects = [
+    { kind: "circle" as const, x: 100, y: 100, absolute_time: 1, new_combo: false, hit_sound: 0, hit_sample: sample },
+    { kind: "circle" as const, x: 300, y: 100, absolute_time: 2, new_combo: false, hit_sound: 0, hit_sample: sample },
+  ];
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 2, drain_length_seconds: 2, end_time: 2, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: objects } as const;
+  const quads: Parameters<Parameters<OsuPlayfieldRenderer["draw"]>[6]>[] = [];
+  new OsuPlayfieldRenderer(skin).draw(new OsuViewport(640, 480), chart, new Uint8Array(2), 1, [], 1.25,
+    (...quad) => quads.push(quad));
+  const point_frames = quads.filter((quad) => frames.includes(quad[5])).map((quad) => frames.indexOf(quad[5]));
+  assert.deepEqual(point_frames, [0, 2, 0, 3]);
+});
+
 test("matches stable hit fade-out and note-lock shake", () => {
   const hit_circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
   const overlay = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircleOverlay"];
