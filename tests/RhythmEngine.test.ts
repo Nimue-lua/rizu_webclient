@@ -52,6 +52,22 @@ test("marks elapsed notes missed and clamps the event to the timeout", () => {
   assert.equal(engine.score.judges.miss, 1);
 });
 
+test("does not revisit elapsed mania notes", () => {
+  let time_reads = 0;
+  const notes = Array.from({ length: 10_000 }, (_, index) => ({
+    column: 1,
+    get absolute_time() { time_reads += 1; return index; },
+    weight: 0 as const,
+  }));
+  const engine = new ManiaRulesEngine(createChart(notes), "earliest", 1, true);
+  engine.update(9_000, 1, 1);
+  time_reads = 0;
+
+  engine.update(9_001, 1, 1);
+
+  assert.ok(time_reads < 20, `read ${time_reads} elapsed notes`);
+});
+
 test("holds stay active after the head and score their release", () => {
   const engine = new ManiaRulesEngine(createChart([
     { column: 1, absolute_time: 1, weight: 1 },

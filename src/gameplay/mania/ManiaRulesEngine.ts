@@ -60,6 +60,8 @@ export class ManiaRulesEngine {
   private readonly tail_miss_deadlines: readonly MissDeadline[];
   private head_miss_cursor = 0;
   private tail_miss_cursor = 0;
+  private first_visual_index = 0;
+  private previous_visual_position = Number.NEGATIVE_INFINITY;
 
   constructor(chart: ManiaChart, hit_registration: ManiaHitRegistration = "earliest", music_rate = 1,
     constant_scroll = false, tap_only = false, timing_identity?: { timings: Timings; subtimings: Subtimings | null }) {
@@ -105,7 +107,21 @@ export class ManiaRulesEngine {
     this.updateMisses(song_time);
     this.visible_notes.length = 0;
     const current_point = this.constant_scroll ? undefined : interpolateVisualPoint(this.chart.visual_points, song_time);
-    for (let index = 0; index < this.linked_notes.length; index += 1) {
+    const visual_position = current_point?.visual_time ?? song_time;
+    if (visual_position < this.previous_visual_position) this.first_visual_index = 0;
+    this.previous_visual_position = visual_position;
+    const getDt = (absolute_time: number): number => {
+      if (!current_point) return absolute_time - song_time;
+      const point = interpolateVisualPoint(this.chart.visual_points, absolute_time);
+      return (point.visual_time - current_point.visual_time) * current_point.global_speed * point.local_speed;
+    };
+    while (this.first_visual_index < this.linked_notes.length) {
+      const note = this.linked_notes[this.first_visual_index]!;
+      if (isActive(this.note_states[this.first_visual_index] as NoteState, note.end !== undefined)) break;
+      if (getDt(note.end?.absolute_time ?? note.start.absolute_time) >= -past_window) break;
+      this.first_visual_index += 1;
+    }
+    for (let index = this.first_visual_index; index < this.linked_notes.length; index += 1) {
       const note = this.linked_notes[index]!;
       const state = this.note_states[index] as NoteState;
       if (note.end === undefined && !isActive(state, false)) continue;
@@ -120,13 +136,9 @@ export class ManiaRulesEngine {
         const release_time = this.head_release_times[index];
         if (!Number.isNaN(release_time)) start_time = release_time;
       }
-      const getDt = (absolute_time: number): number => {
-        if (!current_point) return absolute_time - song_time;
-        const point = interpolateVisualPoint(this.chart.visual_points, absolute_time);
-        return (point.visual_time - current_point.visual_time) * current_point.global_speed * point.local_speed;
-      };
       const start_dt = getDt(start_time);
       const end_dt = note.end && getDt(note.end.absolute_time);
+      if (this.constant_scroll && start_dt > future_window) break;
       if ((end_dt ?? start_dt) < -past_window || start_dt > future_window) continue;
       if (end_dt !== undefined && start_dt >= end_dt) continue;
       this.visible_notes.push({

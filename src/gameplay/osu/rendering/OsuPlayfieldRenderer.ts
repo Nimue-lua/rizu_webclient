@@ -30,6 +30,11 @@ const FOLLOW_POINT_WIDTH = 16;
 const FOLLOW_POINT_HEIGHT = 22;
 
 export class OsuPlayfieldRenderer {
+  private chart: OsuChart | null = null;
+  private first_render_index = 0;
+  private previous_first_active_index = 0;
+  private previous_song_time = Number.NEGATIVE_INFINITY;
+
   constructor(private readonly skin: OsuStandardSkin) {}
 
   draw(viewport: OsuViewport, chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
@@ -48,6 +53,18 @@ export class OsuPlayfieldRenderer {
       if (age >= 0 && age < 0.12) shake_offsets.set(transient.object_index, stableShakeOffset(age));
     }
     if (spinner_state?.active) this.drawSpinner(viewport, spinner_state, write);
+    if (chart !== this.chart || song_time < this.previous_song_time ||
+      first_active_index < this.previous_first_active_index) {
+      this.chart = chart;
+      this.first_render_index = 0;
+    }
+    while (this.first_render_index < first_active_index) {
+      const object = chart.hit_objects[this.first_render_index]!;
+      if (object.kind === "slider" && song_time - object.end_time < SLIDER_FADE_OUT) break;
+      this.first_render_index += 1;
+    }
+    this.previous_song_time = song_time;
+    this.previous_first_active_index = first_active_index;
     let low = 0;
     let high = chart.hit_objects.length;
     while (low < high) {
@@ -56,7 +73,7 @@ export class OsuPlayfieldRenderer {
       else high = middle;
     }
     this.drawFollowPoints(viewport, chart, first_active_index, song_time, write, slider_path);
-    for (let index = low - 1; index >= 0; index -= 1) {
+    for (let index = low - 1; index >= this.first_render_index; index -= 1) {
       const object = chart.hit_objects[index]!;
       if (object.kind === "circle") {
         if (index < first_active_index || circle_states[index] !== OsuCircleState.Pending) continue;

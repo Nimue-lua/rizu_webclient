@@ -84,6 +84,31 @@ test("draws only the supplied active circle range", () => {
   assert.equal(quads.length, 6);
 });
 
+test("does not revisit elapsed osu objects", () => {
+  const sprite = {} as OsuStandardSkin["hitCircle"];
+  const skin = { hitCircle: sprite, hitCircleOverlay: sprite, approachCircle: sprite,
+    comboColor: [1, 1, 1] } as unknown as OsuStandardSkin;
+  let object_reads = 0;
+  const circles = Array.from({ length: 10_000 }, (_, index) => ({
+    get kind() { object_reads += 1; return "circle" as const; },
+    x: 256, y: 192, absolute_time: index, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
+  }));
+  const chart = {
+    mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5, hp_drain_rate: 5,
+    object_count: circles.length, drain_length_seconds: circles.length, end_time: circles.length,
+    primary_tempo: 120, slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [], hit_objects: circles,
+  } as const;
+  const playfield = new OsuPlayfieldRenderer(skin);
+  const states = new Uint8Array(circles.length);
+  playfield.draw(new OsuViewport(640, 480), chart, states, 9_000, [], 9_000, () => {});
+  object_reads = 0;
+
+  playfield.draw(new OsuViewport(640, 480), chart, states, 9_001, [], 9_001, () => {});
+
+  assert.ok(object_reads < 20, `read ${object_reads} elapsed objects`);
+});
+
 test("draws osu follow points between same-combo objects", () => {
   const circle = { sourceSize: { w: 64, h: 64 } } as OsuStandardSkin["hitCircle"];
   const follow_point = { sourceSize: { w: 16, h: 22 } } as OsuStandardSkin["hitCircle"];
