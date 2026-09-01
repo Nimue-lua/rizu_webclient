@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuSlider, OsuSliderCurveType } from "../src/chart/Chart";
-import { OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
+import { createOsuSliderPaths, OsuSliderPath } from "../src/gameplay/osu/OsuSliderPath";
 
 function slider(curve_type: OsuSliderCurveType, control_points: readonly { x: number; y: number }[],
   pixel_length: number): OsuSlider {
@@ -23,6 +23,23 @@ test("trims and extends linear paths to declared pixel length", () => {
   assert.deepEqual(extended.points, [{ x: 0, y: 0 }, { x: 50, y: 0 }]);
   assert.deepEqual(extended.directionAtProgress(0.5), { x: 1, y: 0 });
   assert.equal(extended.angleAtProgress(1), 0);
+});
+
+test("prepares one shared path for every chart slider", () => {
+  const first = slider("linear", [{ x: 100, y: 0 }], 100);
+  const second = { ...slider("bezier", [{ x: 50, y: 50 }, { x: 100, y: 0 }], 120), absolute_time: 3 };
+  const circle = { kind: "circle" as const, x: 20, y: 30, absolute_time: 2, hit_sound: 0,
+    hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" } };
+  const chart = { mode: "osu", format_version: 14, approach_rate: 5, circle_size: 5, overall_difficulty: 5,
+    hp_drain_rate: 5, object_count: 3, drain_length_seconds: 3, end_time: 4, primary_tempo: 120,
+    slider_multiplier: 1.4, slider_tick_rate: 1, combo_colors: [], timing_points: [],
+    hit_objects: [first, circle, second] } as const;
+
+  const paths = createOsuSliderPaths(chart);
+
+  assert.equal(paths.size, 2);
+  assert.ok(paths.has(first));
+  assert.ok(paths.has(second));
 });
 
 test("builds stable perfect-circle and Catmull paths", () => {

@@ -11,12 +11,10 @@ import { OsuViewport, type ClientBounds, type Point } from "../OsuViewport";
 import type { OsuCursorState } from "../OsuInputEvent";
 import type { OsuCircleTransient } from "../OsuCirclePresentation";
 import type { OsuSlider } from "../../../chart/Chart";
-import { OsuSliderPath } from "../OsuSliderPath";
+import type { OsuSliderPath } from "../OsuSliderPath";
 import { osuCircleDiameter } from "../OsuCircleGeometry";
 import { WebGlSliderGraphics } from "./WebGlSliderGraphics";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "../OsuSliderPresentation";
-
-const MAX_SLIDER_UPLOADS_PER_FRAME = 2;
 
 export interface OsuGameplayRenderer {
   clientToPlayfield(point: Point, bounds: ClientBounds): Point;
@@ -42,10 +40,10 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private readonly cursor_scale: number;
   private readonly draw_cursor: boolean;
   private readonly slider_paths = new Map<OsuSlider, OsuSliderPath>();
-  private readonly rejected_slider_paths = new WeakSet<OsuSlider>();
 
   constructor(canvas: HTMLCanvasElement, skin: OsuStandardSkin, hud?: GameplayHudRenderer,
-    x_flip = false, y_flip = false, cursor_scale = 1, draw_cursor = true) {
+    x_flip = false, y_flip = false, cursor_scale = 1, draw_cursor = true,
+    chart?: OsuChart, prepared_slider_paths?: ReadonlyMap<OsuSlider, OsuSliderPath>) {
     this.skin = skin;
     this.x_flip = x_flip;
     this.y_flip = y_flip;
@@ -56,6 +54,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
     this.slider_graphics = new WebGlSliderGraphics(canvas);
     this.hud = hud ?? new SpriteGameplayHudRenderer(skin, this.writeHudCommand);
+    if (chart && prepared_slider_paths) this.prepareSliders(chart, prepared_slider_paths);
   }
 
   clientToPlayfield(point: Point, bounds: ClientBounds): Point {
@@ -79,24 +78,9 @@ export class OsuRenderer implements OsuGameplayRenderer {
         rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0, batch });
     };
     const viewport = this.createViewport(frame.logical_width, frame.logical_height);
-    let uploads = 0;
-    const sliderPath = (slider: OsuSlider) => {
-      let path = this.slider_paths.get(slider);
-      if (!path && !this.rejected_slider_paths.has(slider) && uploads < MAX_SLIDER_UPLOADS_PER_FRAME) {
-        path = OsuSliderPath.create(slider, chart.format_version);
-        if (this.slider_graphics.upload(slider, path, osuCircleDiameter(chart.circle_size) / 2)) {
-          this.slider_paths.set(slider, path);
-        } else {
-          this.rejected_slider_paths.add(slider);
-          path = undefined;
-        }
-        uploads += 1;
-      }
-      return path;
-    };
     this.hud.drawHpBar();
     this.playfield.draw(viewport, chart, circle_states, first_active_index, circle_transients, song_time, write,
-      sliderPath, (slider, _path, alpha, color) => {
+      this.sliderPath, (slider, _path, alpha, color) => {
         this.graphics.submit(commands);
         commands.length = 0;
         this.slider_graphics.draw(slider, viewport, frame,
@@ -121,6 +105,15 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private createViewport(width: number, height: number): OsuViewport {
     return new OsuViewport(width, height, this.x_flip, this.y_flip);
   }
+
+  private prepareSliders(chart: OsuChart, paths: ReadonlyMap<OsuSlider, OsuSliderPath>): void {
+    const radius = osuCircleDiameter(chart.circle_size) / 2;
+    for (const [slider, path] of paths) {
+      if (this.slider_graphics.upload(slider, path, radius)) this.slider_paths.set(slider, path);
+    }
+  }
+
+  private readonly sliderPath = (slider: OsuSlider): OsuSliderPath | undefined => this.slider_paths.get(slider);
 
   destroy(): void {
     this.slider_graphics.destroy();

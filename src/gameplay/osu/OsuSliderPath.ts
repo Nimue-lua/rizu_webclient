@@ -1,4 +1,4 @@
-import type { OsuSlider } from "../../chart/Chart";
+import type { OsuChart, OsuSlider } from "../../chart/Chart";
 import type { Point } from "./OsuViewport";
 
 const MAX_PATH_POINTS = 16_384;
@@ -119,6 +119,14 @@ export class OsuSliderPath {
   endPosition(repeat_count: number): Point {
     return repeat_count % 2 === 0 ? this.points[0]! : this.points.at(-1)!;
   }
+}
+
+export function createOsuSliderPaths(chart: OsuChart): ReadonlyMap<OsuSlider, OsuSliderPath> {
+  const paths = new Map<OsuSlider, OsuSliderPath>();
+  for (const object of chart.hit_objects) {
+    if (object.kind === "slider") paths.set(object, OsuSliderPath.create(object, chart.format_version));
+  }
+  return paths;
 }
 
 function flatten(slider: OsuSlider, controls: readonly Point[], format_version: number): MutablePoint[] {

@@ -2,7 +2,7 @@ import type { OsuChart, OsuSlider, OsuSpinner } from "../../chart/Chart";
 import { osuApproachPreempt, osuCircleHitRadius } from "./OsuCircleGeometry";
 import type { OsuCircleTransient } from "./OsuCirclePresentation";
 import { OsuCircleState } from "./OsuCircleState";
-import { OsuSliderPath } from "./OsuSliderPath";
+import { createOsuSliderPaths, OsuSliderPath } from "./OsuSliderPath";
 import type { OsuSliderPresentationState, OsuSpinnerPresentationState } from "./OsuSliderPresentation";
 import type { OsuStandardJudgmentEvent } from "./OsuStandardJudgmentEvent";
 import type { Point } from "./OsuViewport";
@@ -65,7 +65,6 @@ export class OsuRulesEngine {
   private readonly score_engine: ScoreEngine<OsuStandardJudgmentEvent>;
   private readonly hit_radius: number;
   private readonly hit_radius_squared: number;
-  private readonly slider_paths = new Map<number, OsuSliderPath>();
   private readonly active_sliders: ActiveSlider[] = [];
   private active_spinner: ActiveSpinner | null = null;
   private cursor: Point = { x: 256, y: 192 };
@@ -73,15 +72,13 @@ export class OsuRulesEngine {
   private next_timeout_index = 0;
 
   constructor(private readonly chart: OsuChart, private readonly timings: OsuStandardTimingValues,
-    difficulty_multiplier: number) {
+    difficulty_multiplier: number,
+    private readonly slider_paths: ReadonlyMap<OsuSlider, OsuSliderPath> = createOsuSliderPaths(chart)) {
     this.object_states = new Uint8Array(chart.hit_objects.length);
     this.circle_states = this.object_states;
     this.score_engine = new ScoreEngine([new OsuStandardScore(timings, difficulty_multiplier)]);
     this.hit_radius = osuCircleHitRadius(chart.circle_size);
     this.hit_radius_squared = this.hit_radius * this.hit_radius;
-    chart.hit_objects.forEach((object, index) => {
-      if (object.kind === "slider") this.slider_paths.set(index, OsuSliderPath.create(object, chart.format_version));
-    });
   }
 
   get score(): ScoreResult { return this.score_engine.getResult(); }
@@ -223,7 +220,7 @@ export class OsuRulesEngine {
         position: { x: slider.x, y: slider.y } });
     }
     const active: ActiveSlider = {
-      index, slider, path: this.slider_paths.get(index)!, points: this.sliderScorePoints(slider),
+      index, slider, path: this.slider_paths.get(slider)!, points: this.sliderScorePoints(slider),
       next_point: 0, successful_parts: successful ? 1 : 0, tracking: false,
       tracking_started_at: null, head_resolved_at: time, head_successful: successful,
     };
