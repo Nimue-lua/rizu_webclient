@@ -6,7 +6,7 @@ export LC_ALL=C
 readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly DEPLOY_HOST="${DEPLOY_HOST:-root@nimue.mom}"
 readonly DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/rizu}"
-readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.nimue.mom}"
+readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.kuudere.fun}"
 readonly LIBRARY_DIR="${LIBRARY_DIR:-/media/SSD/s3_test}"
 readonly LIBRARY_REMOTE="${LIBRARY_REMOTE:-catalog:rizu.catalog}"
 readonly LIBRARY_URL="${LIBRARY_URL:-https://s3.kuudere.fun}"
@@ -75,7 +75,7 @@ prepare_remote_copy() {
   ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$DEPLOY_ROOT" <<'REMOTE'
 set -Eeuo pipefail
 deploy_root="$1"
-test -d "$deploy_root/dist"
+test -d "$deploy_root"
 rm -rf -- "$deploy_root.new" "$deploy_root.old"
 cp -al -- "$deploy_root" "$deploy_root.new"
 REMOTE
@@ -144,7 +144,7 @@ upload_catalog() {
 }
 
 deploy_application() {
-  require_commands npm node rsync ssh curl
+  require_commands npm node rsync ssh curl grep perl
   local stage_dir="${STAGE_DIR:-/tmp/rizu-deploy}"
 
   printf 'Installing dependencies and running checks...\n'
@@ -154,8 +154,10 @@ deploy_application() {
   npm --prefix "$ROOT_DIR" run build
 
   rm -rf -- "$stage_dir"
-  mkdir -p -- "$stage_dir/dist"
+  mkdir -p -- "$stage_dir/dist" "$stage_dir/server/replay-server"
   cp -a -- "$ROOT_DIR/dist/." "$stage_dir/dist/"
+  cp -a -- "$ROOT_DIR/server/replay-server/index.ts" "$stage_dir/server/replay-server/"
+  cp -a -- "$ROOT_DIR/server/rizu-replay.service" "$stage_dir/server/"
 
   printf 'Preparing application deployment...\n'
   prepare_remote_copy
@@ -169,12 +171,18 @@ deploy_application() {
     exit 1
   fi
 
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "rm -rf -- '$DEPLOY_ROOT.new/dist'; mkdir -p -- '$DEPLOY_ROOT.new/dist'"
+  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "rm -rf -- '$DEPLOY_ROOT.new/dist' '$DEPLOY_ROOT.new/server'; mkdir -p -- '$DEPLOY_ROOT.new'"
   rsync -a --delete --partial --info=progress2 \
     -e "ssh ${SSH_OPTIONS[*]}" \
-    "$stage_dir/dist/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/dist/"
+    "$stage_dir/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/"
   activate_remote_copy
-  curl -fsS "$DEPLOY_URL/" >/dev/null
+  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "cp '$DEPLOY_ROOT/server/rizu-replay.service' /etc/systemd/system/rizu-replay.service; systemctl daemon-reload; systemctl restart rizu-replay; systemctl --quiet is-active rizu-replay"
+  curl -fsS --retry 30 --retry-delay 1 --retry-all-errors "$DEPLOY_URL/api/health" >/dev/null
+  local asset_path chart_path
+  asset_path="$(perl -ne 'print $1 if m{src="(/[^"]+\.js)"}' "$ROOT_DIR/dist/index.html")"
+  chart_path="$(node -e 'const {DatabaseSync}=require("node:sqlite"); const db=new DatabaseSync(process.argv[1],{readOnly:true}); const row=db.prepare("SELECT chart_md5, chart_index FROM charts LIMIT 1").get(); process.stdout.write(`/chart/${row.chart_md5}/${row.chart_index}`)' "$ROOT_DIR/server/replay-server/catalog.sqlite")"
+  curl -fsSI "$DEPLOY_URL$asset_path" | grep -qi '^content-type: text/javascript'
+  curl -fsS "$DEPLOY_URL$chart_path" | grep -q 'property="og:title"'
   printf 'Application deployed: %s\n' "$DEPLOY_URL"
 }
 

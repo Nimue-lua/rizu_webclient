@@ -67,6 +67,7 @@ interface ReplayServerOptions {
   catalog_path?: string;
   catalog?: DatabaseSync;
   app_html?: string;
+  app_directory?: string;
   asset_base_url?: string;
 }
 
@@ -117,6 +118,36 @@ function chartPageHtml(template: string, chart: CatalogChartRow, page_url: strin
   return template
     .replace(/<title>.*?<\/title>/s, `<title>${htmlEscape(title)} | Rizu</title>`)
     .replace("</head>", `    ${metadata}\n  </head>`);
+}
+
+const STATIC_CONTENT_TYPES: Record<string, string> = {
+  ".avif": "image/avif",
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".osk": "application/octet-stream",
+  ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
+};
+
+async function staticFile(app_directory: string, pathname: string): Promise<{ body: Buffer; content_type: string } | null> {
+  let decoded_path: string;
+  try {
+    decoded_path = decodeURIComponent(pathname);
+  } catch {
+    return null;
+  }
+  const relative_path = decoded_path.replace(/^\/+/, "");
+  const file_path = path.resolve(app_directory, relative_path);
+  if (file_path !== app_directory && !file_path.startsWith(`${app_directory}${path.sep}`)) return null;
+  try {
+    const body = await readFile(file_path);
+    return { body, content_type: STATIC_CONTENT_TYPES[path.extname(file_path).toLowerCase()] ?? "application/octet-stream" };
+  } catch (reason) {
+    if (reason && typeof reason === "object" && "code" in reason && (reason.code === "ENOENT" || reason.code === "EISDIR")) return null;
+    throw reason;
+  }
 }
 
 function tokenHash(token: string): string {
@@ -377,7 +408,7 @@ const SCORE_SELECT = `
 `;
 
 export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database,
-  catalog_path, catalog: supplied_catalog, app_html, asset_base_url }: ReplayServerOptions = {}) {
+  catalog_path, catalog: supplied_catalog, app_html, app_directory, asset_base_url }: ReplayServerOptions = {}) {
   const database = supplied_database ?? openReplayDatabase(database_path);
   const catalog = supplied_catalog ?? (catalog_path ? new DatabaseSync(catalog_path, { readOnly: true }) : undefined);
   if (!catalog) {
@@ -568,6 +599,28 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         return;
       }
 
+      if ((request.method === "GET" || request.method === "HEAD") && app_html && app_directory) {
+        const file = url.pathname === "/" ? null : await staticFile(app_directory, url.pathname);
+        if (file) {
+          response.writeHead(200, {
+            "Cache-Control": url.pathname.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "public, max-age=3600",
+            "Content-Length": file.body.length,
+            "Content-Type": file.content_type,
+          }).end(request.method === "HEAD" ? undefined : file.body);
+          return;
+        }
+        if (path.posix.extname(url.pathname)) {
+          response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("Not found");
+          return;
+        }
+        response.writeHead(200, {
+          "Cache-Control": "no-cache",
+          "Content-Length": Buffer.byteLength(app_html),
+          "Content-Type": "text/html; charset=utf-8",
+        }).end(request.method === "HEAD" ? undefined : app_html);
+        return;
+      }
+
       json(response, 404, { error: "Not found" });
     } catch (reason) {
       const status = reason && typeof reason === "object" && "status" in reason ? Number(reason.status) : 500;
@@ -590,10 +643,10 @@ async function main(): Promise<void> {
   const host = process.env.HOST ?? "127.0.0.1";
   const catalog_url = process.env.RIZU_CATALOG_URL ?? DEFAULT_CATALOG_URL;
   const catalog_path = process.env.RIZU_CATALOG ?? DEFAULT_CATALOG_PATH;
-  const app_html_path = process.env.RIZU_WEB_INDEX ?? "/srv/rizu/dist/index.html";
+  const app_directory = path.resolve(process.env.RIZU_WEB_ROOT ?? "/srv/rizu/dist");
   await prepareCatalog(catalog_url, catalog_path);
-  const app_html = await readFile(app_html_path, "utf8");
-  createReplayServer({ database_path, catalog_path, app_html, asset_base_url: new URL(".", catalog_url).href }).listen(port, host, () => {
+  const app_html = await readFile(path.join(app_directory, "index.html"), "utf8");
+  createReplayServer({ database_path, catalog_path, app_html, app_directory, asset_base_url: new URL(".", catalog_url).href }).listen(port, host, () => {
     console.log(`Rizu API listening on http://${host}:${port}`);
   });
 }

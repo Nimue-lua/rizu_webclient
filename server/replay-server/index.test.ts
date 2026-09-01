@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { DatabaseSync } from "node:sqlite";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { openReplayDatabase, createReplayServer, skillRating } from "./index.ts";
 
@@ -13,9 +16,12 @@ let database: DatabaseSync;
 let catalog: DatabaseSync;
 let server: Server;
 let base_url: string;
+let app_directory: string;
 
 beforeEach(async () => {
   database = openReplayDatabase(":memory:");
+  app_directory = await mkdtemp(path.join(os.tmpdir(), "rizu-server-test-"));
+  await writeFile(path.join(app_directory, "app.js"), "export const ready = true;\n");
   catalog = new DatabaseSync(":memory:");
   catalog.exec(`
     CREATE TABLE songs (id TEXT PRIMARY KEY, title TEXT, artist TEXT);
@@ -28,7 +34,7 @@ beforeEach(async () => {
     INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 0, NULL, 'Insane', NULL, 'song-1');
   `);
   server = createReplayServer({ database, catalog, app_html: "<!doctype html><html><head><title>Rizu</title></head><body></body></html>",
-    asset_base_url: "https://assets.example/" });
+    app_directory, asset_base_url: "https://assets.example/" });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base_url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 });
@@ -37,6 +43,7 @@ afterEach(async () => {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   database.close();
   catalog.close();
+  await rm(app_directory, { recursive: true, force: true });
 });
 
 async function request(path: string, options: RequestInit = {}) {
@@ -66,6 +73,25 @@ test("serves the web client without chart metadata for charts outside the server
   assert.equal(response.status, 200);
   assert.match(body, /<title>Rizu<\/title>/);
   assert.doesNotMatch(body, /property="og:title"/);
+});
+
+test("serves modules with JavaScript MIME and never falls back for missing files", async () => {
+  const origin = base_url.replace(/\/api$/, "");
+  const module_response = await fetch(`${origin}/app.js`);
+  assert.equal(module_response.status, 200);
+  assert.equal(module_response.headers.get("content-type"), "text/javascript; charset=utf-8");
+  assert.match(await module_response.text(), /ready = true/);
+
+  const missing_response = await fetch(`${origin}/missing.js`);
+  assert.equal(missing_response.status, 404);
+  assert.equal(missing_response.headers.get("content-type"), "text/plain; charset=utf-8");
+});
+
+test("serves SPA HTML for application routes", async () => {
+  const response = await fetch(`${base_url.replace(/\/api$/, "")}/settings`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8");
+  assert.match(await response.text(), /<title>Rizu<\/title>/);
 });
 
 async function auth(path: string, name: string, password = "secret1") {
