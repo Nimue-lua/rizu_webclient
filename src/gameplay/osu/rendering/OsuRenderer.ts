@@ -23,7 +23,7 @@ export interface OsuGameplayRenderer {
     circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState,
     slider_states?: readonly OsuSliderPresentationState[], spinner_state?: OsuSpinnerPresentationState | null,
-    progress?: number | null): void;
+    progress?: number | null): number;
   destroy(): void;
 }
 
@@ -38,6 +38,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
   private active_commands: SpriteDrawCommand[] | null = null;
   private active_viewport: OsuViewport | null = null;
   private active_frame: GameplayFrame | null = null;
+  private slider_draw_calls = 0;
   private readonly skin: OsuStandardSkin;
   private readonly x_flip: boolean;
   private readonly y_flip: boolean;
@@ -70,9 +71,10 @@ export class OsuRenderer implements OsuGameplayRenderer {
     circle_transients: readonly OsuCircleTransient[], song_time: number,
     state: GameplayPresentationState, cursor: OsuCursorState,
     slider_states: readonly OsuSliderPresentationState[] | undefined = undefined,
-    spinner_state: OsuSpinnerPresentationState | null = null, progress: number | null = null): void {
+    spinner_state: OsuSpinnerPresentationState | null = null, progress: number | null = null): number {
     const frame = this.graphics.getFrame();
     this.graphics.beginFrame(frame);
+    this.slider_draw_calls = 0;
     const commands = this.commands;
     commands.length = 0;
     this.active_commands = commands;
@@ -98,6 +100,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.active_viewport = null;
     this.active_frame = null;
     this.graphics.submit(commands);
+    return this.graphics.drawCallCount + this.slider_draw_calls;
   }
 
   private createViewport(width: number, height: number): OsuViewport {
@@ -128,7 +131,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     if (!commands || !viewport || !frame) return;
     this.graphics.submit(commands);
     commands.length = 0;
-    this.slider_graphics.draw(slider, viewport, frame,
+    this.slider_draw_calls += this.slider_graphics.draw(slider, viewport, frame,
       this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha);
   };
 

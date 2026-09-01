@@ -69,6 +69,7 @@ export class WebGlSpriteGraphics {
   private readonly viewport_size: WebGLUniformLocation;
   private readonly sampler: WebGLUniformLocation;
   private readonly textures = new Map<Sprite, WebGLTexture>();
+  private draw_calls = 0;
   private destroyed = false;
 
   constructor(canvas: HTMLCanvasElement, skin: SpriteSkin,
@@ -132,6 +133,7 @@ export class WebGlSpriteGraphics {
 
   beginFrame(frame: GameplayFrame): void {
     const gl = this.gl;
+    this.draw_calls = 0;
     gl.viewport(0, 0, frame.framebuffer_width, frame.framebuffer_height);
     gl.clearColor(...BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -217,7 +219,10 @@ export class WebGlSpriteGraphics {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
+    this.draw_calls += 1;
   }
+
+  get drawCallCount(): number { return this.draw_calls; }
 
   private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand): void {
     const progress = Math.max(-1, Math.min(1, command.circularProgress ?? 0));

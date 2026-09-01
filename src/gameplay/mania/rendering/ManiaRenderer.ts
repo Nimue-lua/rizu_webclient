@@ -32,7 +32,7 @@ export class ManiaRenderer {
   }
 
   draw(column_count: number, notes: readonly ManiaVisualNote[], scroll_speed: number,
-    pressed_columns: ArrayLike<number> = [], state: GameplayPresentationState, progress: number | null = null): void {
+    pressed_columns: ArrayLike<number> = [], state: GameplayPresentationState, progress: number | null = null): number {
     this.validateColumnCount(column_count);
     const frame = this.graphics.getFrame();
     const layout = this.playfield.getLayout(frame.logical_width);
@@ -57,6 +57,7 @@ export class ManiaRenderer {
     this.hud.drawProgress(progress, getGameplayHudLayout(layout.width));
     this.active_commands = null;
     this.graphics.submit(commands);
+    return this.graphics.drawCallCount;
   }
 
   destroy(): void {

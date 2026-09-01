@@ -191,7 +191,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
     performance_now: () => 1000,
     create_renderer: () => ({
       getTimeRange: () => ({ past: 2, future: 2 }),
-      draw: () => { renderer.draw_calls += 1; },
+      draw: () => { renderer.draw_calls += 1; return 1; },
       destroy: () => { renderer.destroy_calls += 1; },
     }),
   };

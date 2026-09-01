@@ -2,7 +2,7 @@ export interface GameplayPerformanceSample {
   readonly timestamp: number;
   readonly update_ms: number;
   readonly draw_ms: number;
-  readonly visible_objects: number;
+  readonly draw_calls: number;
 }
 
 export class GameplayPerformanceGraph {
@@ -16,17 +16,16 @@ export class GameplayPerformanceGraph {
   private stats_write_index = 0;
   private stats_sample_count = 0;
   private previous_timestamp: number | null = null;
-  private visible_objects = 0;
+  private draw_calls = 0;
   private next_label_update = Number.NEGATIVE_INFINITY;
   private label_fps = "--";
   private label_frame = "0.00";
   private label_update = "0.00";
   private label_draw = "0.00";
   private label_cpu = "0.00";
-  private label_low_point_one = "--";
-  private label_low_point_zero_one = "--";
+  private label_low_one = "--";
   private label_heap = "";
-  private label_visible_objects = 0;
+  private label_draw_calls = 0;
   private update_total = 0;
   private draw_total = 0;
   private timing_sample_count = 0;
@@ -37,7 +36,7 @@ export class GameplayPerformanceGraph {
   push(sample: GameplayPerformanceSample): void {
     const frame_ms = this.previous_timestamp === null ? 0 : sample.timestamp - this.previous_timestamp;
     const heap_bytes = readHeapBytes();
-    this.visible_objects = sample.visible_objects;
+    this.draw_calls = sample.draw_calls;
     this.update_total += sample.update_ms;
     this.draw_total += sample.draw_ms;
     this.timing_sample_count += 1;
@@ -81,8 +80,8 @@ export class GameplayPerformanceGraph {
     context.fillStyle = "#f35cff";
     context.fillText(`CPU ${this.label_cpu}ms`, 402, 12);
     context.fillStyle = "#fff";
-    context.fillText(`objects ${this.label_visible_objects}`, 510, 12);
-    context.fillText(`0.1% low ${this.label_low_point_one}  0.01% low ${this.label_low_point_zero_one}`, 610, 12);
+    context.fillText(`drawcalls ${this.label_draw_calls}`, 510, 12);
+    context.fillText(`1% low ${this.label_low_one}`, 630, 12);
     if (this.label_heap) context.fillText(`JS heap ${this.label_heap} MiB`, 12, 27);
   }
 
@@ -107,10 +106,9 @@ export class GameplayPerformanceGraph {
     this.label_update = update_ms.toFixed(2);
     this.label_draw = draw_ms.toFixed(2);
     this.label_cpu = (update_ms + draw_ms).toFixed(2);
-    this.label_low_point_one = this.lowFps(0.1);
-    this.label_low_point_zero_one = this.lowFps(0.01);
+    this.label_low_one = this.lowFps(1);
     this.label_heap = heap_bytes > 0 ? (heap_bytes / (1024 * 1024)).toFixed(1) : "";
-    this.label_visible_objects = this.visible_objects;
+    this.label_draw_calls = this.draw_calls;
     this.update_total = 0;
     this.draw_total = 0;
     this.timing_sample_count = 0;

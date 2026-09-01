@@ -287,33 +287,19 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const slider_states = this.rules_engine.slider_states;
     const spinner_state = this.rules_engine.spinner_state;
     const draw_start = this.dependencies.performance_now();
-    this.renderer.draw(this.chart, this.rules_engine.circle_states,
+    const draw_calls = this.renderer.draw(this.chart, this.rules_engine.circle_states,
       first_active_index, this.rules_engine.circle_transients, song_time,
       this.hud_state.update(this.rules_engine.score, timestamp / 1000), this.cursor_state,
       slider_states, spinner_state,
       getGameplayProgress(song_time, this.progress_range));
     const draw_ms = this.dependencies.performance_now() - draw_start;
-    this.performance_sample?.({ timestamp, update_ms, draw_ms,
-      visible_objects: this.visibleObjectCount(song_time, first_active_index) + slider_states.length +
-        (spinner_state?.active ? 1 : 0) });
+    this.performance_sample?.({ timestamp, update_ms, draw_ms, draw_calls });
     if (song_time >= getGameplayEndTime(this.data, this.music_rate)) {
       this.finishGameplay();
       return;
     }
     this.animation_frame = this.dependencies.request_animation_frame(this.render);
   };
-
-  private visibleObjectCount(song_time: number, first_active_index: number): number {
-    const visible_until = song_time + osuApproachPreempt(this.chart.approach_rate);
-    let low = first_active_index;
-    let high = this.chart.hit_objects.length;
-    while (low < high) {
-      const middle = (low + high) >>> 1;
-      if (this.chart.hit_objects[middle]!.absolute_time <= visible_until) low = middle + 1;
-      else high = middle;
-    }
-    return low - first_active_index;
-  }
 
   private updateBackgroundState(song_time: number): void {
     const first_object_time = this.chart.hit_objects[0]?.absolute_time ?? Infinity;

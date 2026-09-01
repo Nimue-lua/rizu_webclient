@@ -137,9 +137,9 @@ export class WebGlSliderGraphics {
   }
 
   draw(slider: OsuSlider, viewport: OsuViewport, frame: GameplayFrame,
-    body: readonly [number, number, number, number], border: readonly [number, number, number, number], opacity: number): void {
+    body: readonly [number, number, number, number], border: readonly [number, number, number, number], opacity: number): number {
     const mesh = this.meshes.get(slider);
-    if (!mesh || mesh.index_count === 0) return;
+    if (!mesh || mesh.index_count === 0) return 0;
     const gl = this.gl;
     gl.useProgram(this.program);
     gl.bindVertexArray(mesh.vertex_array);
@@ -177,6 +177,7 @@ export class WebGlSliderGraphics {
     gl.depthMask(false);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.SCISSOR_TEST);
+    return 2;
   }
 
   destroy(): void {
