@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { GameplayPerformanceGraph } from "../src/gameplay/GameplayPerformance";
 
-test("draws gameplay performance samples without allocating canvas history", () => {
+test("draws gameplay performance labels without graph lines", () => {
   const calls = { strokes: 0, texts: [] as string[] };
   const context = {
     setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {},
@@ -22,7 +22,7 @@ test("draws gameplay performance samples without allocating canvas history", () 
 
   assert.equal(canvas.width, 1600);
   assert.equal(canvas.height, 1200);
-  assert.ok(calls.strokes >= 7);
+  assert.equal(calls.strokes, 0);
   assert.ok(calls.texts.some((text) => text.includes("frame 0.00ms")));
   assert.ok(calls.texts.some((text) => text === "update 1.50ms"));
   assert.ok(calls.texts.some((text) => text === "draw 2.50ms"));
