@@ -15,19 +15,19 @@ function straightSlider(): OsuSlider {
   };
 }
 
-test("creates finite indexed slider geometry with round bounds", () => {
+test("creates finite indexed capsule coverage with round bounds", () => {
   const mesh = createOsuSliderMesh(OsuSliderPath.create(straightSlider(), 14), 20);
   assert.ok(mesh.vertices.length > 0);
   assert.ok(mesh.indices.length > 0);
   assert.deepEqual(mesh.bounds, { left: -20, top: -20, right: 120, bottom: 20 });
   assert.ok([...mesh.vertices].every(Number.isFinite));
-  const vertex_count = mesh.vertices.length / 3;
+  const vertex_count = mesh.vertices.length / 6;
   assert.ok([...mesh.indices].every((index) => index < vertex_count));
-  assert.ok([...mesh.vertices].filter((_value, index) => index % 3 === 2).includes(0));
-  assert.ok([...mesh.vertices].filter((_value, index) => index % 3 === 2).includes(1));
+  assert.deepEqual([...mesh.vertices.slice(2, 6)], [0, 0, 100, 0]);
+  assert.equal(mesh.indices.length, 6);
 });
 
-test("uses round join geometry at a multipart Bezier cusp", () => {
+test("uses segment capsules at a multipart Bezier cusp", () => {
   const slider: OsuSlider = {
     ...straightSlider(), x: 362, y: 323, curve_type: "bezier", pixel_length: 160,
     control_points: [{ x: 385, y: 338 }, { x: 397, y: 354 }, { x: 397, y: 354 },
@@ -36,13 +36,13 @@ test("uses round join geometry at a multipart Bezier cusp", () => {
   const path = OsuSliderPath.create(slider, 14);
   const mesh = createOsuSliderMesh(path, 20);
   const vertices = [...mesh.vertices];
-  const cusp_centers = vertices.filter((_value, index) => index % 3 === 2 && vertices[index] === 0 &&
-    Math.hypot(vertices[index - 2]! - 397, vertices[index - 1]! - 354) < 1e-6);
-  assert.ok(cusp_centers.length > 0);
-  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 3));
+  const cusp_segments = vertices.filter((_value, index) => index % 6 === 2 &&
+    Math.hypot(vertices[index]! - 397, vertices[index + 1]! - 354) < 1e-6);
+  assert.ok(cusp_segments.length > 0);
+  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 6));
 });
 
-test("caps an exact retracing Bezier turnaround", () => {
+test("covers an exact retracing Bezier turnaround with analytic capsules", () => {
   const slider: OsuSlider = {
     ...straightSlider(), x: 275, y: 93, curve_type: "bezier", pixel_length: 50,
     control_points: [{ x: 288, y: 72 }, { x: 288, y: 72 }, { x: 275, y: 93 }],
@@ -50,14 +50,14 @@ test("caps an exact retracing Bezier turnaround", () => {
   const path = OsuSliderPath.create(slider, 14);
   const mesh = createOsuSliderMesh(path, 20);
   const vertices = [...mesh.vertices];
-  const turnaround_centers = vertices.filter((_value, index) => index % 3 === 2 && vertices[index] === 0 &&
-    Math.hypot(vertices[index - 2]! - 288, vertices[index - 1]! - 72) < 1e-6);
-  assert.ok(turnaround_centers.length > 0);
+  const turnaround_segments = vertices.filter((_value, index) => index % 6 === 2 &&
+    Math.hypot(vertices[index]! - 288, vertices[index + 1]! - 72) < 1e-6);
+  assert.ok(turnaround_segments.length > 0);
   assert.ok([...mesh.vertices].every(Number.isFinite));
-  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 3));
+  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 6));
 });
 
-test("uses outer wedges instead of full circles along smooth curves", () => {
+test("uses one compact analytic capsule per simplified curve segment", () => {
   const slider: OsuSlider = {
     ...straightSlider(), x: 224, y: 232, curve_type: "perfect", pixel_length: 90,
     control_points: [{ x: 272, y: 256 }, { x: 312, y: 252 }],
@@ -65,8 +65,8 @@ test("uses outer wedges instead of full circles along smooth curves", () => {
   const path = OsuSliderPath.create(slider, 14);
   const mesh = createOsuSliderMesh(path, 20);
   const point_count = path.points.length;
-  const full_disks_at_every_point_indices = point_count * 24 * 3;
   assert.ok(point_count > 3);
-  assert.ok(mesh.indices.length < point_count * 12 + full_disks_at_every_point_indices);
+  assert.equal(mesh.indices.length % 6, 0);
+  assert.ok(mesh.indices.length <= (point_count - 1) * 6);
   assert.ok([...mesh.vertices].every(Number.isFinite));
 });

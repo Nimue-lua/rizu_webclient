@@ -92,7 +92,7 @@ export class WebGlSpriteGraphics {
 
   constructor(canvas: HTMLCanvasElement, skin: SpriteSkin,
     device_pixel_ratio: () => number = () => window.devicePixelRatio) {
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2", { stencil: true });
     if (!gl) throw new Error("WebGL 2 is required for gameplay");
     const program = createProgram(gl);
     const vertex_array = gl.createVertexArray();

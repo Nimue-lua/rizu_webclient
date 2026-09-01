@@ -4,12 +4,13 @@ import type { OsuViewport } from "../OsuViewport";
 import type { GameplayFrame } from "../../renderer/GameplayFrame";
 import { createOsuSliderMesh } from "./OsuSliderMesh";
 
-const VERTEX_FLOATS = 3;
+const VERTEX_FLOATS = 6;
 const MAX_SLIDER_BUFFER_BYTES = 64 * 1024 * 1024;
 
 const vertex_source = `#version 300 es
 in vec2 position;
-in float edge_distance;
+in vec2 segment_start;
+in vec2 segment_end;
 uniform vec2 viewport_size;
 uniform vec2 playfield_scale;
 uniform vec2 playfield_offset;
@@ -17,24 +18,40 @@ uniform vec2 stable_body_origin;
 uniform vec2 stable_viewport_scale;
 uniform float projection_y_direction;
 uniform float depth_bias;
-out float radial;
+out vec2 path_position;
+out vec2 path_start;
+out vec2 path_end;
 void main() {
   vec2 screen = playfield_offset + position * playfield_scale;
   screen = stable_body_origin + (screen - stable_body_origin) * stable_viewport_scale;
   gl_Position = vec4(screen.x / viewport_size.x * 2.0 - 1.0,
     projection_y_direction * (1.0 - screen.y / viewport_size.y * 2.0),
-    edge_distance * 1.8 - 0.8 - depth_bias, 1.0);
-  radial = edge_distance;
+    0.0, 1.0);
+  path_position = position;
+  path_start = segment_start;
+  path_end = segment_end;
 }`;
 
 const fragment_source = `#version 300 es
 precision highp float;
-in float radial;
+in vec2 path_position;
+in vec2 path_start;
+in vec2 path_end;
 uniform vec4 body_color;
 uniform vec4 border_color;
 uniform float opacity;
+uniform float path_radius;
+uniform float depth_bias;
 out vec4 color;
 void main() {
+  vec2 segment = path_end - path_start;
+  float segment_length_squared = dot(segment, segment);
+  float progress = segment_length_squared > 0.0
+    ? clamp(dot(path_position - path_start, segment) / segment_length_squared, 0.0, 1.0)
+    : 0.0;
+  float radial = distance(path_position, path_start + segment * progress) / path_radius;
+  if (radial > 1.0) discard;
+  gl_FragDepth = radial * 0.9 + 0.1 - depth_bias;
   float track_position = 1.0 - radial;
   float aa = max(fwidth(track_position), 3.0 / 256.0);
   vec4 shadow = vec4(0.0, 0.0, 0.0, 64.0 / 255.0);
@@ -74,13 +91,13 @@ export class WebGlSliderGraphics {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly uniforms: Readonly<Record<"viewport" | "scale" | "offset" | "stable_origin" | "stable_scale" |
-    "projection_y" | "depth_bias" | "body" | "border" | "opacity", WebGLUniformLocation>>;
+    "projection_y" | "depth_bias" | "body" | "border" | "opacity" | "radius", WebGLUniformLocation>>;
   private readonly meshes = new Map<OsuSlider, UploadedMesh>();
   private uploaded_bytes = 0;
   private destroyed = false;
 
   constructor(canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2", { stencil: true });
     if (!gl) throw new Error("WebGL 2 is required for slider rendering");
     const program = createProgram(gl, vertex_source, fragment_source);
     const uniforms = {
@@ -90,7 +107,7 @@ export class WebGlSliderGraphics {
       stable_scale: gl.getUniformLocation(program, "stable_viewport_scale"),
       projection_y: gl.getUniformLocation(program, "projection_y_direction"),
       body: gl.getUniformLocation(program, "body_color"), border: gl.getUniformLocation(program, "border_color"),
-      opacity: gl.getUniformLocation(program, "opacity"),
+      opacity: gl.getUniformLocation(program, "opacity"), radius: gl.getUniformLocation(program, "path_radius"),
     };
     if (Object.values(uniforms).some((uniform) => !uniform)) {
       gl.deleteProgram(program);
@@ -121,7 +138,7 @@ export class WebGlSliderGraphics {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, mesh.vertices, this.gl.STATIC_DRAW);
     const stride = VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
-    for (const [name, size, offset] of [["position", 2, 0], ["edge_distance", 1, 2]] as const) {
+    for (const [name, size, offset] of [["position", 2, 0], ["segment_start", 2, 2], ["segment_end", 2, 4]] as const) {
       const location = this.gl.getAttribLocation(this.program, name);
       if (location < 0) throw new Error(`Slider shader is missing ${name}`);
       this.gl.enableVertexAttribArray(location);
@@ -156,11 +173,14 @@ export class WebGlSliderGraphics {
     gl.uniform4f(this.uniforms.body, ...body);
     gl.uniform4f(this.uniforms.border, ...border);
     gl.uniform1f(this.uniforms.opacity, Math.min(Math.max(opacity, 0), 1));
+    gl.uniform1f(this.uniforms.radius, mesh.radius);
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthMask(true);
     gl.clearDepth(1);
-    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.clearStencil(0);
+    gl.stencilMask(0xff);
+    gl.clear(gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(stable.clip_x, stable.clip_y, stable.clip_width, stable.clip_height);
     gl.colorMask(false, false, false, false);
@@ -169,12 +189,16 @@ export class WebGlSliderGraphics {
     gl.drawElements(gl.TRIANGLES, mesh.index_count, gl.UNSIGNED_INT, 0);
 
     gl.colorMask(true, true, true, true);
-    gl.depthFunc(gl.LESS);
-    gl.uniform1f(this.uniforms.depth_bias, 1 / 65_536);
+    gl.depthMask(false);
+    gl.depthFunc(gl.EQUAL);
+    gl.enable(gl.STENCIL_TEST);
+    gl.stencilFunc(gl.NOTEQUAL, 1, 0xff);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawElements(gl.TRIANGLES, mesh.index_count, gl.UNSIGNED_INT, 0);
-    gl.depthMask(false);
+    gl.disable(gl.STENCIL_TEST);
+    gl.stencilMask(0xff);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.SCISSOR_TEST);
     return 2;

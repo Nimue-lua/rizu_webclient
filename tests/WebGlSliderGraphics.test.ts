@@ -21,6 +21,8 @@ function createGl(max_viewport = 16_384) {
   const calls = { buffers: 0, deleted_buffers: 0, arrays: 0, deleted_arrays: 0, draws: 0,
     shader_sources: [] as string[],
     depth_masks: [] as boolean[], color_masks: [] as boolean[][], scissors: [] as number[][],
+    depth_funcs: [] as number[], clear_masks: [] as number[], stencil_funcs: [] as number[][],
+    stencil_ops: [] as number[][], stencil_masks: [] as number[], clear_stencils: [] as number[],
     uniform2: [] as number[][], uniform1: [] as number[], framebuffers: 0, textures: 0, renderbuffers: 0, array_draws: 0,
     framebuffer_bindings: [] as (object | null)[], viewports: [] as number[][], deleted_programs: 0 };
   const handle = () => ({ id: ++id });
@@ -28,7 +30,8 @@ function createGl(max_viewport = 16_384) {
     VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4, ARRAY_BUFFER: 5,
     ELEMENT_ARRAY_BUFFER: 6, FLOAT: 7, STATIC_DRAW: 8, BLEND: 9, ONE: 10, ONE_MINUS_SRC_ALPHA: 11,
     TRIANGLES: 12, UNSIGNED_INT: 13, DEPTH_TEST: 14, DEPTH_BUFFER_BIT: 15, LEQUAL: 16, LESS: 17,
-    MAX_VIEWPORT_DIMS: 18, SCISSOR_TEST: 19,
+    MAX_VIEWPORT_DIMS: 18, SCISSOR_TEST: 19, EQUAL: 37, STENCIL_TEST: 38, STENCIL_BUFFER_BIT: 128,
+    KEEP: 39, REPLACE: 40, NOTEQUAL: 41,
     FRAMEBUFFER: 20, RENDERBUFFER: 21, TEXTURE_2D: 22, TEXTURE_MIN_FILTER: 23, TEXTURE_MAG_FILTER: 24,
     TEXTURE_WRAP_S: 25, TEXTURE_WRAP_T: 26, LINEAR: 27, CLAMP_TO_EDGE: 28, RGBA8: 29, RGBA: 30,
     UNSIGNED_BYTE: 31, DEPTH_COMPONENT16: 32, COLOR_ATTACHMENT0: 33, DEPTH_ATTACHMENT: 34,
@@ -43,7 +46,8 @@ function createGl(max_viewport = 16_384) {
     deleteVertexArray(value: object | null) { if (value) calls.deleted_arrays += 1; }, bindVertexArray() {},
     createBuffer() { calls.buffers += 1; return handle(); },
     deleteBuffer(value: object | null) { if (value) calls.deleted_buffers += 1; }, bindBuffer() {}, bufferData() {},
-    getAttribLocation: (_program: object, name: string) => name === "position" ? 0 : 1,
+    getAttribLocation: (_program: object, name: string) =>
+      ({ position: 0, segment_start: 1, segment_end: 2 })[name] ?? -1,
     enableVertexAttribArray() {}, vertexAttribPointer() {}, useProgram() {},
     uniform2f(_uniform: object, ...values: number[]) { calls.uniform2.push(values); }, uniform4f() {},
     createFramebuffer() { calls.framebuffers += 1; return handle(); }, deleteFramebuffer() {},
@@ -54,7 +58,13 @@ function createGl(max_viewport = 16_384) {
     checkFramebufferStatus: () => 35, viewport(...values: number[]) { calls.viewports.push(values); },
     activeTexture() {}, uniform1i() {}, clearColor() {},
     uniform1f(_uniform: object, value: number) { calls.uniform1.push(value); },
-    enable() {}, disable() {}, blendFunc() {}, depthFunc() {}, clearDepth() {}, clear() {},
+    enable() {}, disable() {}, blendFunc() {},
+    depthFunc(value: number) { calls.depth_funcs.push(value); }, clearDepth() {},
+    clear(mask: number) { calls.clear_masks.push(mask); },
+    clearStencil(value: number) { calls.clear_stencils.push(value); },
+    stencilMask(value: number) { calls.stencil_masks.push(value); },
+    stencilFunc(...values: number[]) { calls.stencil_funcs.push(values); },
+    stencilOp(...values: number[]) { calls.stencil_ops.push(values); },
     depthMask(value: boolean) { calls.depth_masks.push(value); },
     colorMask(...values: boolean[]) { calls.color_masks.push(values); },
     scissor(...values: number[]) { calls.scissors.push(values); },
@@ -67,9 +77,9 @@ function createGl(max_viewport = 16_384) {
 test("uploads each slider once, draws indexed geometry, and destroys owned buffers", () => {
   const fake = createGl();
   const graphics = new WebGlSliderGraphics({ getContext: () => fake.gl } as unknown as HTMLCanvasElement);
-  assert.match(fake.calls.shader_sources[0]!, /out float radial;/);
-  assert.match(fake.calls.shader_sources[0]!, /radial = edge_distance;/);
-  assert.match(fake.calls.shader_sources[1]!, /in float radial;/);
+  assert.match(fake.calls.shader_sources[0]!, /in vec2 segment_start;/);
+  assert.match(fake.calls.shader_sources[1]!, /distance\(path_position,/);
+  assert.match(fake.calls.shader_sources[1]!, /gl_FragDepth = radial/);
   const slider = createSlider();
   const path = OsuSliderPath.create(slider, 14);
   assert.equal(graphics.upload(slider, path, 20), true);
@@ -81,6 +91,12 @@ test("uploads each slider once, draws indexed geometry, and destroys owned buffe
   }, [1, 0, 0, 1], [1, 1, 1, 1], 1);
   assert.equal(fake.calls.draws, 2);
   assert.deepEqual(fake.calls.depth_masks, [true, false]);
+  assert.deepEqual(fake.calls.depth_funcs, [fake.gl.LEQUAL, fake.gl.EQUAL]);
+  assert.deepEqual(fake.calls.clear_stencils, [0]);
+  assert.deepEqual(fake.calls.clear_masks, [fake.gl.DEPTH_BUFFER_BIT | fake.gl.STENCIL_BUFFER_BIT]);
+  assert.deepEqual(fake.calls.stencil_funcs, [[fake.gl.NOTEQUAL, 1, 0xff]]);
+  assert.deepEqual(fake.calls.stencil_ops, [[fake.gl.KEEP, fake.gl.KEEP, fake.gl.REPLACE]]);
+  assert.deepEqual(fake.calls.stencil_masks, [0xff, 0xff]);
   assert.deepEqual(fake.calls.color_masks, [[false, false, false, false], [true, true, true, true]]);
   assert.deepEqual(fake.calls.scissors, [[0, 0, 640, 480]]);
   graphics.destroy();
