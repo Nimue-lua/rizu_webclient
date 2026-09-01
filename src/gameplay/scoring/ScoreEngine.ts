@@ -10,6 +10,8 @@ export class ScoreEngine<Event> {
   private grade_source?: IGradeSource;
   private combo_source?: IComboSource;
   private judges_source?: IJudgesSource;
+  private latest_result: ScoreResult;
+  readonly results: ScoreResult[] = [];
 
   constructor(private readonly systems: readonly ScoreSystem<Event>[]) {
     for (const system of systems) {
@@ -19,13 +21,20 @@ export class ScoreEngine<Event> {
       if (isComboSource(system)) this.combo_source = system;
       if (isJudgesSource(system)) this.judges_source = system;
     }
+    this.latest_result = this.createResult();
   }
 
   receive(event: Event): void {
     for (const system of this.systems) system.receive(event);
+    this.latest_result = this.createResult();
+    this.results.push(this.latest_result);
   }
 
   getResult(): ScoreResult {
+    return this.latest_result;
+  }
+
+  private createResult(): ScoreResult {
     const result: ScoreResult = {};
     if (this.score_source) result.score = this.score_source.getScore();
     if (this.accuracy_source) result.accuracy = this.accuracy_source.getAccuracy();
@@ -38,9 +47,11 @@ export class ScoreEngine<Event> {
       const names = this.judges_source.judge_names;
       const counts = this.judges_source.getJudges();
       result.judge_names = names;
-      result.judges = Object.fromEntries(names.map((name, index) => [name, counts[index] ?? 0]));
+      const judges: Record<string, number> = {};
+      for (let index = 0; index < names.length; index += 1) judges[names[index]!] = counts[index] ?? 0;
+      result.judges = Object.freeze(judges);
       result.last_judge = this.judges_source.getLastJudge();
     }
-    return result;
+    return Object.freeze(result);
   }
 }

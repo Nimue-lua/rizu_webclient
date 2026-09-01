@@ -40,6 +40,30 @@ test("applies stable circle ScoreV1 combo bonus before incrementing combo", () =
   assert.equal(engine.getResult().accuracy, 750 / 1500);
 });
 
+test("stores immutable score snapshots only when score events are received", () => {
+  const engine = new ScoreEngine([new OsuStandardScore(createOsuStandardTimingValues(5), 1)]);
+  const initial = engine.getResult();
+  assert.equal(engine.getResult(), initial);
+  assert.equal(engine.results.length, 0);
+
+  engine.receive(hit(0));
+  const first = engine.getResult();
+  assert.notEqual(first, initial);
+  assert.equal(engine.getResult(), first);
+  assert.equal(engine.results.length, 1);
+  assert.equal(first.judges?.["300"], 1);
+
+  engine.receive(miss());
+  const second = engine.getResult();
+  assert.equal(engine.results.length, 2);
+  assert.equal(engine.results[0], first);
+  assert.equal(engine.results[1], second);
+  assert.equal(first.judges?.miss, 0);
+  assert.equal(second.judges?.miss, 1);
+  assert.equal(Object.isFrozen(second), true);
+  assert.equal(Object.isFrozen(second.judges), true);
+});
+
 test("uses stable osu standard grades", () => {
   const perfect = new OsuStandardScore(createOsuStandardTimingValues(5), 1);
   perfect.receive(hit(0));
