@@ -80,7 +80,6 @@ export class WebGlSpriteGraphics {
   private readonly sampler: WebGLUniformLocation;
   private readonly sprites = new Map<Sprite, UploadedSprite>();
   private readonly textures: WebGLTexture[] = [];
-  private readonly atlas_overlays: HTMLCanvasElement[] = [];
   private draw_calls = 0;
   private destroyed = false;
 
@@ -124,8 +123,27 @@ export class WebGlSpriteGraphics {
     const layout = packRuntimeTextureLayout(sources, { maxWidth: max_size, maxHeight: max_size,
       extrusion: 1, padding: 1 });
     const atlases = createRuntimeTextureAtlases(layout);
-    for (const atlas of atlases) this.addAtlasOverlay(atlas.canvas);
-    for (const source of sources) {
+    for (const atlas of atlases) {
+      const texture = gl.createTexture();
+      if (!texture) throw new Error("Failed to create gameplay sprite atlas texture");
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, atlas.canvas);
+      const error = gl.getError();
+      if (error !== gl.NO_ERROR) {
+        gl.deleteTexture(texture);
+        throw new Error(`Failed to upload sprite atlas (${atlas.width}x${atlas.height}): WebGL error 0x${error.toString(16)}`);
+      }
+      this.textures.push(texture);
+      for (const entry of atlas.entries) {
+        this.sprites.set(entry.value, { texture, u0: entry.x / atlas.width, v0: entry.y / atlas.height,
+          u1: (entry.x + entry.width) / atlas.width, v1: (entry.y + entry.height) / atlas.height });
+      }
+    }
+    for (const source of layout.standalone) {
       const texture = gl.createTexture();
       if (!texture) throw new Error("Failed to create gameplay sprite texture");
       gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -176,7 +194,7 @@ export class WebGlSpriteGraphics {
       if (!uploaded) throw new Error("Gameplay sprite texture was not uploaded");
       let end = start + 1;
       while (end < commands.length && this.sprites.get(commands[end]!.sprite)?.texture === uploaded.texture) end += 1;
-      this.submitBatch(uploaded, commands.slice(start, end));
+      this.submitBatch(uploaded.texture, commands.slice(start, end));
       start = end;
     }
   }
@@ -185,16 +203,17 @@ export class WebGlSpriteGraphics {
     if (this.destroyed) return;
     this.destroyed = true;
     for (const texture of this.textures) this.gl.deleteTexture(texture);
-    for (const overlay of this.atlas_overlays) overlay.remove();
     this.gl.deleteBuffer(this.vertex_buffer);
     this.gl.deleteVertexArray(this.vertex_array);
     this.gl.deleteProgram(this.program);
   }
 
-  private submitBatch(uploaded: UploadedSprite, commands: readonly SpriteDrawCommand[]): void {
+  private submitBatch(texture: WebGLTexture, commands: readonly SpriteDrawCommand[]): void {
     const vertices: number[] = [];
     for (const command of commands) {
       if (command.width <= 0 || command.height <= 0) continue;
+      const uploaded = this.sprites.get(command.sprite);
+      if (!uploaded) throw new Error("Gameplay sprite texture was not uploaded");
       if (command.circularProgress !== undefined) {
         this.addCircularProgressVertices(vertices, command, uploaded);
         continue;
@@ -226,27 +245,12 @@ export class WebGlSpriteGraphics {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, uploaded.texture);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
     this.draw_calls += 1;
   }
 
   get drawCallCount(): number { return this.draw_calls; }
-
-  private addAtlasOverlay(overlay: HTMLCanvasElement): void {
-    if (!this.canvas.parentElement) return;
-    overlay.style.position = "fixed";
-    overlay.style.inset = "0";
-    overlay.style.width = "100vw";
-    overlay.style.height = "100vh";
-    overlay.style.objectFit = "contain";
-    overlay.style.zIndex = "10000";
-    overlay.style.pointerEvents = "none";
-    overlay.style.background = "rgba(0, 0, 0, 0.75)";
-    overlay.style.imageRendering = "pixelated";
-    this.canvas.parentElement.append(overlay);
-    this.atlas_overlays.push(overlay);
-  }
 
   private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand, uploaded: UploadedSprite): void {
     const progress = Math.max(-1, Math.min(1, command.circularProgress ?? 0));

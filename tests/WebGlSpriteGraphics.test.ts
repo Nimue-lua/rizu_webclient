@@ -71,7 +71,7 @@ function command(sprite: Sprite, batch?: string): SpriteDrawCommand {
     flipY: false, rotateCounterClockwise: false, rotationRadians: 0, batch };
 }
 
-test("displays the atlas but uploads aliased gameplay sprites only once", () => {
+test("uploads aliased gameplay sprites in one atlas texture", () => {
   const dom = installCanvasStub();
   const sprite = createSprite("shared");
   const fake = createGl();
@@ -80,7 +80,7 @@ test("displays the atlas but uploads aliased gameplay sprites only once", () => 
   const graphics = new WebGlSpriteGraphics(canvas, { sprites: { first: sprite, alias: sprite } }, () => 1);
 
   assert.equal(fake.calls.created_textures.length, 1);
-  assert.equal(fake.calls.uploaded_images[0], sprite.image);
+  assert.equal(fake.calls.uploaded_images[0], dom.canvases[0]);
   graphics.destroy();
   graphics.destroy();
   assert.equal(fake.calls.deleted_textures.length, 1);
@@ -106,7 +106,7 @@ test("rotates sprite geometry around its center by an arbitrary angle", () => {
   dom.restore();
 });
 
-test("preserves sprite order without using the atlas for gameplay", () => {
+test("batches ordered sprite commands that share an atlas", () => {
   const dom = installCanvasStub();
   const first = createSprite("first");
   const second = createSprite("second");
@@ -114,17 +114,20 @@ test("preserves sprite order without using the atlas for gameplay", () => {
   const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
     getContext: () => fake.gl } as unknown as HTMLCanvasElement;
   const graphics = new WebGlSpriteGraphics(canvas, { sprites: { first, second } }, () => 1);
-  const [first_texture, second_texture] = fake.calls.created_textures;
+  const [atlas_texture] = fake.calls.created_textures;
 
   graphics.submit([command(first), command(second), command(first, "notes"), command(second, "notes"),
     command(first, "notes"), command(second)]);
 
-  assert.deepEqual(fake.calls.draw_textures,
-    [first_texture, second_texture, first_texture, second_texture, first_texture, second_texture]);
+  assert.deepEqual(fake.calls.draw_textures, [atlas_texture]);
+  assert.equal(fake.calls.uploaded_vertices[0]!.length, 6 * 6 * 8);
+  const vertices = fake.calls.uploaded_vertices[0]!;
+  assert.notEqual(vertices[2], vertices[6 * 8 + 2]);
+  assert.equal(vertices[2], vertices[2 * 6 * 8 + 2]);
   dom.restore();
 });
 
-test("uses full texture UVs for gameplay sprites", () => {
+test("uses packed atlas UVs for gameplay sprites", () => {
   const dom = installCanvasStub();
   const sprite = createSprite("uv");
   const fake = createGl();
@@ -135,8 +138,9 @@ test("uses full texture UVs for gameplay sprites", () => {
   graphics.submit([command(sprite)]);
 
   const vertices = fake.calls.uploaded_vertices[0]!;
-  assert.equal(vertices[2], 0);
-  assert.equal(vertices[3], 0);
-  assert.equal(vertices[10], 1);
+  assert.ok(Math.abs(vertices[2]! - 2 / 14) < 1e-6);
+  assert.ok(Math.abs(vertices[3]! - 2 / 14) < 1e-6);
+  assert.ok(Math.abs(vertices[10]! - 12 / 14) < 1e-6);
+  assert.ok(Math.abs(vertices[19]! - 12 / 14) < 1e-6);
   dom.restore();
 });
