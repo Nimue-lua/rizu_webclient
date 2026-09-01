@@ -28,6 +28,15 @@ test("formats the actual score without truncating values over seven digits", () 
   assert.deepEqual(names.slice(0, 8), [..."12345678"].map((digit) => `glyph-${digit}`));
 });
 
+test("rounds the animated score up", () => {
+  const names: string[] = [];
+  const { sprites, glyphs } = createHud();
+  new SpriteGameplayHudRenderer({ sprites, scoreGlyphs: glyphs, scoreOverlap: 0 },
+    (_x, _y, _width, _height, _color, drawn) => names.push((drawn as Sprite & { name: string }).name))
+    .drawScore({ score: 1.01, accuracy: 100 }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.deepEqual(names.slice(0, 7), [..."0000002"].map((digit) => `glyph-${digit}`));
+});
+
 test("tolerates skins without global HUD assets", () => {
   assert.doesNotThrow(() => new SpriteGameplayHudRenderer({ sprites: {} }, () => {})
     .drawScore({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 }));

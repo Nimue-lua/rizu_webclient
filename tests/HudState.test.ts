@@ -7,7 +7,7 @@ test("derives immutable HUD snapshots from shared score results", () => {
   const first = deriver.update({ score: 1234, combo: 12, accuracy: 0.985, last_judge: "perfect",
     judges: { perfect: 1 } }, 1);
   assert.deepEqual(first, {
-    hud: { score: 1234, accuracy: 0 },
+    hud: { score: 0, accuracy: 0 },
     combo: 12,
     comboAnimationAge: 0,
     comboAnimationFrom: 0,
@@ -17,6 +17,7 @@ test("derives immutable HUD snapshots from shared score results", () => {
   });
   const second = deriver.update({ score: 1234, combo: 12, accuracy: 0.985, last_judge: "perfect",
     judges: { perfect: 1 } }, 1.1);
+  assert.ok(second.hud.score > 0 && second.hud.score < 1234);
   assert.ok(second.hud.accuracy > 0 && second.hud.accuracy < 98.5);
   assert.ok(second.judgmentAge > 0);
   assert.ok(Math.abs(second.comboAnimationAge - 0.1) < 1e-12);

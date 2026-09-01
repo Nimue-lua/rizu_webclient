@@ -29,6 +29,7 @@ export interface HitErrorMeterState {
 }
 
 export class HudStateDeriver {
+  private readonly displayed_score = new SpringValue(0);
   private readonly displayed_accuracy = new SpringValue(0);
   private previous_frame_time: number | null = null;
   private previous_judges_total = 0;
@@ -80,7 +81,7 @@ export class HudStateDeriver {
     while (this.hit_errors[0] && frame_time - this.hit_errors[0].time >= 10) this.hit_errors.shift();
     return {
       hud: {
-        score: score.score ?? 0,
+        score: this.displayed_score.update(score.score ?? 0, delta_time),
         accuracy: this.displayed_accuracy.update((score.accuracy ?? 0) * 100, delta_time),
       },
       combo,

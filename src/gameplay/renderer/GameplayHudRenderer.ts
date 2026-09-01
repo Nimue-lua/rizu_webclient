@@ -28,7 +28,7 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
 
   drawScore(hud: HudState, layout: HudLayout): void {
     if (!this.assets.scoreGlyphs) return;
-    const score = String(Math.max(0, Math.round(hud.score))).padStart(7, "0");
+    const score = String(Math.max(0, Math.ceil(hud.score))).padStart(7, "0");
     drawBitmapText(this.assets.sprites, score, this.assets.scoreGlyphs, this.assets.scoreOverlap ?? 0,
       layout.scoreRight, layout.scoreTop, 0.96, "right", this.write);
     const score_height = this.bitmapTextHeight(this.assets.scoreGlyphs) * 0.625 * 0.96;
