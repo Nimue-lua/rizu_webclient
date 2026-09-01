@@ -1,8 +1,18 @@
 import { resizeGameplayCanvas, type GameplayFrame } from "./GameplayFrame";
+import { createRuntimeTextureAtlases, packRuntimeTextureLayout } from "./RuntimeTexturePacker";
 import type { Sprite, SpriteDrawCommand, SpriteSkin } from "./Sprite";
 
 const BACKGROUND_COLOR = [0, 0, 0, 0] as const;
 const VERTEX_FLOATS = 8;
+const MAX_ATLAS_SIZE = 4096;
+
+interface UploadedSprite {
+  texture: WebGLTexture;
+  u0: number;
+  v0: number;
+  u1: number;
+  v1: number;
+}
 
 const vertex_shader_source = `#version 300 es
 in vec2 position;
@@ -68,7 +78,9 @@ export class WebGlSpriteGraphics {
   private readonly vertex_buffer: WebGLBuffer;
   private readonly viewport_size: WebGLUniformLocation;
   private readonly sampler: WebGLUniformLocation;
-  private readonly textures = new Map<Sprite, WebGLTexture>();
+  private readonly sprites = new Map<Sprite, UploadedSprite>();
+  private readonly textures: WebGLTexture[] = [];
+  private readonly atlas_overlays: HTMLCanvasElement[] = [];
   private draw_calls = 0;
   private destroyed = false;
 
@@ -106,8 +118,14 @@ export class WebGlSpriteGraphics {
     }
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.activeTexture(gl.TEXTURE0);
-    for (const [name, sprite] of Object.entries(skin.sprites)) {
-      if (this.textures.has(sprite)) continue;
+    const sources = [...new Set(Object.values(skin.sprites))].map((sprite) => ({ value: sprite, image: sprite.image }));
+    const hardware_max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+    const max_size = Math.min(MAX_ATLAS_SIZE, hardware_max);
+    const layout = packRuntimeTextureLayout(sources, { maxWidth: max_size, maxHeight: max_size,
+      extrusion: 1, padding: 1 });
+    const atlases = createRuntimeTextureAtlases(layout);
+    for (const atlas of atlases) this.addAtlasOverlay(atlas.canvas);
+    for (const source of sources) {
       const texture = gl.createTexture();
       if (!texture) throw new Error("Failed to create gameplay sprite texture");
       gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -115,13 +133,14 @@ export class WebGlSpriteGraphics {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, sprite.image);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, source.image);
       const error = gl.getError();
       if (error !== gl.NO_ERROR) {
         gl.deleteTexture(texture);
-        throw new Error(`Failed to upload sprite ${name} (${sprite.image.width}x${sprite.image.height}): WebGL error 0x${error.toString(16)}`);
+        throw new Error(`Failed to upload sprite (${source.image.width}x${source.image.height}): WebGL error 0x${error.toString(16)}`);
       }
-      this.textures.set(sprite, texture);
+      this.textures.push(texture);
+      this.sprites.set(source.value, { texture, u0: 0, v0: 0, u1: 1, v1: 1 });
     }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -152,46 +171,38 @@ export class WebGlSpriteGraphics {
     gl.uniform1i(this.sampler, 0);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    for (let index = 0; index < commands.length;) {
-      const command = commands[index]!;
-      if (!command.batch) {
-        this.submitBatch(command.sprite, [command]);
-        index += 1;
-        continue;
-      }
-      const batch_key = command.batch;
-      const by_sprite = new Map<Sprite, SpriteDrawCommand[]>();
-      while (index < commands.length && commands[index]!.batch === batch_key) {
-        const next = commands[index++]!;
-        const batch = by_sprite.get(next.sprite) ?? [];
-        batch.push(next);
-        by_sprite.set(next.sprite, batch);
-      }
-      for (const [sprite, batch] of by_sprite) this.submitBatch(sprite, batch);
+    for (let start = 0; start < commands.length;) {
+      const uploaded = this.sprites.get(commands[start]!.sprite);
+      if (!uploaded) throw new Error("Gameplay sprite texture was not uploaded");
+      let end = start + 1;
+      while (end < commands.length && this.sprites.get(commands[end]!.sprite)?.texture === uploaded.texture) end += 1;
+      this.submitBatch(uploaded, commands.slice(start, end));
+      start = end;
     }
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    for (const texture of this.textures.values()) this.gl.deleteTexture(texture);
+    for (const texture of this.textures) this.gl.deleteTexture(texture);
+    for (const overlay of this.atlas_overlays) overlay.remove();
     this.gl.deleteBuffer(this.vertex_buffer);
     this.gl.deleteVertexArray(this.vertex_array);
     this.gl.deleteProgram(this.program);
   }
 
-  private submitBatch(sprite: Sprite, commands: readonly SpriteDrawCommand[]): void {
+  private submitBatch(uploaded: UploadedSprite, commands: readonly SpriteDrawCommand[]): void {
     const vertices: number[] = [];
     for (const command of commands) {
       if (command.width <= 0 || command.height <= 0) continue;
       if (command.circularProgress !== undefined) {
-        this.addCircularProgressVertices(vertices, command);
+        this.addCircularProgressVertices(vertices, command, uploaded);
         continue;
       }
-      let top_left = [0, command.flipY ? 1 : 0];
-      let top_right = [1, command.flipY ? 1 : 0];
-      let bottom_left = [0, command.flipY ? 0 : 1];
-      let bottom_right = [1, command.flipY ? 0 : 1];
+      let top_left = [uploaded.u0, command.flipY ? uploaded.v1 : uploaded.v0];
+      let top_right = [uploaded.u1, command.flipY ? uploaded.v1 : uploaded.v0];
+      let bottom_left = [uploaded.u0, command.flipY ? uploaded.v0 : uploaded.v1];
+      let bottom_right = [uploaded.u1, command.flipY ? uploaded.v0 : uploaded.v1];
       if (command.rotateCounterClockwise) {
         [top_left, top_right, bottom_left, bottom_right] = [top_right, bottom_right, top_left, bottom_left];
       }
@@ -214,17 +225,30 @@ export class WebGlSpriteGraphics {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
-    const texture = this.textures.get(sprite);
-    if (!texture) throw new Error("Gameplay sprite texture was not uploaded");
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindTexture(gl.TEXTURE_2D, uploaded.texture);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / VERTEX_FLOATS);
     this.draw_calls += 1;
   }
 
   get drawCallCount(): number { return this.draw_calls; }
 
-  private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand): void {
+  private addAtlasOverlay(overlay: HTMLCanvasElement): void {
+    if (!this.canvas.parentElement) return;
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.width = "100vw";
+    overlay.style.height = "100vh";
+    overlay.style.objectFit = "contain";
+    overlay.style.zIndex = "10000";
+    overlay.style.pointerEvents = "none";
+    overlay.style.background = "rgba(0, 0, 0, 0.75)";
+    overlay.style.imageRendering = "pixelated";
+    this.canvas.parentElement.append(overlay);
+    this.atlas_overlays.push(overlay);
+  }
+
+  private addCircularProgressVertices(vertices: number[], command: SpriteDrawCommand, uploaded: UploadedSprite): void {
     const progress = Math.max(-1, Math.min(1, command.circularProgress ?? 0));
     if (progress === 0) return;
     const center_x = command.x + command.width / 2;
@@ -237,7 +261,9 @@ export class WebGlSpriteGraphics {
     const segments = 40;
     const step = Math.PI * 2 / segments;
     const color = command.color;
-    const vertex = (x: number, y: number) => vertices.push(x, y, 0.5, 0.5, ...color);
+    const vertex = (x: number, y: number) => vertices.push(x, y,
+      uploaded.u0 + (x - command.x) / command.width * (uploaded.u1 - uploaded.u0),
+      uploaded.v0 + (y - command.y) / command.height * (uploaded.v1 - uploaded.v0), ...color);
     for (let angle = angle_min; angle < angle_max;) {
       const next = Math.min(angle + step, angle_max);
       vertex(center_x, center_y);

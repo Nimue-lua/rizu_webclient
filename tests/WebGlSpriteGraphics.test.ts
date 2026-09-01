@@ -22,13 +22,14 @@ function createGl() {
     draw_textures: [] as object[],
     uploaded_vertices: [] as Float32Array[],
     current_texture: null as object | null,
+    uploaded_images: [] as object[],
   };
   const handle = () => ({ id: ++id });
   const gl = {
     VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4,
     ARRAY_BUFFER: 5, FLOAT: 6, UNPACK_PREMULTIPLY_ALPHA_WEBGL: 7, TEXTURE0: 8,
     TEXTURE_2D: 9, TEXTURE_MIN_FILTER: 10, LINEAR: 11, TEXTURE_MAG_FILTER: 12,
-    TEXTURE_WRAP_S: 13, CLAMP_TO_EDGE: 14, TEXTURE_WRAP_T: 15, RGBA8: 16,
+    TEXTURE_WRAP_S: 13, CLAMP_TO_EDGE: 14, TEXTURE_WRAP_T: 15, RGBA8: 16, MAX_TEXTURE_SIZE: 25,
     RGBA: 17, UNSIGNED_BYTE: 18, NO_ERROR: 0, BLEND: 19, ONE: 20,
     ONE_MINUS_SRC_ALPHA: 21, COLOR_BUFFER_BIT: 22, DYNAMIC_DRAW: 23, TRIANGLES: 24,
     createShader: handle, shaderSource() {}, compileShader() {}, getShaderParameter: () => true,
@@ -41,7 +42,8 @@ function createGl() {
     enableVertexAttribArray() {}, vertexAttribPointer() {}, pixelStorei() {}, activeTexture() {},
     createTexture() { const texture = handle(); calls.created_textures.push(texture); return texture; },
     bindTexture(_target: number, texture: object | null) { calls.current_texture = texture; },
-    texParameteri() {}, texImage2D() {}, getError: () => 0,
+    texParameteri() {}, texImage2D(...args: unknown[]) { calls.uploaded_images.push(args.at(-1) as object); },
+    getParameter: () => 4096, getError: () => 0,
     deleteTexture(texture: object) { calls.deleted_textures.push(texture); }, enable() {}, blendFunc() {},
     viewport() {}, clearColor() {}, clear() {}, useProgram() {}, uniform2f() {}, uniform1i() {},
     bufferData(_target: number, data: Float32Array) { calls.uploaded_vertices.push(data); },
@@ -50,12 +52,27 @@ function createGl() {
   return { gl, calls };
 }
 
+function installCanvasStub() {
+  const original_document = globalThis.document;
+  const canvases: object[] = [];
+  Object.defineProperty(globalThis, "document", { configurable: true, value: {
+    createElement: () => {
+      const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }) };
+      canvases.push(canvas);
+      return canvas;
+    },
+  } });
+  return { canvases, restore: () => Object.defineProperty(globalThis, "document",
+    { configurable: true, value: original_document }) };
+}
+
 function command(sprite: Sprite, batch?: string): SpriteDrawCommand {
   return { x: 0, y: 0, width: 10, height: 10, color: [1, 1, 1, 1], sprite,
     flipY: false, rotateCounterClockwise: false, rotationRadians: 0, batch };
 }
 
-test("uploads aliased sprites once and destroys every GPU resource once", () => {
+test("displays the atlas but uploads aliased gameplay sprites only once", () => {
+  const dom = installCanvasStub();
   const sprite = createSprite("shared");
   const fake = createGl();
   const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
@@ -63,15 +80,18 @@ test("uploads aliased sprites once and destroys every GPU resource once", () => 
   const graphics = new WebGlSpriteGraphics(canvas, { sprites: { first: sprite, alias: sprite } }, () => 1);
 
   assert.equal(fake.calls.created_textures.length, 1);
+  assert.equal(fake.calls.uploaded_images[0], sprite.image);
   graphics.destroy();
   graphics.destroy();
   assert.equal(fake.calls.deleted_textures.length, 1);
   assert.equal(fake.calls.deleted_buffers, 1);
   assert.equal(fake.calls.deleted_vertex_arrays, 1);
   assert.equal(fake.calls.deleted_programs, 1);
+  dom.restore();
 });
 
 test("rotates sprite geometry around its center by an arbitrary angle", () => {
+  const dom = installCanvasStub();
   const sprite = createSprite("rotated");
   const fake = createGl();
   const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
@@ -83,9 +103,11 @@ test("rotates sprite geometry around its center by an arbitrary angle", () => {
   assert.ok(Math.abs(vertices[1]! - 15) < 1e-9);
   assert.ok(Math.abs(vertices[8]! - 25) < 1e-9);
   assert.ok(Math.abs(vertices[9]! - 35) < 1e-9);
+  dom.restore();
 });
 
-test("preserves unbatched order and groups sprites only within a contiguous batch", () => {
+test("preserves sprite order without using the atlas for gameplay", () => {
+  const dom = installCanvasStub();
   const first = createSprite("first");
   const second = createSprite("second");
   const fake = createGl();
@@ -97,5 +119,24 @@ test("preserves unbatched order and groups sprites only within a contiguous batc
   graphics.submit([command(first), command(second), command(first, "notes"), command(second, "notes"),
     command(first, "notes"), command(second)]);
 
-  assert.deepEqual(fake.calls.draw_textures, [first_texture, second_texture, first_texture, second_texture, second_texture]);
+  assert.deepEqual(fake.calls.draw_textures,
+    [first_texture, second_texture, first_texture, second_texture, first_texture, second_texture]);
+  dom.restore();
+});
+
+test("uses full texture UVs for gameplay sprites", () => {
+  const dom = installCanvasStub();
+  const sprite = createSprite("uv");
+  const fake = createGl();
+  const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
+    getContext: () => fake.gl } as unknown as HTMLCanvasElement;
+  const graphics = new WebGlSpriteGraphics(canvas, { sprites: { sprite } }, () => 1);
+
+  graphics.submit([command(sprite)]);
+
+  const vertices = fake.calls.uploaded_vertices[0]!;
+  assert.equal(vertices[2], 0);
+  assert.equal(vertices[3], 0);
+  assert.equal(vertices[10], 1);
+  dom.restore();
 });
