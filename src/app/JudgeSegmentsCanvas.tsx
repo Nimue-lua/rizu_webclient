@@ -64,7 +64,8 @@ void main() {
   }
 
   float coverage = ring_mask * gap_mask * segment_color.a;
-  out_color = vec4(mix(u_panel_color, segment_color.rgb, coverage), 1.0);
+  vec3 color = mix(u_panel_color, segment_color.rgb, coverage);
+  out_color = vec4(color * outer_mask, outer_mask);
 }`;
 
 function calculateThresholds(judges: readonly number[]): Float32Array | null {
@@ -128,7 +129,7 @@ export function JudgeSegmentsCanvas({ judges, judge_names }: {
     const pixel_ratio = window.devicePixelRatio || 1;
     canvas.width = Math.round(canvas.clientWidth * pixel_ratio);
     canvas.height = Math.round(canvas.clientHeight * pixel_ratio);
-    const gl = canvas.getContext("webgl2", { alpha: true, antialias: true });
+    const gl = canvas.getContext("webgl2", { alpha: true, antialias: true, premultipliedAlpha: true });
     if (!gl) return;
 
     const vertex_shader = compileShader(gl, gl.VERTEX_SHADER, vertex_shader_source);
