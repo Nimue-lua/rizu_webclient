@@ -49,6 +49,8 @@ export function SettingsScreen({
   const scroll_speed = useSetting(settings.scroll_speed);
   const scroll_speed_type = useSetting(settings.scroll_speed_type);
   const cursor_scale = useSetting(settings.cursor_scale);
+  const hit_error_meter = useSetting(settings.hit_error_meter);
+  const hit_error_meter_scale = useSetting(settings.hit_error_meter_scale);
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
   const hit_registration = useSetting(settings.mania_hit_registration);
@@ -248,6 +250,21 @@ export function SettingsScreen({
                   <option value="webgl">WebGL cursor</option>
                 </select>
               </label>
+              <label className="settings-checkbox-control">
+                <input type="checkbox" checked={hit_error_meter}
+                  onChange={(event) => appSettings.set(settings.hit_error_meter, event.target.checked)} />
+                <span aria-hidden="true" />
+                <strong>Enable hit error meter</strong>
+              </label>
+              <div className="settings-control settings-slider-control">
+                <div className="config-control-label"><ConfigResetButton label="Reset Hit error meter scale to default"
+                  onReset={() => appSettings.set(settings.hit_error_meter_scale, settings.hit_error_meter_scale.default)} />
+                  <label htmlFor="settings-hit-error-meter-scale">Hit error meter scale&nbsp;&nbsp;
+                    <output>{hit_error_meter_scale.toFixed(2)}x</output></label></div>
+                <RangeInput id="settings-hit-error-meter-scale" min={0.5} max={2} step={0.05}
+                  value={hit_error_meter_scale} style={sliderStyle(hit_error_meter_scale, 0.5, 2)}
+                  onValueChange={(value) => appSettings.set(settings.hit_error_meter_scale, value)} />
+              </div>
           </section>
 
           <section className="settings-section" id="settings-online">

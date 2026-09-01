@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { ConfigStorage } from "../src/config/Config";
+import { createSettingsConfig, settings } from "../src/config/Settings";
+
+test("persists hit error meter visibility and scale", () => {
+  let stored: string | null = null;
+  const storage: ConfigStorage = {
+    getItem: () => stored,
+    setItem: (_key, value) => { stored = value; },
+    removeItem: () => { stored = null; },
+  };
+  const config = createSettingsConfig(storage);
+  assert.equal(config.get(settings.hit_error_meter), true);
+  assert.equal(config.get(settings.hit_error_meter_scale), 1);
+  config.set(settings.hit_error_meter, false);
+  config.set(settings.hit_error_meter_scale, 2);
+  assert.deepEqual(JSON.parse(stored!), {
+    version: 1,
+    values: {
+      "renderer.hit_error_meter.enabled": false,
+      "renderer.hit_error_meter.scale": 2,
+    },
+  });
+});
+
+test("limits hit error meter scale to 0.5x through 2x", () => {
+  const config = createSettingsConfig();
+  config.set(settings.hit_error_meter_scale, 0.5);
+  config.set(settings.hit_error_meter_scale, 2);
+  assert.throws(() => config.set(settings.hit_error_meter_scale, 0.49), /Invalid value/);
+  assert.throws(() => config.set(settings.hit_error_meter_scale, 2.01), /Invalid value/);
+});

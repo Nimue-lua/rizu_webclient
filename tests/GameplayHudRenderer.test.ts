@@ -96,3 +96,36 @@ test("hides the hit error meter after stable's four second delay and fade", () =
       { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
   assert.equal(draws, 0);
 });
+
+test("does not draw the hit error meter when disabled", () => {
+  let draws = 0;
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: sprite("white") }, () => draws += 1,
+    { enabled: false, scale: 1 })
+    .drawHitErrorMeter({ windows: [0.05, 0.1, 0.15], ticks: [], floatingError: 0, age: 0 },
+      { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.equal(draws, 0);
+});
+
+test("scales all hit error meter geometry", () => {
+  const fill = sprite("white", 1, 1);
+  const arrow = sprite("editor-rate-arrow", 10, 20);
+  const drawAtScale = (scale: number) => {
+    const draws: Array<{ x: number; y: number; width: number; height: number }> = [];
+    new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: fill, hitErrorArrow: arrow },
+      (x, y, width, height) => draws.push({ x, y, width, height }), { enabled: true, scale })
+      .drawHitErrorMeter({
+        windows: [0.05, 0.1, 0.15], ticks: [{ deltaTime: 0, age: 0 }], floatingError: 0, age: 0,
+      }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+    return draws;
+  };
+  const half = drawAtScale(0.5);
+  const double = drawAtScale(2);
+  assert.equal(half[0]?.width, 192);
+  assert.equal(double[0]?.width, 768);
+  assert.equal(half[5]?.width, 1.5);
+  assert.equal(double[5]?.width, 6);
+  assert.equal(half[6]?.width, 3);
+  assert.equal(double[6]?.width, 12);
+  assert.equal(half[0]?.y, 469.32);
+  assert.equal(double[0]?.y, 437.28);
+});

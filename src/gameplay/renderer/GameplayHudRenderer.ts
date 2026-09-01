@@ -17,8 +17,14 @@ export interface HudAssets {
   readonly hitErrorArrow?: Sprite;
 }
 
+export interface HitErrorMeterOptions {
+  readonly enabled: boolean;
+  readonly scale: number;
+}
+
 export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
-  constructor(private readonly assets: HudAssets, private readonly write: SpriteQuadWriter) {}
+  constructor(private readonly assets: HudAssets, private readonly write: SpriteQuadWriter,
+    private readonly hit_error_options: HitErrorMeterOptions = { enabled: true, scale: 1 }) {}
 
   drawScore(hud: HudState, layout: HudLayout): void {
     if (!this.assets.scoreGlyphs) return;
@@ -58,6 +64,7 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
   }
 
   drawHitErrorMeter(state: HitErrorMeterState, layout: HudLayout): void {
+    if (!this.hit_error_options.enabled) return;
     const fill = this.assets.hitErrorFill;
     const windows = state.windows;
     if (!fill || !windows || state.age >= 4.6) return;
@@ -65,9 +72,10 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
     const range = windows[2];
     if (!(range > 0)) return;
     const center_x = layout.width / 2;
-    const center_y = layout.height - 6;
-    const width = range * 1000 * 1.6;
-    const bar_height = 4.8;
+    const scale = this.hit_error_options.scale;
+    const center_y = layout.height - 6 * scale;
+    const width = range * 1000 * 1.6 * scale;
+    const bar_height = 4.8 * scale;
     const color300 = [50 / 255, 188 / 255, 231 / 255, alpha] as const;
     const color100 = [87 / 255, 227 / 255, 19 / 255, alpha] as const;
     const color50 = [218 / 255, 174 / 255, 70 / 255, alpha] as const;
@@ -79,19 +87,19 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
     draw_centered(width, bar_height, color50);
     draw_centered(windows[1] / range * width, bar_height, color100);
     draw_centered(windows[0] / range * width, bar_height, color300);
-    draw_centered(2.4, bar_height * 4, [1, 1, 1, alpha]);
+    draw_centered(2.4 * scale, bar_height * 4, [1, 1, 1, alpha]);
     for (const tick of state.ticks) {
       const tick_alpha = 0.4 * Math.max(0, 1 - tick.age / 10) * alpha;
       const error = Math.abs(tick.deltaTime);
       const color = error < windows[0] ? color300 : error < windows[1] ? color100 : color50;
-      this.write(center_x + tick.deltaTime / range * width / 2 - 1.5, center_y - bar_height * 2,
-        3, bar_height * 4, [color[0], color[1], color[2], tick_alpha], fill,
+      this.write(center_x + tick.deltaTime / range * width / 2 - 1.5 * scale, center_y - bar_height * 2,
+        3 * scale, bar_height * 4, [color[0], color[1], color[2], tick_alpha], fill,
         false, undefined, false, 0, undefined, true);
     }
     const arrow = this.assets.hitErrorArrow;
     if (arrow) {
-      const arrow_width = arrow.sourceSize.w * 0.6;
-      const arrow_height = arrow.sourceSize.h * 0.6;
+      const arrow_width = arrow.sourceSize.w * 0.6 * scale;
+      const arrow_height = arrow.sourceSize.h * 0.6 * scale;
       const arrow_x = center_x + state.floatingError / range * width / 2;
       this.write(arrow_x - arrow_width / 2, center_y - 3 - arrow_height,
         arrow_width, arrow_height, [1, 1, 1, alpha], arrow);

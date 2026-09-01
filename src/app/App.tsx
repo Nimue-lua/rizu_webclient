@@ -93,6 +93,8 @@ export function App() {
   const music_offset = useSetting(settings.music_offset);
   const scroll_speed = useSetting(settings.scroll_speed);
   const cursor_scale = useSetting(settings.cursor_scale);
+  const hit_error_meter = useSetting(settings.hit_error_meter);
+  const hit_error_meter_scale = useSetting(settings.hit_error_meter_scale);
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
   const hit_registration = useSetting(settings.mania_hit_registration);
@@ -339,6 +341,8 @@ export function App() {
             music_offset={music_offset}
             scroll_speed={scroll_speed}
             cursor_scale={cursor_scale}
+            hit_error_meter={hit_error_meter}
+            hit_error_meter_scale={hit_error_meter_scale}
             osu_cursor_renderer={osu_cursor_renderer}
             osu_raw_input={osu_raw_input}
             replay_base={replay_base}

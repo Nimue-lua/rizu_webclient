@@ -198,7 +198,7 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
   };
   const playback = options.playback ?? (options.autoplay ? createManiaAutoplayReplay(data.chart, replay.tap_only) : undefined);
   const runtime = new ManiaGameplayRuntime({} as HTMLCanvasElement, data, 0.6, options.offset ?? 0, 2,
-    replay, ["KeyA"], "earliest", (completed, reached_end) => {
+    true, 1, replay, ["KeyA"], "earliest", (completed, reached_end) => {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       scores.push(completed.score);

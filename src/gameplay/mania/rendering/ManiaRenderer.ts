@@ -8,6 +8,7 @@ import type { NoteSkin } from "../../../noteskin/NoteSkin";
 import type { SpriteDrawCommand } from "../../renderer/Sprite";
 import { WebGlSpriteGraphics } from "../../renderer/WebGlSpriteGraphics";
 import type { GameplayRenderStats } from "../../renderer/GameplayRenderStats";
+import type { HitErrorMeterOptions } from "../../renderer/GameplayHudRenderer";
 
 export class ManiaRenderer {
   private readonly playfield: ManiaPlayfieldRenderer;
@@ -16,7 +17,8 @@ export class ManiaRenderer {
   private readonly hud: GameplayHudRenderer;
   private active_commands: SpriteDrawCommand[] | null = null;
 
-  constructor(canvas: HTMLCanvasElement, private readonly skin: NoteSkin, hud?: GameplayHudRenderer) {
+  constructor(canvas: HTMLCanvasElement, private readonly skin: NoteSkin, hud?: GameplayHudRenderer,
+    hit_error_options?: HitErrorMeterOptions) {
     this.playfield = new ManiaPlayfieldRenderer(skin);
     this.overlay = new ManiaOverlayRenderer({ sprites: skin.sprites, judgments: skin.config.judgments,
       comboGlyphs: skin.config.comboGlyphs, comboOverlap: skin.config.comboOverlap });
@@ -24,7 +26,8 @@ export class ManiaRenderer {
     this.hud = hud ?? new SpriteGameplayHudRenderer({ sprites: skin.sprites,
       scoreGlyphs: skin.config.scoreGlyphs, scoreOverlap: skin.config.scoreOverlap,
       progressOverlay: skin.sprites.circularmetre, progressFill: skin.sprites.__white,
-      hitErrorFill: skin.sprites.__white, hitErrorArrow: skin.sprites["editor-rate-arrow"] }, this.writeHudCommand);
+      hitErrorFill: skin.sprites.__white, hitErrorArrow: skin.sprites["editor-rate-arrow"] }, this.writeHudCommand,
+      hit_error_options);
   }
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {

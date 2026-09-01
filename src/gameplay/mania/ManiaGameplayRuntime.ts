@@ -26,7 +26,8 @@ export interface ManiaGameplayRuntimeDependencies {
   request_animation_frame: (callback: FrameRequestCallback) => number;
   cancel_animation_frame: (handle: number) => void;
   performance_now: () => number;
-  create_renderer: (canvas: HTMLCanvasElement, data: ManiaGameplayData) => ManiaRenderer;
+  create_renderer: (canvas: HTMLCanvasElement, data: ManiaGameplayData,
+    hit_error_meter: boolean, hit_error_meter_scale: number) => ManiaRenderer;
 }
 
 function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
@@ -35,7 +36,8 @@ function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
     request_animation_frame: (callback) => window.requestAnimationFrame(callback),
     cancel_animation_frame: (handle) => window.cancelAnimationFrame(handle),
     performance_now: () => performance.now(),
-    create_renderer: (canvas, data) => new WebGlManiaRenderer(canvas, data.note_skin),
+    create_renderer: (canvas, data, hit_error_meter, hit_error_meter_scale) =>
+      new WebGlManiaRenderer(canvas, data.note_skin, undefined, { enabled: hit_error_meter, scale: hit_error_meter_scale }),
   };
 }
 
@@ -71,7 +73,8 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private background_state: GameplayBackgroundState | null = null;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
-    scroll_speed: number, replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
+    scroll_speed: number, hit_error_meter: boolean, hit_error_meter_scale: number,
+    replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
     finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
     private readonly playback_replay?: ManiaRecordedReplay,
@@ -95,7 +98,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
       : { timings: replay_base.timings, subtimings: replay_base.subtimings };
     this.rules_engine = new ManiaRulesEngine(data.chart, hit_registration, this.music_rate, replay_base.const,
       replay_base.tap_only, timing_identity);
-    this.renderer = dependencies.create_renderer(canvas, data);
+    this.renderer = dependencies.create_renderer(canvas, data, hit_error_meter, hit_error_meter_scale);
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,
       audio_buffer: data.audio_buffer,

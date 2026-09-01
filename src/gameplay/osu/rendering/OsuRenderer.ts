@@ -1,7 +1,7 @@
 import type { OsuChart } from "../../../chart/Chart";
 import type { GameplayPresentationState } from "../../HudState";
 import { getGameplayHudLayout, type GameplayHudRenderer } from "../../GameplayHudRenderer";
-import { SpriteGameplayHudRenderer } from "../../renderer/GameplayHudRenderer";
+import { SpriteGameplayHudRenderer, type HitErrorMeterOptions } from "../../renderer/GameplayHudRenderer";
 import { OsuComboRenderer } from "./OsuComboRenderer";
 import { OsuPlayfieldRenderer } from "./OsuPlayfieldRenderer";
 import type { OsuStandardSkin } from "../../../noteskin/osu/OsuSkin";
@@ -49,7 +49,8 @@ export class OsuRenderer implements OsuGameplayRenderer {
 
   constructor(canvas: HTMLCanvasElement, skin: OsuStandardSkin, hud?: GameplayHudRenderer,
     x_flip = false, y_flip = false, cursor_scale = 1, draw_cursor = true,
-    chart?: OsuChart, prepared_slider_paths?: ReadonlyMap<OsuSlider, OsuSliderPath>) {
+    chart?: OsuChart, prepared_slider_paths?: ReadonlyMap<OsuSlider, OsuSliderPath>,
+    hit_error_options?: HitErrorMeterOptions) {
     this.skin = skin;
     this.x_flip = x_flip;
     this.y_flip = y_flip;
@@ -59,7 +60,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.combo = new OsuComboRenderer(skin);
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
     this.slider_graphics = new WebGlSliderGraphics(canvas);
-    this.hud = hud ?? new SpriteGameplayHudRenderer(skin, this.writeHudCommand);
+    this.hud = hud ?? new SpriteGameplayHudRenderer(skin, this.writeHudCommand, hit_error_options);
     if (chart && prepared_slider_paths) this.prepareSliders(chart, prepared_slider_paths);
   }
 
