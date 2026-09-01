@@ -13,6 +13,7 @@ test("derives immutable HUD snapshots from shared score results", () => {
     comboAnimationFrom: 0,
     judgment: "perfect",
     judgmentAge: 0,
+    hitErrorMeter: { windows: null, ticks: [], floatingError: 0, age: Infinity },
   });
   const second = deriver.update({ score: 1234, combo: 12, accuracy: 0.985, last_judge: "perfect",
     judges: { perfect: 1 } }, 1.1);
@@ -40,6 +41,23 @@ test("defaults unavailable score capabilities without displaying a judgment", ()
   assert.equal(state.hud.accuracy, 0);
   assert.equal(state.judgment, null);
   assert.equal(state.judgmentAge, Infinity);
+  assert.deepEqual(state.hitErrorMeter, { windows: null, ticks: [], floatingError: 0, age: Infinity });
+});
+
+test("retains each hit error once and expires ticks after ten seconds", () => {
+  const deriver = new HudStateDeriver();
+  const hit_error = { sequence: 1, delta_time: 0.05, windows: [0.02, 0.06, 0.1] as const };
+  const first = deriver.update({ hit_error }, 1);
+  assert.deepEqual(first.hitErrorMeter.windows, [0.02, 0.06, 0.1]);
+  assert.deepEqual(first.hitErrorMeter.ticks, [{ deltaTime: 0.05, age: 0 }]);
+  assert.equal(first.hitErrorMeter.floatingError, 0);
+  assert.equal(first.hitErrorMeter.age, 0);
+  const moving = deriver.update({ hit_error }, 1.4);
+  assert.ok(Math.abs(moving.hitErrorMeter.floatingError - 0.0075) < 1e-12);
+  const same = deriver.update({ hit_error }, 2);
+  assert.equal(same.hitErrorMeter.ticks.length, 1);
+  assert.ok(Math.abs(same.hitErrorMeter.floatingError - 0.01) < 1e-12);
+  assert.deepEqual(deriver.update({ hit_error }, 11).hitErrorMeter.ticks, []);
 });
 
 test("restarts combo animation only when combo increases", () => {

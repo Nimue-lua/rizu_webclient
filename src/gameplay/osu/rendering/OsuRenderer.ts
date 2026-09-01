@@ -89,6 +89,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
       8, frame.logical_height - 8, this.writeCommand);
     this.hud.drawScore(state.hud, getGameplayHudLayout(frame.logical_width));
     this.hud.drawProgress(progress, getGameplayHudLayout(frame.logical_width));
+    this.hud.drawHitErrorMeter(state.hitErrorMeter, getGameplayHudLayout(frame.logical_width));
     if (this.draw_cursor) {
       const cursor_center = viewport.playfieldToScreen(cursor.position);
       const cursor_scale = this.cursor_scale * (cursor.primary || cursor.secondary ? 0.9 : 1);
@@ -149,9 +150,10 @@ export class OsuRenderer implements OsuGameplayRenderer {
 
   private readonly writeHudCommand = (x: number, y: number, width: number, height: number,
     color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
-    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number) => {
+    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number,
+    additive?: boolean) => {
     this.active_commands?.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
       rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0,
-      circularProgress: circular_progress, batch });
+      circularProgress: circular_progress, additive, batch });
   };
 }

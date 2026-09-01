@@ -1,8 +1,8 @@
-import { isAccuracySource, isComboSource, isGradeSource, isJudgesSource, isScoreSource,
+import { isAccuracySource, isComboSource, isGradeSource, isHitErrorSource, isJudgesSource, isScoreSource,
   type IAccuracySource, type IComboSource, type IGradeSource, type IJudgesSource,
-  type IScoreSource } from "./ScoreSources";
+  type IHitErrorSource, type IScoreSource } from "./ScoreSources";
 import type { ScoreSystem } from "./ScoreSystem";
-import type { ScoreResult } from "./ScoreResult";
+import type { HitErrorResult, ScoreResult } from "./ScoreResult";
 
 export class ScoreEngine<Event> {
   private score_source?: IScoreSource;
@@ -10,8 +10,11 @@ export class ScoreEngine<Event> {
   private grade_source?: IGradeSource;
   private combo_source?: IComboSource;
   private judges_source?: IJudgesSource;
+  private hit_error_source?: IHitErrorSource;
   private latest_result: ScoreResult;
   readonly results: ScoreResult[] = [];
+  private hit_error_sequence = 0;
+  private latest_hit_error?: HitErrorResult;
 
   constructor(private readonly systems: readonly ScoreSystem<Event>[]) {
     for (const system of systems) {
@@ -20,12 +23,15 @@ export class ScoreEngine<Event> {
       if (isGradeSource(system)) this.grade_source = system;
       if (isComboSource(system)) this.combo_source = system;
       if (isJudgesSource(system)) this.judges_source = system;
+      if (isHitErrorSource(system)) this.hit_error_source = system;
     }
     this.latest_result = this.createResult();
   }
 
   receive(event: Event): void {
     for (const system of this.systems) system.receive(event);
+    const hit_error = this.hit_error_source?.getHitError();
+    if (hit_error) this.latest_hit_error = Object.freeze({ ...hit_error, sequence: ++this.hit_error_sequence });
     this.latest_result = this.createResult();
     this.results.push(this.latest_result);
   }
@@ -52,6 +58,7 @@ export class ScoreEngine<Event> {
       result.judges = Object.freeze(judges);
       result.last_judge = this.judges_source.getLastJudge();
     }
+    if (this.latest_hit_error) result.hit_error = this.latest_hit_error;
     return Object.freeze(result);
   }
 }

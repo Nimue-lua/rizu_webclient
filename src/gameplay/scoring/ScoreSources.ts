@@ -21,6 +21,10 @@ export interface IJudgesSource {
   getLastJudge(): string | null;
 }
 
+export interface IHitErrorSource {
+  getHitError(): Omit<HitErrorResult, "sequence"> | null;
+}
+
 function hasMethod(value: object, method: string): boolean {
   return method in value && typeof (value as Record<string, unknown>)[method] === "function";
 }
@@ -44,3 +48,8 @@ export function isComboSource(value: object): value is IComboSource {
 export function isJudgesSource(value: object): value is IJudgesSource {
   return "judge_names" in value && hasMethod(value, "getJudges") && hasMethod(value, "getLastJudge");
 }
+
+export function isHitErrorSource(value: object): value is IHitErrorSource {
+  return hasMethod(value, "getHitError");
+}
+import type { HitErrorResult } from "./ScoreResult";

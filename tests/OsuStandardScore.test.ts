@@ -64,6 +64,19 @@ test("stores immutable score snapshots only when score events are received", () 
   assert.equal(Object.isFrozen(second.judges), true);
 });
 
+test("exposes successful circle and slider-head timing errors", () => {
+  const timings = createOsuStandardTimingValues(5);
+  const engine = new ScoreEngine([new OsuStandardScore(timings, 1)]);
+  engine.receive(hit(-0.04));
+  assert.deepEqual(engine.getResult().hit_error, {
+    sequence: 1, delta_time: -0.04, windows: [0.05, 0.1, 0.15],
+  });
+  engine.receive({ kind: "slider-head", object_index: 1, time: 2, delta_time: 0.08, successful: false });
+  assert.equal(engine.getResult().hit_error?.sequence, 1);
+  engine.receive({ kind: "slider-head", object_index: 2, time: 3, delta_time: 0.08, successful: true });
+  assert.equal(engine.getResult().hit_error?.sequence, 2);
+});
+
 test("uses stable osu standard grades", () => {
   const perfect = new OsuStandardScore(createOsuStandardTimingValues(5), 1);
   perfect.receive(hit(0));

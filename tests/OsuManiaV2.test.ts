@@ -37,6 +37,13 @@ test("scores release deltas after tail normalization", () => {
     miss: 1,
   });
   assert.ok(Math.abs(score.getResult().accuracy! - 600 / 915) < 1e-12);
+  assert.deepEqual(score.results[0]?.hit_error, {
+    sequence: 1, delta_time: 0.03, windows: [0.049, 0.112, 0.136],
+  });
+  assert.deepEqual(score.results[1]?.hit_error, {
+    sequence: 2, delta_time: 0.06, windows: [0.073, 0.168, 0.204],
+  });
+  assert.equal(score.getResult().hit_error?.sequence, 2);
 });
 
 test("exposes only capabilities implemented by selected systems", () => {

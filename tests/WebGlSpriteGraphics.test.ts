@@ -24,6 +24,7 @@ function createGl() {
     buffer_allocations: [] as number[],
     current_texture: null as object | null,
     uploaded_images: [] as object[],
+    blend_functions: [] as Array<readonly [number, number]>,
   };
   const handle = () => ({ id: ++id });
   const gl = {
@@ -45,7 +46,8 @@ function createGl() {
     bindTexture(_target: number, texture: object | null) { calls.current_texture = texture; },
     texParameteri() {}, texImage2D(...args: unknown[]) { calls.uploaded_images.push(args.at(-1) as object); },
     getParameter: () => 4096, getError: () => 0,
-    deleteTexture(texture: object) { calls.deleted_textures.push(texture); }, enable() {}, blendFunc() {},
+    deleteTexture(texture: object) { calls.deleted_textures.push(texture); }, enable() {},
+    blendFunc(source: number, destination: number) { calls.blend_functions.push([source, destination]); },
     viewport() {}, clearColor() {}, clear() {}, useProgram() {}, uniform2f() {}, uniform1i() {},
     bufferData(_target: number, size: number) { calls.buffer_allocations.push(size); },
     bufferSubData(_target: number, _offset: number, data: Float32Array, source_offset: number, length: number) {
@@ -149,6 +151,21 @@ test("batches ordered sprite commands that share an atlas", () => {
   assert.equal(graphics.commandCount, 6);
   assert.equal(graphics.vertexCount, 36);
   assert.equal(graphics.bufferUploadCount, 1);
+  dom.restore();
+});
+
+test("uses additive blending only for additive command batches", () => {
+  const dom = installCanvasStub();
+  const sprite = createSprite("blended");
+  const fake = createGl();
+  const canvas = { clientWidth: 100, clientHeight: 100, width: 0, height: 0,
+    getContext: () => fake.gl } as unknown as HTMLCanvasElement;
+  const graphics = new WebGlSpriteGraphics(canvas, { sprites: { sprite } }, () => 1);
+
+  graphics.submit([command(sprite), { ...command(sprite), additive: true }, command(sprite)]);
+
+  assert.deepEqual(fake.calls.blend_functions.slice(-4), [[20, 21], [20, 21], [20, 20], [20, 21]]);
+  assert.equal(graphics.drawCallCount, 3);
   dom.restore();
 });
 

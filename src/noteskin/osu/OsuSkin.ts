@@ -40,6 +40,8 @@ export interface OsuStandardSkin extends SpriteSkin {
   readonly hpFill: Sprite;
   readonly progressOverlay: Sprite;
   readonly progressFill: Sprite;
+  readonly hitErrorFill: Sprite;
+  readonly hitErrorArrow?: Sprite;
   readonly scoreGlyphs: Readonly<Record<string, string>>;
   readonly comboGlyphs: Readonly<Record<string, string>>;
   readonly scoreOverlap: number;
@@ -278,14 +280,15 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
   const spinner_names = ["spinner-background", "spinner-circle", "spinner-metre", "spinner-approachcircle",
     "spinner-rpm", "spinner-top", "spinner-bottom", "spinner-middle"]
     .filter((name) => available.has(name) || defaults.has(name));
+  const hit_error_names = defaults.has("editor-rate-arrow") ? ["editor-rate-arrow"] : [];
   const names = [...new Set(["hitcircle", "hitcircleoverlay", "approachcircle", "reversearrow", "sliderfollowcircle",
     "sliderscorepoint", "scorebar-bg", "scorebar-colour", "circularmetre", cursor_name, slider_end_names.circle,
     ...slider_end_names.overlay ? [slider_end_names.overlay] : [],
-    ...slider_ball_names, ...spinner_names, ...follow_point_names,
+    ...slider_ball_names, ...spinner_names, ...follow_point_names, ...hit_error_names,
     ...Object.values(hit_circle_glyph_names), ...Object.values(scoreGlyphs),
     ...Object.values(comboGlyphs), ...Object.values(judgments).flat()])];
   const decoded = await Promise.all(names.map(async (name) => {
-    const file = available.get(name) ?? defaults.get(name);
+    const file = name === "editor-rate-arrow" ? defaults.get(name) : available.get(name) ?? defaults.get(name);
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
     const source = pngSize(file.bytes);
     const image = await createImageBitmap(new Blob([file.bytes as Uint8Array<ArrayBuffer>], { type: "image/png" }), {
@@ -352,6 +355,8 @@ export async function loadOsuStandardSkinUrl(url: string, audio_context: AudioCo
     hpFill: sprites["scorebar-colour"]!,
     progressOverlay: sprites.circularmetre!,
     progressFill: sprites.__white!,
+    hitErrorFill: sprites.__white!,
+    hitErrorArrow: sprites["editor-rate-arrow"],
     scoreGlyphs,
     comboGlyphs,
     scoreOverlap: numberValue(fonts, "ScoreOverlap", 0),
@@ -456,11 +461,11 @@ export async function loadOsuManiaSkin(files: Readonly<Record<string, Uint8Array
     ...Object.values(resolved_config.judgments).flat(),
     ...Object.values(resolved_config.scoreGlyphs), ...Object.values(resolved_config.comboGlyphs),
     ...[resolved_config.hpBackground, resolved_config.hpFill].filter((name): name is string => name !== undefined),
-    "circularmetre",
+    "circularmetre", ...defaults.has("editor-rate-arrow") ? ["editor-rate-arrow"] : [],
   ])];
   const decoded = await Promise.all(names.map(async (name) => {
     const normalized = name.replace(/\.(png|jpg|jpeg|bmp|tga)$/i, "").toLowerCase();
-    const file = available.get(normalized) ?? defaults.get(normalized);
+    const file = normalized === "editor-rate-arrow" ? defaults.get(normalized) : available.get(normalized) ?? defaults.get(normalized);
     if (!file) throw new Error(`Skin is missing sprite ${name}`);
     const source = pngSize(file.bytes);
     const scale = Math.min(1, MAX_TEXTURE_SIZE / source.width, MAX_TEXTURE_SIZE / source.height);

@@ -24,13 +24,13 @@ test("formats the actual score without truncating values over seven digits", () 
   const { sprites, glyphs } = createHud();
   new SpriteGameplayHudRenderer({ sprites, scoreGlyphs: glyphs, scoreOverlap: 0 },
     (_x, _y, _width, _height, _color, drawn) => names.push((drawn as Sprite & { name: string }).name))
-    .drawScore({ score: 12345678, accuracy: 100 }, { scoreRight: 848, scoreTop: 0 });
+    .drawScore({ score: 12345678, accuracy: 100 }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
   assert.deepEqual(names.slice(0, 8), [..."12345678"].map((digit) => `glyph-${digit}`));
 });
 
 test("tolerates skins without global HUD assets", () => {
   assert.doesNotThrow(() => new SpriteGameplayHudRenderer({ sprites: {} }, () => {})
-    .drawScore({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0 }));
+    .drawScore({ score: 0, accuracy: 0 }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 }));
 });
 
 test("draws the osu HP background and full HP fill at native HUD positions", () => {
@@ -48,7 +48,7 @@ test("draws the osu HP background and full HP fill at native HUD positions", () 
 });
 
 test("anchors the global HUD to the viewport instead of a letterboxed playfield", () => {
-  assert.deepEqual(getGameplayHudLayout(1280), { scoreRight: 1274, scoreTop: 0 });
+  assert.deepEqual(getGameplayHudLayout(1280), { scoreRight: 1274, scoreTop: 0, width: 1280, height: 480 });
 });
 
 test("draws green intro progress beneath the circular metre overlay", () => {
@@ -59,8 +59,40 @@ test("draws green intro progress beneath the circular metre overlay", () => {
   new SpriteGameplayHudRenderer({ sprites, scoreGlyphs: glyphs, progressFill: fill, progressOverlay: overlay },
     (_x, _y, _width, _height, color, drawn, _flip, _batch, _rotate, _radians, progress) => draws.push({
       name: (drawn as Sprite & { name: string }).name, color, progress,
-    })).drawProgress(-0.5, { scoreRight: 848, scoreTop: 0 });
+    })).drawProgress(-0.5, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
   assert.deepEqual(draws.map((draw) => draw.name), ["white", "circularmetre"]);
   assert.deepEqual(draws[0]?.color, [199 / 255, 1, 47 / 255, 0.6]);
   assert.equal(draws[0]?.progress, -0.5);
+});
+
+test("draws stable hit error bands, ticks, center, and smoothed arrow", () => {
+  const fill = sprite("white", 1, 1);
+  const arrow = sprite("editor-rate-arrow", 10, 20);
+  const draws: Array<{ x: number; y: number; width: number; height: number; name: string;
+    color: readonly number[]; additive?: boolean }> = [];
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: fill, hitErrorArrow: arrow },
+    (x, y, width, height, color, drawn, _flip, _batch, _rotate, _radians, _progress, additive) => draws.push({
+      x, y, width, height, color, additive, name: (drawn as Sprite & { name: string }).name,
+    })).drawHitErrorMeter({
+      windows: [0.05, 0.1, 0.15], ticks: [{ deltaTime: 0.075, age: 0 }], floatingError: 0.015, age: 0,
+    }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.deepEqual(draws.map((draw) => draw.name), ["white", "white", "white", "white", "white", "white", "editor-rate-arrow"]);
+  for (const [actual, expected] of draws.slice(0, 5).map((draw) => draw.width)
+    .map((width, index) => [width, [384, 240, 160, 80, 2.4][index]!] as const)) {
+    assert.ok(Math.abs(actual - expected) < 1e-12);
+  }
+  assert.equal(draws[5]?.x, 485.5);
+  assert.equal(draws[5]?.color[3], 0.4);
+  assert.equal(draws[5]?.additive, true);
+  assert.equal(draws[4]?.additive, undefined);
+  assert.equal(draws[6]?.x, 436);
+  assert.equal(draws[6]?.y, 459);
+});
+
+test("hides the hit error meter after stable's four second delay and fade", () => {
+  let draws = 0;
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: sprite("white") }, () => draws += 1)
+    .drawHitErrorMeter({ windows: [0.05, 0.1, 0.15], ticks: [], floatingError: 0, age: 4.6 },
+      { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.equal(draws, 0);
 });

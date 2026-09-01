@@ -1,7 +1,9 @@
 import type { OsuStandardJudgmentEvent } from "../OsuStandardJudgmentEvent";
 import type { OsuStandardTimingValues } from "../timing/OsuStandardOdTimings";
-import type { IAccuracySource, IComboSource, IGradeSource, IJudgesSource, IScoreSource } from "../../scoring/ScoreSources";
+import type { IAccuracySource, IComboSource, IGradeSource, IHitErrorSource, IJudgesSource,
+  IScoreSource } from "../../scoring/ScoreSources";
 import type { ScoreSystem } from "../../scoring/ScoreSystem";
+import type { HitErrorResult } from "../../scoring/ScoreResult";
 
 export const OSU_STANDARD_JUDGE_NAMES = ["300", "100", "50", "miss"] as const;
 export type OsuStandardJudge = typeof OSU_STANDARD_JUDGE_NAMES[number];
@@ -32,7 +34,7 @@ export function classifyOsuStandardJudgment(windows: OsuStandardTimingValues,
 }
 
 export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, IScoreSource,
-  IAccuracySource, IGradeSource, IComboSource, IJudgesSource {
+  IAccuracySource, IGradeSource, IComboSource, IJudgesSource, IHitErrorSource {
   readonly key = "osu_standard_v1";
   readonly judge_names = OSU_STANDARD_JUDGE_NAMES;
   private readonly judge_counts = OSU_STANDARD_JUDGE_NAMES.map(() => 0);
@@ -41,6 +43,7 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
   private combo = 0;
   private max_combo = 0;
   private last_judge_index: number | null = null;
+  private hit_error: Omit<HitErrorResult, "sequence"> | null = null;
 
   constructor(private readonly windows: OsuStandardTimingValues, difficulty_multiplier: number) {
     if (!Number.isInteger(difficulty_multiplier) || difficulty_multiplier < 0) {
@@ -50,7 +53,9 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
   }
 
   receive(event: OsuStandardJudgmentEvent): void {
+    this.hit_error = null;
     if (event.kind === "slider-head") {
+      if (event.successful) this.setHitError(event.delta_time);
       this.addSliderPoint(30, event.successful, true);
       return;
     }
@@ -64,6 +69,7 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
       else this.score += 100;
       return;
     }
+    if (event.kind === "hit" && Math.abs(event.delta_time) < this.windows.hit_50) this.setHitError(event.delta_time);
     const judge_index = OSU_STANDARD_JUDGE_NAMES.indexOf(classifyOsuStandardJudgment(this.windows, event));
     this.add(judge_index, event.kind !== "slider-end");
   }
@@ -106,6 +112,17 @@ export class OsuStandardScore implements ScoreSystem<OsuStandardJudgmentEvent>, 
 
   getLastJudge(): OsuStandardJudge | null {
     return this.last_judge_index === null ? null : OSU_STANDARD_JUDGE_NAMES[this.last_judge_index]!;
+  }
+
+  getHitError(): Omit<HitErrorResult, "sequence"> | null {
+    return this.hit_error;
+  }
+
+  private setHitError(delta_time: number): void {
+    this.hit_error = {
+      delta_time,
+      windows: [this.windows.hit_300, this.windows.hit_100, this.windows.hit_50],
+    };
   }
 
   private add(index: number, change_combo = true): void {

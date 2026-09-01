@@ -23,7 +23,8 @@ export class ManiaRenderer {
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
     this.hud = hud ?? new SpriteGameplayHudRenderer({ sprites: skin.sprites,
       scoreGlyphs: skin.config.scoreGlyphs, scoreOverlap: skin.config.scoreOverlap,
-      progressOverlay: skin.sprites.circularmetre, progressFill: skin.sprites.__white }, this.writeHudCommand);
+      progressOverlay: skin.sprites.circularmetre, progressFill: skin.sprites.__white,
+      hitErrorFill: skin.sprites.__white, hitErrorArrow: skin.sprites["editor-rate-arrow"] }, this.writeHudCommand);
   }
 
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number } {
@@ -57,6 +58,7 @@ export class ManiaRenderer {
     }, state, write);
     this.hud.drawScore(state.hud, getGameplayHudLayout(layout.width));
     this.hud.drawProgress(progress, getGameplayHudLayout(layout.width));
+    this.hud.drawHitErrorMeter(state.hitErrorMeter, getGameplayHudLayout(layout.width));
     this.active_commands = null;
     this.graphics.submit(commands);
     return {
@@ -78,9 +80,10 @@ export class ManiaRenderer {
 
   private readonly writeHudCommand = (x: number, y: number, width: number, height: number,
     color: readonly [number, number, number, number], sprite: SpriteDrawCommand["sprite"],
-    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number) => {
+    flip_y?: boolean, batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number,
+    additive?: boolean) => {
     this.active_commands?.push({ x, y, width, height, color, sprite, flipY: flip_y ?? false,
       rotateCounterClockwise: rotate_ccw ?? false, rotationRadians: rotation_radians ?? 0,
-      circularProgress: circular_progress, batch });
+      circularProgress: circular_progress, additive, batch });
   };
 }

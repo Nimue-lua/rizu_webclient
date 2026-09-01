@@ -1,7 +1,8 @@
 import { NoteState, type ManiaLogicEvent } from "../ManiaLogicEvent";
 import { createOsuManiaV2TimingPreset, type OsuManiaV2TimingPreset } from "../timing/OsuManiaV2Timings";
-import type { IAccuracySource, IGradeSource, IJudgesSource } from "../../scoring/ScoreSources";
+import type { IAccuracySource, IGradeSource, IHitErrorSource, IJudgesSource } from "../../scoring/ScoreSources";
 import type { ScoreSystem } from "../../scoring/ScoreSystem";
+import type { HitErrorResult } from "../../scoring/ScoreResult";
 
 export const OSU_MANIA_V2_JUDGE_NAMES = ["perfect", "great", "good", "ok", "meh", "miss"] as const;
 export type OsuManiaV2Judge = typeof OSU_MANIA_V2_JUDGE_NAMES[number];
@@ -9,13 +10,15 @@ export type OsuManiaV2Grade = "X" | "S" | "A" | "B" | "C" | "D";
 
 const JUDGE_WEIGHTS = [305, 300, 200, 100, 50, 0] as const;
 
-export class OsuManiaV2Score implements ScoreSystem<ManiaLogicEvent>, IAccuracySource, IGradeSource, IJudgesSource {
+export class OsuManiaV2Score implements ScoreSystem<ManiaLogicEvent>, IAccuracySource, IGradeSource,
+  IJudgesSource, IHitErrorSource {
   readonly key: string;
   readonly judge_names = OSU_MANIA_V2_JUDGE_NAMES;
   private readonly windows: readonly number[];
   private readonly tail_windows: readonly number[];
   private readonly judge_counts = OSU_MANIA_V2_JUDGE_NAMES.map(() => 0);
   private last_judge_index: number | null = null;
+  private hit_error: Omit<HitErrorResult, "sequence"> | null = null;
 
   constructor(preset_or_od: OsuManiaV2TimingPreset | number) {
     const preset = typeof preset_or_od === "number" ? createOsuManiaV2TimingPreset(preset_or_od) : preset_or_od;
@@ -25,6 +28,7 @@ export class OsuManiaV2Score implements ScoreSystem<ManiaLogicEvent>, IAccuracyS
   }
 
   receive(event: ManiaLogicEvent): void {
+    this.hit_error = null;
     if (event.type === "tap") {
       if (event.old_state === NoteState.Clear && event.new_state === NoteState.Passed) this.hit(event.delta_time);
       else if (event.old_state === NoteState.Clear && event.new_state === NoteState.Missed) this.miss();
@@ -72,8 +76,13 @@ export class OsuManiaV2Score implements ScoreSystem<ManiaLogicEvent>, IAccuracyS
     return this.last_judge_index === null ? null : OSU_MANIA_V2_JUDGE_NAMES[this.last_judge_index]!;
   }
 
+  getHitError(): Omit<HitErrorResult, "sequence"> | null {
+    return this.hit_error;
+  }
+
   private hit(delta_time: number, release = false): void {
     const windows = release ? this.tail_windows : this.windows;
+    this.hit_error = { delta_time, windows: [windows[1]!, windows[3]!, windows[4]!] };
     const normalized_delta = Math.abs(delta_time);
     const judge_index = windows.findIndex((window) => normalized_delta <= window);
     this.add(judge_index < 0 ? this.windows.length - 1 : judge_index);

@@ -1,5 +1,5 @@
 import type { GameplayHudRenderer, HudLayout } from "../GameplayHudRenderer";
-import type { HudState } from "../HudState";
+import type { HitErrorMeterState, HudState } from "../HudState";
 import { drawBitmapText } from "./BitmapTextRenderer";
 import type { Sprite, SpriteQuadWriter } from "./Sprite";
 
@@ -13,6 +13,8 @@ export interface HudAssets {
   readonly scoreOverlap?: number;
   readonly progressOverlay?: Sprite;
   readonly progressFill?: Sprite;
+  readonly hitErrorFill?: Sprite;
+  readonly hitErrorArrow?: Sprite;
 }
 
 export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
@@ -53,6 +55,47 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
     const width = overlay.sourceSize.w * OSU_NATIVE_SCALE;
     const height = overlay.sourceSize.h * OSU_NATIVE_SCALE;
     this.write(center_x - width / 2, center_y - height / 2, width, height, [1, 1, 1, 1], overlay);
+  }
+
+  drawHitErrorMeter(state: HitErrorMeterState, layout: HudLayout): void {
+    const fill = this.assets.hitErrorFill;
+    const windows = state.windows;
+    if (!fill || !windows || state.age >= 4.6) return;
+    const alpha = state.age <= 4 ? 1 : 1 - (state.age - 4) / 0.6;
+    const range = windows[2];
+    if (!(range > 0)) return;
+    const center_x = layout.width / 2;
+    const center_y = layout.height - 6;
+    const width = range * 1000 * 1.6;
+    const bar_height = 4.8;
+    const color300 = [50 / 255, 188 / 255, 231 / 255, alpha] as const;
+    const color100 = [87 / 255, 227 / 255, 19 / 255, alpha] as const;
+    const color50 = [218 / 255, 174 / 255, 70 / 255, alpha] as const;
+    const draw_centered = (draw_width: number, draw_height: number,
+      color: readonly [number, number, number, number]) => {
+      this.write(center_x - draw_width / 2, center_y - draw_height / 2, draw_width, draw_height, color, fill);
+    };
+    draw_centered(width * 1.6, bar_height * 4 * 1.6, [0, 0, 0, 0.6 * alpha]);
+    draw_centered(width, bar_height, color50);
+    draw_centered(windows[1] / range * width, bar_height, color100);
+    draw_centered(windows[0] / range * width, bar_height, color300);
+    draw_centered(2.4, bar_height * 4, [1, 1, 1, alpha]);
+    for (const tick of state.ticks) {
+      const tick_alpha = 0.4 * Math.max(0, 1 - tick.age / 10) * alpha;
+      const error = Math.abs(tick.deltaTime);
+      const color = error < windows[0] ? color300 : error < windows[1] ? color100 : color50;
+      this.write(center_x + tick.deltaTime / range * width / 2 - 1.5, center_y - bar_height * 2,
+        3, bar_height * 4, [color[0], color[1], color[2], tick_alpha], fill,
+        false, undefined, false, 0, undefined, true);
+    }
+    const arrow = this.assets.hitErrorArrow;
+    if (arrow) {
+      const arrow_width = arrow.sourceSize.w * 0.6;
+      const arrow_height = arrow.sourceSize.h * 0.6;
+      const arrow_x = center_x + state.floatingError / range * width / 2;
+      this.write(arrow_x - arrow_width / 2, center_y - 3 - arrow_height,
+        arrow_width, arrow_height, [1, 1, 1, alpha], arrow);
+    }
   }
 
   private bitmapTextHeight(glyphs: Readonly<Record<string, string>>): number {

@@ -204,7 +204,9 @@ export class WebGlSpriteGraphics {
       const uploaded = this.sprites.get(commands[start]!.sprite);
       if (!uploaded) throw new Error("Gameplay sprite texture was not uploaded");
       let end = start + 1;
-      while (end < commands.length && this.sprites.get(commands[end]!.sprite)?.texture === uploaded.texture) end += 1;
+      while (end < commands.length && this.sprites.get(commands[end]!.sprite)?.texture === uploaded.texture &&
+        !!commands[end]!.additive === !!commands[start]!.additive) end += 1;
+      gl.blendFunc(gl.ONE, commands[start]!.additive ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
       this.submitBatch(uploaded.texture, commands, start, end);
       start = end;
     }

@@ -10,7 +10,8 @@ export interface SpriteSkin {
 
 export type SpriteQuadWriter = (x: number, y: number, width: number, height: number,
   color: readonly [number, number, number, number], sprite: Sprite, flip_y?: boolean,
-  batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number) => void;
+  batch?: string, rotate_ccw?: boolean, rotation_radians?: number, circular_progress?: number,
+  additive?: boolean) => void;
 
 export interface SpriteDrawCommand {
   x: number;
@@ -23,5 +24,6 @@ export interface SpriteDrawCommand {
   rotateCounterClockwise: boolean;
   rotationRadians: number;
   circularProgress?: number;
+  additive?: boolean;
   batch?: string;
 }
