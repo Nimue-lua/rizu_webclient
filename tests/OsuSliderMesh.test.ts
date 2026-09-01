@@ -19,12 +19,10 @@ test("creates finite indexed slider geometry with round bounds", () => {
   const mesh = createOsuSliderMesh(OsuSliderPath.create(straightSlider(), 14), 20);
   assert.ok(mesh.vertices.length > 0);
   assert.ok(mesh.indices.length > 0);
-  assert.ok(mesh.wireframe_indices.length > 0);
   assert.deepEqual(mesh.bounds, { left: -20, top: -20, right: 120, bottom: 20 });
   assert.ok([...mesh.vertices].every(Number.isFinite));
   const vertex_count = mesh.vertices.length / 3;
   assert.ok([...mesh.indices].every((index) => index < vertex_count));
-  assert.ok([...mesh.wireframe_indices].every((index) => index < vertex_count));
   assert.ok([...mesh.vertices].filter((_value, index) => index % 3 === 2).includes(0));
   assert.ok([...mesh.vertices].filter((_value, index) => index % 3 === 2).includes(1));
 });

@@ -9,7 +9,6 @@ const VERTEX_FLOATS = 3;
 export interface OsuSliderMeshData {
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
-  readonly wireframe_indices: Uint32Array;
   readonly bounds: Readonly<{ left: number; top: number; right: number; bottom: number }>;
 }
 
@@ -72,7 +71,6 @@ export function createOsuSliderMesh(path: OsuSliderPath, radius: number): OsuSli
   return {
     vertices: new Float32Array(vertices),
     indices: new Uint32Array(indices),
-    wireframe_indices: createWireframeIndices(indices),
     bounds: { left, top, right, bottom },
   };
 }
@@ -128,19 +126,6 @@ function addTurnaroundCap(point: Point, direction_x: number, direction_y: number
     indices.push(center, previous_edge, edge);
     previous_edge = edge;
   }
-}
-
-function createWireframeIndices(indices: readonly number[]): Uint32Array {
-  const edges = new Map<string, readonly [number, number]>();
-  for (let index = 0; index < indices.length; index += 3) {
-    const triangle = [indices[index]!, indices[index + 1]!, indices[index + 2]!] as const;
-    for (const [first, second] of [[triangle[0], triangle[1]], [triangle[1], triangle[2]],
-      [triangle[2], triangle[0]]] as const) {
-      const edge = first < second ? [first, second] as const : [second, first] as const;
-      edges.set(`${edge[0]}:${edge[1]}`, edge);
-    }
-  }
-  return new Uint32Array([...edges.values()].flatMap((edge) => edge));
 }
 
 function simplify(points: readonly Point[]): Point[] {
