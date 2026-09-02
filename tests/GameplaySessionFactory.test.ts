@@ -42,6 +42,7 @@ function createOptions(data: ManiaGameplayData | OsuGameplayData): GameplaySessi
     scroll_speed: 1.2,
     cursor_scale: 1.25,
     hit_error_meter: true,
+    hit_error_meter_type: "fullscreen",
     hit_error_meter_scale: 1.5,
     osu_cursor_renderer: "webgl",
     replay_base: new ManiaReplayBase(),
@@ -120,6 +121,7 @@ test("creates an osu session without exposing mania column input", () => {
   assert.equal(harness.osu_options[0]?.replay_base.rate, options.replay_base.rate);
   assert.equal(harness.osu_options[0]?.cursor_scale, options.cursor_scale);
   assert.equal(harness.osu_options[0]?.hit_error_meter, true);
+  assert.equal(harness.osu_options[0]?.hit_error_meter_type, "fullscreen");
   assert.equal(harness.osu_options[0]?.hit_error_meter_scale, 1.5);
   assert.equal(harness.osu_options[0]?.osu_cursor_renderer, "webgl");
   assert.equal(harness.osu_options[0]?.osu_hit_sound_volume, 0.75);

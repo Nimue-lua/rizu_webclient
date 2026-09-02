@@ -13,6 +13,7 @@ import type { OsuCursorRendererMode } from "./osu/OsuHardwareCursor";
 import { createManiaAutoplayReplay, createOsuAutoplayReplay } from "./AutoplayReplay";
 import { applyOsuHitObjectStacking } from "./osu/OsuHitObjectStacking";
 import type { GameplayPerformanceSample } from "./GameplayPerformance";
+import type { HitErrorMeterType } from "./renderer/GameplayHudRenderer";
 
 export interface GameplaySessionOptions {
   canvas: HTMLCanvasElement;
@@ -23,6 +24,7 @@ export interface GameplaySessionOptions {
   scroll_speed: number;
   cursor_scale: number;
   hit_error_meter: boolean;
+  hit_error_meter_type: HitErrorMeterType;
   hit_error_meter_scale: number;
   osu_cursor_renderer: OsuCursorRendererMode;
   replay_base: ManiaReplayBase;
@@ -46,13 +48,13 @@ export interface GameplaySessionFactoryDependencies {
 
 const default_dependencies: GameplaySessionFactoryDependencies = {
   create_mania: (options) => new ManiaGameplayRuntime(options.canvas, options.data, options.master_volume,
-    options.music_offset, options.scroll_speed, options.hit_error_meter, options.hit_error_meter_scale,
+    options.music_offset, options.scroll_speed, options.hit_error_meter, options.hit_error_meter_type, options.hit_error_meter_scale,
     options.replay_base, options.input_bindings,
     options.hit_registration, options.finish, undefined, options.playback_replay, options.initial_lead_in,
     options.background_state_change, options.performance_sample),
   create_osu: (options) => new OsuGameplayRuntime(options.canvas, options.data, options.master_volume,
     options.osu_hit_sound_volume, options.music_offset, options.cursor_scale, options.osu_cursor_renderer,
-    options.hit_error_meter, options.hit_error_meter_scale, options.replay_base,
+    options.hit_error_meter, options.hit_error_meter_type, options.hit_error_meter_scale, options.replay_base,
     options.input_bindings, options.finish, undefined, options.playback_replay, options.initial_lead_in,
     options.background_state_change, options.performance_sample),
 };

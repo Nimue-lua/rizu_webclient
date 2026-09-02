@@ -19,12 +19,15 @@ export interface HudAssets {
 
 export interface HitErrorMeterOptions {
   readonly enabled: boolean;
+  readonly type: HitErrorMeterType;
   readonly scale: number;
 }
 
+export type HitErrorMeterType = "normal" | "fullscreen";
+
 export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
   constructor(private readonly assets: HudAssets, private readonly write: SpriteQuadWriter,
-    private readonly hit_error_options: HitErrorMeterOptions = { enabled: true, scale: 1 }) {}
+    private readonly hit_error_options: HitErrorMeterOptions = { enabled: true, type: "normal", scale: 1 }) {}
 
   drawScore(hud: HudState, layout: HudLayout): void {
     if (!this.assets.scoreGlyphs) return;
@@ -72,6 +75,30 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
     const range = windows[2];
     if (!(range > 0)) return;
     const center_x = layout.width / 2;
+    if (this.hit_error_options.type === "normal") {
+      this.drawNormalHitErrorMeter(state, layout, fill, windows, alpha, range, center_x);
+      return;
+    }
+    const width = layout.width;
+    for (const tick of state.ticks) {
+      if (tick.age >= 0.300) continue;
+      const error = Math.abs(tick.deltaTime);
+      const center_fade = error / 0.024;
+      const opacity = error <= 0.024 ? center_fade * center_fade * 0.6 : error < windows[0] ? 0.08 : 0.6;
+      const tick_alpha = opacity * Math.max(0, 1 - tick.age / 0.300) * alpha;
+      const color = tick.deltaTime < 0
+        ? [87 / 255, 227 / 255, 19 / 255] as const
+        : [255 / 255, 0, 0] as const;
+      const normalized_error = tick.deltaTime / range;
+      const position = Math.sign(normalized_error) * Math.sqrt(Math.abs(normalized_error));
+      this.write(center_x + position * width / 2 - 2.5, 0,
+        5, layout.height, [color[0], color[1], color[2], tick_alpha], fill,
+        false, undefined, false, 0, undefined, true);
+    }
+  }
+
+  private drawNormalHitErrorMeter(state: HitErrorMeterState, layout: HudLayout, fill: Sprite,
+    windows: readonly [number, number, number], alpha: number, range: number, center_x: number): void {
     const scale = this.hit_error_options.scale;
     const center_y = layout.height - 6 * scale;
     const width = range * 1000 * 1.6 * scale;
@@ -97,13 +124,12 @@ export class SpriteGameplayHudRenderer implements GameplayHudRenderer {
         false, undefined, false, 0, undefined, true);
     }
     const arrow = this.assets.hitErrorArrow;
-    if (arrow) {
-      const arrow_width = arrow.sourceSize.w * 0.6 * scale;
-      const arrow_height = arrow.sourceSize.h * 0.6 * scale;
-      const arrow_x = center_x + state.floatingError / range * width / 2;
-      this.write(arrow_x - arrow_width / 2, center_y - 3 - arrow_height,
-        arrow_width, arrow_height, [1, 1, 1, alpha], arrow);
-    }
+    if (!arrow) return;
+    const arrow_width = arrow.sourceSize.w * 0.6 * scale;
+    const arrow_height = arrow.sourceSize.h * 0.6 * scale;
+    const arrow_x = center_x + state.floatingError / range * width / 2;
+    this.write(arrow_x - arrow_width / 2, center_y - 3 - arrow_height,
+      arrow_width, arrow_height, [1, 1, 1, alpha], arrow);
   }
 
   private bitmapTextHeight(glyphs: Readonly<Record<string, string>>): number {

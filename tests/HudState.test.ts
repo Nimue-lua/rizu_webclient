@@ -53,12 +53,21 @@ test("retains each hit error once and expires ticks after ten seconds", () => {
   assert.deepEqual(first.hitErrorMeter.ticks, [{ deltaTime: 0.05, age: 0 }]);
   assert.equal(first.hitErrorMeter.floatingError, 0);
   assert.equal(first.hitErrorMeter.age, 0);
-  const moving = deriver.update({ hit_error }, 1.4);
-  assert.ok(Math.abs(moving.hitErrorMeter.floatingError - 0.0075) < 1e-12);
-  const same = deriver.update({ hit_error }, 2);
+  const moving = deriver.update({ hit_error }, 1.04);
+  assert.ok(Math.abs(moving.hitErrorMeter.floatingError - 0.000975) < 1e-12);
+  const same = deriver.update({ hit_error }, 1.049);
   assert.equal(same.hitErrorMeter.ticks.length, 1);
-  assert.ok(Math.abs(same.hitErrorMeter.floatingError - 0.01) < 1e-12);
+  assert.equal(deriver.update({ hit_error }, 10.999).hitErrorMeter.ticks.length, 1);
   assert.deepEqual(deriver.update({ hit_error }, 11).hitErrorMeter.ticks, []);
+});
+
+test("keeps all hit error ticks within their lifetime", () => {
+  const deriver = new HudStateDeriver();
+  const windows = [0.02, 0.06, 0.1] as const;
+  for (let sequence = 1; sequence <= 4; sequence += 1) {
+    deriver.update({ hit_error: { sequence, delta_time: sequence / 100, windows } }, 1 + sequence / 1000);
+  }
+  assert.deepEqual(deriver.update({}, 1.004).hitErrorMeter.ticks.map((tick) => tick.deltaTime), [0.01, 0.02, 0.03, 0.04]);
 });
 
 test("restarts combo animation only when combo increases", () => {

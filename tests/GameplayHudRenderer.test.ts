@@ -74,7 +74,7 @@ test("draws green intro progress beneath the circular metre overlay", () => {
   assert.equal(draws[0]?.progress, -0.5);
 });
 
-test("draws stable hit error bands, ticks, center, and smoothed arrow", () => {
+test("draws only full-height translucent hit error ticks", () => {
   const fill = sprite("white", 1, 1);
   const arrow = sprite("editor-rate-arrow", 10, 20);
   const draws: Array<{ x: number; y: number; width: number; height: number; name: string;
@@ -82,20 +82,15 @@ test("draws stable hit error bands, ticks, center, and smoothed arrow", () => {
   new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: fill, hitErrorArrow: arrow },
     (x, y, width, height, color, drawn, _flip, _batch, _rotate, _radians, _progress, additive) => draws.push({
       x, y, width, height, color, additive, name: (drawn as Sprite & { name: string }).name,
-    })).drawHitErrorMeter({
+    }), { enabled: true, type: "fullscreen", scale: 1 }).drawHitErrorMeter({
       windows: [0.05, 0.1, 0.15], ticks: [{ deltaTime: 0.075, age: 0 }], floatingError: 0.015, age: 0,
     }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
-  assert.deepEqual(draws.map((draw) => draw.name), ["white", "white", "white", "white", "white", "white", "editor-rate-arrow"]);
-  for (const [actual, expected] of draws.slice(0, 5).map((draw) => draw.width)
-    .map((width, index) => [width, [384, 240, 160, 80, 2.4][index]!] as const)) {
-    assert.ok(Math.abs(actual - expected) < 1e-12);
-  }
-  assert.equal(draws[5]?.x, 485.5);
-  assert.equal(draws[5]?.color[3], 0.4);
-  assert.equal(draws[5]?.additive, true);
-  assert.equal(draws[4]?.additive, undefined);
-  assert.equal(draws[6]?.x, 436);
-  assert.equal(draws[6]?.y, 459);
+  assert.equal(draws.length, 1);
+  assert.ok(Math.abs(draws[0]!.x - (427 + Math.sqrt(0.5) * 427 - 2.5)) < 1e-12);
+  assert.deepEqual({ ...draws[0], x: undefined }, {
+    x: undefined, y: 0, width: 5, height: 480,
+    color: [1, 0, 0, 0.6], additive: true, name: "white",
+  });
 });
 
 test("hides the hit error meter after stable's four second delay and fade", () => {
@@ -109,32 +104,100 @@ test("hides the hit error meter after stable's four second delay and fade", () =
 test("does not draw the hit error meter when disabled", () => {
   let draws = 0;
   new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: sprite("white") }, () => draws += 1,
-    { enabled: false, scale: 1 })
+    { enabled: false, type: "normal", scale: 1 })
     .drawHitErrorMeter({ windows: [0.05, 0.1, 0.15], ticks: [], floatingError: 0, age: 0 },
       { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
   assert.equal(draws, 0);
 });
 
-test("scales all hit error meter geometry", () => {
+test("draws early hits green and late hits red", () => {
+  const draws: Array<{ height: number; color: readonly number[] }> = [];
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: sprite("white", 1, 1) },
+    (_x, _y, _width, height, color) => draws.push({ height, color }),
+    { enabled: true, type: "fullscreen", scale: 1 })
+    .drawHitErrorMeter({
+      windows: [0.05, 0.1, 0.15],
+      ticks: [{ deltaTime: -0.025, age: 0 }, { deltaTime: 0.025, age: 0 }],
+      floatingError: 0,
+      age: 0,
+    }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.deepEqual(draws, [
+    { height: 480, color: [87 / 255, 227 / 255, 19 / 255, 0.08] },
+    { height: 480, color: [1, 0, 0, 0.08] },
+  ]);
+});
+
+test("fades hits within 16ms toward an invisible perfect hit", () => {
+  const draws: number[][] = [];
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: sprite("white", 1, 1) },
+    (_x, _y, _width, _height, color) => draws.push([...color]),
+    { enabled: true, type: "fullscreen", scale: 1 })
+    .drawHitErrorMeter({
+      windows: [0.05, 0.1, 0.15],
+      ticks: [
+        { deltaTime: -0.016, age: 0 },
+        { deltaTime: -0.008, age: 0 },
+        { deltaTime: 0, age: 0 },
+        { deltaTime: 0.008, age: 0 },
+        { deltaTime: 0.016, age: 0 },
+      ],
+      floatingError: 0,
+      age: 0,
+    }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.deepEqual(draws.map((color) => color[3]),
+    [4 / 15, 1 / 15, 0, 1 / 15, 4 / 15]);
+});
+
+test("fullscreen hit error ticks stop rendering after 133ms", () => {
+  const alphas: number[] = [];
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: sprite("white", 1, 1) },
+    (_x, _y, _width, _height, color) => alphas.push(color[3]!),
+    { enabled: true, type: "fullscreen", scale: 1 })
+    .drawHitErrorMeter({
+      windows: [0.05, 0.1, 0.15],
+      ticks: [{ deltaTime: 0.075, age: 0 }, { deltaTime: 0.075, age: 0.0665 }, { deltaTime: 0.075, age: 0.133 }],
+      floatingError: 0,
+      age: 0,
+    }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.deepEqual(alphas, [0.6, 0.46699999999999997]);
+});
+
+test("restores the normal hit error bands, ticks, center, and arrow", () => {
+  const fill = sprite("white", 1, 1);
+  const arrow = sprite("editor-rate-arrow", 10, 20);
+  const draws: Array<{ x: number; y: number; width: number; height: number; name: string }> = [];
+  new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: fill, hitErrorArrow: arrow },
+    (x, y, width, height, _color, drawn) => draws.push({
+      x, y, width, height, name: (drawn as Sprite & { name: string }).name,
+    }), { enabled: true, type: "normal", scale: 1 }).drawHitErrorMeter({
+      windows: [0.05, 0.1, 0.15], ticks: [{ deltaTime: 0.075, age: 0 }], floatingError: 0.015, age: 0,
+    }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
+  assert.deepEqual(draws.map((draw) => draw.name),
+    ["white", "white", "white", "white", "white", "white", "editor-rate-arrow"]);
+  for (const [actual, expected] of draws.slice(0, 5).map((draw) => draw.width)
+    .map((width, index) => [width, [384, 240, 160, 80, 2.4][index]!] as const)) {
+    assert.ok(Math.abs(actual - expected) < 1e-12);
+  }
+  assert.equal(draws[5]?.x, 485.5);
+  assert.equal(draws[6]?.x, 436);
+  assert.equal(draws[6]?.y, 459);
+});
+
+test("does not scale full-height hit error ticks", () => {
   const fill = sprite("white", 1, 1);
   const arrow = sprite("editor-rate-arrow", 10, 20);
   const drawAtScale = (scale: number) => {
     const draws: Array<{ x: number; y: number; width: number; height: number }> = [];
     new SpriteGameplayHudRenderer({ sprites: {}, hitErrorFill: fill, hitErrorArrow: arrow },
-      (x, y, width, height) => draws.push({ x, y, width, height }), { enabled: true, scale })
+      (x, y, width, height) => draws.push({ x, y, width, height }), { enabled: true, type: "fullscreen", scale })
       .drawHitErrorMeter({
-        windows: [0.05, 0.1, 0.15], ticks: [{ deltaTime: 0, age: 0 }], floatingError: 0, age: 0,
+        windows: [0.05, 0.1, 0.15], ticks: [{ deltaTime: 0.075, age: 0 }], floatingError: 0, age: 0,
       }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });
     return draws;
   };
   const half = drawAtScale(0.5);
   const double = drawAtScale(2);
-  assert.equal(half[0]?.width, 192);
-  assert.equal(double[0]?.width, 768);
-  assert.equal(half[5]?.width, 1.5);
-  assert.equal(double[5]?.width, 6);
-  assert.equal(half[6]?.width, 3);
-  assert.equal(double[6]?.width, 12);
-  assert.equal(half[0]?.y, 469.32);
-  assert.equal(double[0]?.y, 437.28);
+  assert.deepEqual(half, double);
+  assert.equal(half[0]?.width, 5);
+  assert.equal(half[0]?.height, 480);
 });

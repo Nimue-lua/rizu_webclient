@@ -3,7 +3,7 @@ import test from "node:test";
 import type { ConfigStorage } from "../src/config/Config";
 import { createSettingsConfig, settings } from "../src/config/Settings";
 
-test("persists hit error meter visibility and scale", () => {
+test("persists hit error meter visibility, type, and scale", () => {
   let stored: string | null = null;
   const storage: ConfigStorage = {
     getItem: () => stored,
@@ -12,13 +12,16 @@ test("persists hit error meter visibility and scale", () => {
   };
   const config = createSettingsConfig(storage);
   assert.equal(config.get(settings.hit_error_meter), true);
+  assert.equal(config.get(settings.hit_error_meter_type), "normal");
   assert.equal(config.get(settings.hit_error_meter_scale), 1);
   config.set(settings.hit_error_meter, false);
+  config.set(settings.hit_error_meter_type, "fullscreen");
   config.set(settings.hit_error_meter_scale, 2);
   assert.deepEqual(JSON.parse(stored!), {
     version: 1,
     values: {
       "renderer.hit_error_meter.enabled": false,
+      "renderer.hit_error_meter.type": "fullscreen",
       "renderer.hit_error_meter.scale": 2,
     },
   });

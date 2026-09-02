@@ -94,7 +94,7 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
   };
   const runtime_playback = playback ?? (autoplay ? createOsuAutoplayReplay(data.chart) : undefined);
   const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 1, 0,
-    1, "webgl", true, 1, createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], (completed, reached_end) => {
+    1, "webgl", true, "normal", 1, createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], (completed, reached_end) => {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       results.push(completed.score);

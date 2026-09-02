@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
 import type { ScrollSpeedType } from "../gameplay/mania/ScrollSpeed";
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
+import type { HitErrorMeterType } from "../gameplay/renderer/GameplayHudRenderer";
 import {
   booleanSetting,
   choiceSetting,
@@ -22,6 +23,7 @@ export const settings = {
   scroll_speed_type: choiceSetting<ScrollSpeedType>("gameplay.scroll_speed_type", "default", ["default", "osu"]),
   cursor_scale: numberSetting("gameplay.osu.cursor_scale", 1, 0.25, 2, 0.05),
   hit_error_meter: booleanSetting("renderer.hit_error_meter.enabled", true),
+  hit_error_meter_type: choiceSetting<HitErrorMeterType>("renderer.hit_error_meter.type", "normal", ["normal", "fullscreen"]),
   hit_error_meter_scale: numberSetting("renderer.hit_error_meter.scale", 1, 0.5, 2, 0.05),
   osu_cursor_renderer: choiceSetting<OsuCursorRendererMode>("renderer.osu.cursor", "os", ["os", "webgl"]),
   osu_raw_input: booleanSetting("gameplay.osu.raw_input", true),

@@ -12,6 +12,7 @@ import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInpu
   type ManiaRecordedReplay } from "../../replay/RecordedReplay";
 import type { GameplayPerformanceSample } from "../GameplayPerformance";
 import type { GameplayRenderStats } from "../renderer/GameplayRenderStats";
+import type { HitErrorMeterType } from "../renderer/GameplayHudRenderer";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -27,7 +28,7 @@ export interface ManiaGameplayRuntimeDependencies {
   cancel_animation_frame: (handle: number) => void;
   performance_now: () => number;
   create_renderer: (canvas: HTMLCanvasElement, data: ManiaGameplayData,
-    hit_error_meter: boolean, hit_error_meter_scale: number) => ManiaRenderer;
+    hit_error_meter: boolean, hit_error_meter_type: HitErrorMeterType, hit_error_meter_scale: number) => ManiaRenderer;
 }
 
 function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
@@ -36,8 +37,9 @@ function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
     request_animation_frame: (callback) => window.requestAnimationFrame(callback),
     cancel_animation_frame: (handle) => window.cancelAnimationFrame(handle),
     performance_now: () => performance.now(),
-    create_renderer: (canvas, data, hit_error_meter, hit_error_meter_scale) =>
-      new WebGlManiaRenderer(canvas, data.note_skin, undefined, { enabled: hit_error_meter, scale: hit_error_meter_scale }),
+    create_renderer: (canvas, data, hit_error_meter, hit_error_meter_type, hit_error_meter_scale) =>
+      new WebGlManiaRenderer(canvas, data.note_skin, undefined,
+        { enabled: hit_error_meter, type: hit_error_meter_type, scale: hit_error_meter_scale }),
   };
 }
 
@@ -73,7 +75,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private background_state: GameplayBackgroundState | null = null;
 
   constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
-    scroll_speed: number, hit_error_meter: boolean, hit_error_meter_scale: number,
+    scroll_speed: number, hit_error_meter: boolean, hit_error_meter_type: HitErrorMeterType, hit_error_meter_scale: number,
     replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
     finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
     dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
@@ -98,7 +100,7 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
       : { timings: replay_base.timings, subtimings: replay_base.subtimings };
     this.rules_engine = new ManiaRulesEngine(data.chart, hit_registration, this.music_rate, replay_base.const,
       replay_base.tap_only, timing_identity);
-    this.renderer = dependencies.create_renderer(canvas, data, hit_error_meter, hit_error_meter_scale);
+    this.renderer = dependencies.create_renderer(canvas, data, hit_error_meter, hit_error_meter_type, hit_error_meter_scale);
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,
       audio_buffer: data.audio_buffer,
