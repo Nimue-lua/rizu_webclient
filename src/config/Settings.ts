@@ -32,6 +32,12 @@ export const settings = {
   music_rate: numberSetting("gameplay.music_rate", 1, 0.25, 4, 0.001),
   constant_scroll: booleanSetting("gameplay.mania.constant_scroll", false),
   tap_only: booleanSetting("gameplay.mania.tap_only", false),
+  customize_osu_overall_difficulty: booleanSetting("gameplay.osu.customize_overall_difficulty", false),
+  osu_overall_difficulty: numberSetting("gameplay.osu.overall_difficulty", 5, 0, 12, 0.1),
+  customize_osu_circle_size: booleanSetting("gameplay.osu.customize_circle_size", false),
+  osu_circle_size: numberSetting("gameplay.osu.circle_size", 5, 0, 12, 0.1),
+  customize_osu_approach_rate: booleanSetting("gameplay.osu.customize_approach_rate", false),
+  osu_approach_rate: numberSetting("gameplay.osu.approach_rate", 5, -10, 12, 0.1),
   online_server_address: stringSetting("online.server_address", ""),
 } as const;
 

@@ -30,7 +30,7 @@ export class Timings implements TimingsValue {
     if (value >= 2301 && value <= 2309) return new Timings("etternaj", value - 2300);
     if (value === 2400) return new Timings("quaver");
     if (value >= 2500 && value <= 2504) return new Timings("bmsrank", value - 2500);
-    if (value >= 2600 && value <= 2700) return new Timings("osu_std_od", (value - 2600) / 10);
+    if (value >= 2600 && value <= 2720) return new Timings("osu_std_od", (value - 2600) / 10);
     return new Timings("unknown", value);
   }
 
@@ -70,8 +70,8 @@ export class Timings implements TimingsValue {
       case "sphere":
       case "quaver": return this.data === 0;
       case "simple": return this.data >= 0 && this.data <= 1 && isInteger(this.data * 1000);
-      case "osuod":
-      case "osu_std_od": return this.data >= 0 && this.data <= 10 && isInteger(this.data * 10);
+      case "osuod": return this.data >= 0 && this.data <= 10 && isInteger(this.data * 10);
+      case "osu_std_od": return this.data >= 0 && this.data <= 12 && isInteger(this.data * 10);
       case "etternaj": return isInteger(this.data) && this.data >= 1 && this.data <= 9;
       case "bmsrank": return isInteger(this.data) && this.data >= 0 && this.data <= 4;
       case "unknown": return isInteger(this.data);

@@ -46,6 +46,7 @@ function createOptions(data: ManiaGameplayData | OsuGameplayData): GameplaySessi
     hit_error_meter_scale: 1.5,
     osu_cursor_renderer: "webgl",
     replay_base: new ManiaReplayBase(),
+    osu_replay_base: createOsuReplayBase(),
     input_bindings: ["KeyA"],
     hit_registration: "nearest",
     finish: () => {},
@@ -131,6 +132,23 @@ test("creates an osu session without exposing mania column input", () => {
   assert.equal("subtimings" in harness.osu_options[0]!.replay_base, false);
   assert.equal("const" in harness.osu_options[0]!.replay_base, false);
   assert.equal(binding.pointer_input, binding.session);
+});
+
+test("applies configured osu difficulty overrides", () => {
+  const harness = createDependencies();
+  const options = createOptions(createOsuData());
+  options.osu_replay_base = createOsuReplayBase(1.25, 12);
+  options.osu_replay_base.overall_difficulty = 12;
+  options.osu_replay_base.circle_size = 6.5;
+  options.osu_replay_base.approach_rate = 10.5;
+
+  createGameplaySession(options, harness.dependencies);
+
+  assert.equal(harness.osu_options[0]?.replay_base.rate, 1.25);
+  assert.equal(harness.osu_options[0]?.replay_base.overall_difficulty, 12);
+  assert.equal(harness.osu_options[0]?.replay_base.circle_size, 6.5);
+  assert.equal(harness.osu_options[0]?.replay_base.approach_rate, 10.5);
+  assert.deepEqual(harness.osu_options[0]?.replay_base.timings, { name: "osu_std_od", data: 12 });
 });
 
 test("each factory call creates an independently owned play attempt", () => {

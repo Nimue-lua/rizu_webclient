@@ -3,8 +3,12 @@ import { useHoverRangeKeys } from "../RangeInput";
 import { SongSelectIcon } from "./SongSelectUi";
 
 interface SongSelectFooterProps {
+  mode: "osu" | "mania" | null;
   constant_scroll: boolean;
   music_rate: number;
+  osu_approach_rate: number | null;
+  osu_circle_size: number | null;
+  osu_overall_difficulty: number | null;
   selected_chart_available: boolean;
   tap_only: boolean;
   onMusicRateChange: (music_rate: number) => void;
@@ -15,7 +19,8 @@ interface SongSelectFooterProps {
   onPlay: () => void;
 }
 
-export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_available, tap_only,
+export function SongSelectFooter({ mode, constant_scroll, music_rate, osu_approach_rate, osu_circle_size,
+  osu_overall_difficulty, selected_chart_available, tap_only,
   onMusicRateChange, onOpenInputs, onOpenModifiers, onOpenSkins, onExit, onPlay }: SongSelectFooterProps) {
   const rate_drag_ref = useRef<{ pointer_id: number; start_x: number; start_rate: number } | null>(null);
   const speed_progress = (music_rate - 0.25) / 3.75;
@@ -24,6 +29,9 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
     "--rate-rotation": `${-135 + speed_progress * 270}deg`,
   } as CSSProperties;
   const hover_key_handlers = useHoverRangeKeys(music_rate, 0.25, 4, 0.05, onMusicRateChange);
+  const modifier_count = mode === "osu"
+    ? Number(osu_approach_rate !== null) + Number(osu_circle_size !== null) + Number(osu_overall_difficulty !== null)
+    : mode === "mania" ? Number(constant_scroll) + Number(tap_only) : 0;
 
   const moveRateDrag = (client_x: number) => {
     const drag = rate_drag_ref.current;
@@ -36,7 +44,7 @@ export function SongSelectFooter({ constant_scroll, music_rate, selected_chart_a
     <footer className="song-select-footer">
       <button className="back-control" type="button" onClick={onExit}><SongSelectIcon name="undo" /><span>BACK</span></button>
       <nav className="loadout-controls" aria-label="Loadout">
-        <button className={`mods${constant_scroll || tap_only ? " active" : ""}`} aria-haspopup="dialog" onClick={onOpenModifiers}><SongSelectIcon name="puzzle" /><span>MODS</span><b>{Number(constant_scroll) + Number(tap_only)}</b></button>
+        <button className={`mods${modifier_count > 0 ? " active" : ""}`} aria-haspopup="dialog" onClick={onOpenModifiers}><SongSelectIcon name="puzzle" /><span>MODS</span><b>{modifier_count}</b></button>
         <button className="mutators"><SongSelectIcon name="zap" /><span>MUTATORS</span><b>0</b></button>
         <button className="inputs" disabled={!selected_chart_available} onClick={onOpenInputs}><SongSelectIcon name="keyboard" /><span>INPUTS</span></button>
         <button className="skins" aria-haspopup="dialog" onClick={onOpenSkins}><SongSelectIcon name="paintbrush" /><span>SKINS</span></button>

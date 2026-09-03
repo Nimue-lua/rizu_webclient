@@ -46,12 +46,18 @@ interface SongSelectScreenProps {
   music_rate: number;
   constant_scroll: boolean;
   tap_only: boolean;
+  osu_overall_difficulty: number | null;
+  osu_circle_size: number | null;
+  osu_approach_rate: number | null;
   note_skin_selections: NoteSkinSelections;
   available_note_skins: readonly NoteSkinOption[];
   score_storage_revision: number;
   onMusicRateChange: (music_rate: number) => void;
   onConstantScrollChange: (constant_scroll: boolean) => void;
   onTapOnlyChange: (tap_only: boolean) => void;
+  onOsuOverallDifficultyChange: (overall_difficulty: number | null) => void;
+  onOsuCircleSizeChange: (circle_size: number | null) => void;
+  onOsuApproachRateChange: (approach_rate: number | null) => void;
   onNoteSkinSelectionChange: (key: string, skin_id: string | undefined) => void;
   onNoteSkinImport: (file: File) => Promise<{ options: readonly NoteSkinOption[]; persisted: boolean }>;
   onNoteSkinDelete: (skin_id: string) => Promise<void>;
@@ -84,12 +90,18 @@ export function SongSelectScreen({
   music_rate,
   constant_scroll,
   tap_only,
+  osu_overall_difficulty,
+  osu_circle_size,
+  osu_approach_rate,
   note_skin_selections,
   available_note_skins,
   score_storage_revision,
   onMusicRateChange,
   onConstantScrollChange,
   onTapOnlyChange,
+  onOsuOverallDifficultyChange,
+  onOsuCircleSizeChange,
+  onOsuApproachRateChange,
   onNoteSkinSelectionChange,
   onNoteSkinImport,
   onNoteSkinDelete,
@@ -388,13 +400,21 @@ export function SongSelectScreen({
             isEntrySelected={(entry) => chart_selector.isEntrySelected(entry)} />
         </section>
 
-        <SongSelectFooter constant_scroll={constant_scroll} music_rate={music_rate} selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
+        <SongSelectFooter mode={selected_chart ? selected_chart.mode === 0 ? "osu" : "mania" : null}
+          constant_scroll={constant_scroll} music_rate={music_rate} osu_approach_rate={osu_approach_rate}
+          osu_circle_size={osu_circle_size} osu_overall_difficulty={osu_overall_difficulty}
+          selected_chart_available={Boolean(selected_chart)} tap_only={tap_only}
           onMusicRateChange={onMusicRateChange} onOpenInputs={() => setInputBindingsOpen(true)} onOpenModifiers={() => setModifiersOpen(true)}
           onOpenSkins={() => setSkinsOpen(true)} onExit={onExit} onPlay={() => selected_chart && playChart(selected_chart)}
         />
       </>}
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
-      {modifiers_open && <GameplayModifiersModal constant_scroll={constant_scroll} tap_only={tap_only} onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange} onExit={() => setModifiersOpen(false)} />}
+      {modifiers_open && selected_chart && <GameplayModifiersModal mode={selected_chart.mode === 0 ? "osu" : "mania"}
+        constant_scroll={constant_scroll} tap_only={tap_only} overall_difficulty={osu_overall_difficulty}
+        circle_size={osu_circle_size} approach_rate={osu_approach_rate} onConstantScrollChange={onConstantScrollChange}
+        onTapOnlyChange={onTapOnlyChange} onOverallDifficultyChange={onOsuOverallDifficultyChange}
+        onCircleSizeChange={onOsuCircleSizeChange} onApproachRateChange={onOsuApproachRateChange}
+        onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}
       {skins_open && <NoteSkinsModal selections={note_skin_selections} options={available_note_skins} selected_mode={selected_chart ? noteSkinMode(selected_chart.mode) : null} selected_column_count={selected_chart?.mode === 3 ? selected_chart.keys : null} onSelectionChange={onNoteSkinSelectionChange} onImport={onNoteSkinImport} onDelete={onNoteSkinDelete} onEdit={editNoteSkin} onExit={() => setSkinsOpen(false)} />}
     </main>

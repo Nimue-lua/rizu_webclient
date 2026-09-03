@@ -28,6 +28,7 @@ export interface GameplaySessionOptions {
   hit_error_meter_scale: number;
   osu_cursor_renderer: OsuCursorRendererMode;
   replay_base: ManiaReplayBase;
+  osu_replay_base: OsuReplayBaseValues;
   input_bindings: readonly (string | null)[];
   hit_registration: ManiaHitRegistration;
   initial_lead_in?: number;
@@ -84,7 +85,13 @@ export function createGameplaySession(options: GameplaySessionOptions,
   const { replay_base, ...common_options } = options;
   const osu_replay_base = options.playback?.replay_base.mode === "osu"
     ? options.playback.replay_base
-    : createOsuReplayBase(replay_base.rate, normalizeOsuOd(options.data.chart.overall_difficulty ?? 5));
+    : {
+      ...createOsuReplayBase(options.osu_replay_base.rate, options.osu_replay_base.overall_difficulty
+        ?? normalizeOsuOd(options.data.chart.overall_difficulty ?? 5)),
+      approach_rate: options.osu_replay_base.approach_rate,
+      circle_size: options.osu_replay_base.circle_size,
+      overall_difficulty: options.osu_replay_base.overall_difficulty,
+    };
   const playback_replay = options.playback?.replay.mode === "osu" ? options.playback.replay
     : options.autoplay ? createOsuAutoplayReplay(applyOsuHitObjectStacking(options.data.chart,
       osu_replay_base.approach_rate ?? options.data.chart.approach_rate,

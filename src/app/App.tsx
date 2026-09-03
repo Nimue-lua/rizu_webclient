@@ -13,6 +13,7 @@ import { WelcomeScreen } from "./WelcomeScreen";
 import { CatalogLoadingScreen } from "./CatalogLoadingScreen";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { ManiaReplayBase } from "../replay/mania/ManiaReplayBase";
+import { createOsuReplayBase } from "../replay/osu/OsuReplayBase";
 import {
   loadNoteSkinSelections,
   noteSkinMode,
@@ -107,6 +108,12 @@ export function App() {
   const music_rate = useSetting(settings.music_rate);
   const constant_scroll = useSetting(settings.constant_scroll);
   const tap_only = useSetting(settings.tap_only);
+  const customize_osu_overall_difficulty = useSetting(settings.customize_osu_overall_difficulty);
+  const osu_overall_difficulty = useSetting(settings.osu_overall_difficulty);
+  const customize_osu_circle_size = useSetting(settings.customize_osu_circle_size);
+  const osu_circle_size = useSetting(settings.osu_circle_size);
+  const customize_osu_approach_rate = useSetting(settings.customize_osu_approach_rate);
+  const osu_approach_rate = useSetting(settings.osu_approach_rate);
   const online_server_address = useSetting(settings.online_server_address);
   const replay_base = useMemo(() => {
     const base = new ManiaReplayBase();
@@ -115,6 +122,13 @@ export function App() {
     base.tap_only = tap_only;
     return base;
   }, [constant_scroll, music_rate, tap_only]);
+  const osu_replay_base = useMemo(() => ({
+    ...createOsuReplayBase(music_rate, customize_osu_overall_difficulty ? osu_overall_difficulty : 5),
+    overall_difficulty: customize_osu_overall_difficulty ? osu_overall_difficulty : null,
+    circle_size: customize_osu_circle_size ? osu_circle_size : null,
+    approach_rate: customize_osu_approach_rate ? osu_approach_rate : null,
+  }), [customize_osu_approach_rate, customize_osu_circle_size, customize_osu_overall_difficulty,
+    music_rate, osu_approach_rate, osu_circle_size, osu_overall_difficulty]);
 
   useEffect(() => {
     const refresh = () => void currentUser().then(setOnlineUser).catch(() => setOnlineUser(null));
@@ -382,6 +396,7 @@ export function App() {
             osu_cursor_renderer={osu_cursor_renderer}
             osu_raw_input={osu_raw_input}
             replay_base={replay_base}
+            osu_replay_base={osu_replay_base}
             input_bindings={input_bindings}
             hit_registration={hit_registration}
             autoplay={autoplay}
@@ -479,6 +494,9 @@ export function App() {
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}
             tap_only={replay_base.tap_only}
+            osu_overall_difficulty={osu_replay_base.overall_difficulty}
+            osu_circle_size={osu_replay_base.circle_size}
+            osu_approach_rate={osu_replay_base.approach_rate}
             note_skin_selections={note_skin_selections}
             available_note_skins={available_note_skins}
             score_storage_revision={score_storage_revision}
@@ -507,6 +525,18 @@ export function App() {
             onMusicRateChange={changeMusicRate}
             onConstantScrollChange={changeConstantScroll}
             onTapOnlyChange={changeTapOnly}
+            onOsuOverallDifficultyChange={(value) => {
+              appSettings.set(settings.customize_osu_overall_difficulty, value !== null);
+              if (value !== null) appSettings.set(settings.osu_overall_difficulty, value);
+            }}
+            onOsuCircleSizeChange={(value) => {
+              appSettings.set(settings.customize_osu_circle_size, value !== null);
+              if (value !== null) appSettings.set(settings.osu_circle_size, value);
+            }}
+            onOsuApproachRateChange={(value) => {
+              appSettings.set(settings.customize_osu_approach_rate, value !== null);
+              if (value !== null) appSettings.set(settings.osu_approach_rate, value);
+            }}
             onNoteSkinSelectionChange={changeNoteSkinSelection}
             onNoteSkinImport={importNoteSkin}
             onNoteSkinDelete={deleteNoteSkin}

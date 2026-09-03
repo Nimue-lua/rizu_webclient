@@ -14,6 +14,7 @@ test("preserves native timing integer encodings", () => {
   assert.equal(new Timings("quaver").encode(), 2400);
   assert.equal(new Timings("bmsrank", 3).encode(), 2503);
   assert.equal(new Timings("osu_std_od", 7.5).encode(), 2675);
+  assert.equal(new Timings("osu_std_od", 12).encode(), 2720);
 
   for (let value = -1; value <= 3000; value += 1) {
     assert.equal(Timings.decode(value).encode(), value);
@@ -27,7 +28,7 @@ test("validates timing identity ranges and precision", () => {
   assert.throws(() => new Timings("osuod", -0.1), /Invalid timings/);
   assert.throws(() => new Timings("osuod", 10.1), /Invalid timings/);
   assert.throws(() => new Timings("osu_std_od", 5.05), /Invalid timings/);
-  assert.throws(() => new Timings("osu_std_od", 10.1), /Invalid timings/);
+  assert.throws(() => new Timings("osu_std_od", 12.1), /Invalid timings/);
   assert.throws(() => new Timings("etternaj", 1.5), /Invalid timings/);
   assert.throws(() => Timings.decode(1.5), /integer/);
 });
