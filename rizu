@@ -5,6 +5,10 @@ export LC_ALL=C
 
 readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly DEPLOY_HOST="${DEPLOY_HOST:-root@nimue.mom}"
+readonly REPOSITORY_URL="${REPOSITORY_URL:-https://github.com/Nimue-lua/rizu_webclient.git}"
+readonly BRANCH="${BRANCH:-main}"
+readonly SERVER_ROOT="${SERVER_ROOT:-/srv/rizu-replay/repo}"
+readonly NODE_ROOT="${NODE_ROOT:-/opt/node-v24.20.0}"
 readonly LIBRARY_DIR="${LIBRARY_DIR:-/media/SSD/s3_test}"
 readonly LIBRARY_REMOTE="${LIBRARY_REMOTE:-catalog:rizu.catalog}"
 readonly LIBRARY_URL="${LIBRARY_URL:-https://s3.kuudere.fun}"
@@ -20,6 +24,7 @@ Commands:
   upload-songs    Upload immutable assets to Selectel
   upload-catalog  Upload the gzipped catalog to Selectel
   deploy          Check, build, and deploy the application
+  restart-server  Restart the deployed server without rebuilding
 
 Run without a command to open the interactive menu.
 EOF
@@ -120,7 +125,57 @@ upload_catalog() {
 }
 
 deploy_application() {
-  DEPLOY_HOST="$DEPLOY_HOST" "$ROOT_DIR/start_server.sh"
+  require_commands ssh
+  ssh "$DEPLOY_HOST" "bash -s" -- "$REPOSITORY_URL" "$BRANCH" "$SERVER_ROOT" "$NODE_ROOT" <<'REMOTE'
+set -Eeuo pipefail
+
+repository_url="$1"
+branch="$2"
+server_root="$3"
+node_root="$4"
+export PATH="$node_root/bin:$PATH"
+
+command -v git >/dev/null
+command -v npm >/dev/null
+command -v curl >/dev/null
+
+if [[ ! -d "$server_root/.git" ]]; then
+  git clone --branch "$branch" --single-branch "$repository_url" "$server_root"
+else
+  git -C "$server_root" fetch origin "$branch"
+  git -C "$server_root" merge --ff-only FETCH_HEAD
+fi
+
+rm -rf -- "$server_root/.dist.new"
+npm --prefix "$server_root" ci
+npm --prefix "$server_root" run build -- --outDir .dist.new
+
+rm -rf -- "$server_root/dist.old"
+if [[ -d "$server_root/dist" ]]; then
+  mv -- "$server_root/dist" "$server_root/dist.old"
+fi
+mv -- "$server_root/.dist.new" "$server_root/dist"
+
+install -m 0644 "$server_root/server/rizu-replay.service" /etc/systemd/system/rizu-replay.service
+systemctl daemon-reload
+systemctl restart rizu-replay
+systemctl --quiet is-active rizu-replay
+curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-connrefused \
+  http://127.0.0.1:8765/api/health
+rm -rf -- "$server_root/dist.old"
+REMOTE
+
+  printf '\nRizu client and server deployed from %s (%s).\n' "$REPOSITORY_URL" "$BRANCH"
+}
+
+restart_server() {
+  require_commands ssh
+  ssh "$DEPLOY_HOST" 'set -Eeuo pipefail
+systemctl restart rizu-replay
+systemctl --quiet is-active rizu-replay
+curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-connrefused \
+  http://127.0.0.1:8765/api/health'
+  printf '\nRizu server restarted.\n'
 }
 
 choose_command() {
@@ -131,6 +186,7 @@ choose_command() {
     '3) Upload immutable assets to Selectel' \
     '4) Upload catalog.sqlite' \
     '5) Deploy application' \
+    '6) Restart server' \
     'q) Quit' >&2
   read -r -p '> ' choice
   case "$choice" in
@@ -139,6 +195,7 @@ choose_command() {
     3) printf 'upload-songs' ;;
     4) printf 'upload-catalog' ;;
     5) printf 'deploy' ;;
+    6) printf 'restart-server' ;;
     q|Q) printf 'quit' ;;
     *) printf 'Unknown selection: %s\n' "$choice" >&2; exit 2 ;;
   esac
@@ -158,6 +215,7 @@ case "$command_name" in
   upload-songs) upload_songs ;;
   upload-catalog) upload_catalog ;;
   deploy) deploy_application ;;
+  restart-server|restart_server) restart_server ;;
   quit) exit 0 ;;
   -h|--help|help) usage ;;
   *) printf 'Unknown command: %s\n\n' "$command_name" >&2; usage >&2; exit 2 ;;
