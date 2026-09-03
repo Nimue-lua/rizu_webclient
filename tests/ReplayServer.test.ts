@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listOnlineScores, listRecentPlays, listSkillLeaderboards, loadScoreStats, submitPlay } from "../src/replay/ReplayServer";
+import { listOnlineScores, listRecentPlays, listSkillLeaderboards, loadScoreStats, reportPresence, submitPlay } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -97,4 +97,17 @@ test("loads independently ranked skill leaderboards", async () => {
   assert.equal(leaderboards.technical[0]?.nickname, "Tech");
   assert.deepEqual(leaderboards.dexterity, []);
   assert.deepEqual(leaderboards.stamina, []);
+});
+
+test("reports presence and reads the online count", async () => {
+  let submitted_init: RequestInit | undefined;
+  const status = await reportPresence(async (input, init) => {
+    assert.equal(String(input), "/api/presence");
+    submitted_init = init;
+    return Response.json({ count: 7 });
+  });
+
+  assert.equal(submitted_init?.method, "POST");
+  assert.match(JSON.parse(String(submitted_init?.body)).client_id, /^[a-f\d-]{36}$/);
+  assert.deepEqual(status, { count: 7 });
 });

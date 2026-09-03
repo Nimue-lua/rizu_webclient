@@ -32,6 +32,10 @@ export interface ScoreStats {
   readonly today: number;
 }
 
+export interface PresenceStatus {
+  readonly count: number;
+}
+
 export type SkillName = "speed" | "dexterity" | "stamina" | "technical";
 
 export interface SkillRanking {
@@ -78,6 +82,18 @@ export async function logout(request: typeof fetch = onlineClient.request): Prom
   const response = await request("/api/logout", { method: "POST", headers: onlineClient.authorizationHeaders() });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   onlineClient.clearToken();
+}
+
+export async function reportPresence(request: typeof fetch = onlineClient.request): Promise<PresenceStatus> {
+  const response = await request("/api/presence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...onlineClient.authorizationHeaders() },
+    body: JSON.stringify({ client_id: onlineClient.clientId() }),
+  });
+  if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  const result = await response.json() as Partial<PresenceStatus>;
+  if (!Number.isInteger(result.count) || (result.count ?? -1) < 0) throw new Error("Replay server returned an invalid presence count");
+  return { count: result.count! };
 }
 
 function replayBase64(data: Uint8Array): string {

@@ -10,6 +10,7 @@ const MAX_BODY_SIZE = 5 * 1024 * 1024;
 const MAX_RESULTS = 50;
 const SKILL_PLAY_COUNT = 20;
 const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+const PRESENCE_LIFETIME_SECONDS = 90;
 const DEFAULT_CATALOG_URL = "https://s3.kuudere.fun/catalog.sqlite";
 const DEFAULT_CATALOG_PATH = "server/replay-server/catalog.sqlite";
 const DEFAULT_WEB_ROOT = fileURLToPath(new URL("../../dist", import.meta.url));
@@ -376,10 +377,16 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
       metadata_json TEXT NOT NULL,
       replay BLOB NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS presence (
+      client_id TEXT PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      last_seen INTEGER NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS scores_chart_ranking_idx
       ON scores(chart_md5, chart_index, accuracy DESC, score DESC, id ASC);
     CREATE INDEX IF NOT EXISTS scores_recent_idx ON scores(id DESC);
     CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+    CREATE INDEX IF NOT EXISTS presence_last_seen_idx ON presence(last_seen);
   `);
   return database;
 }
@@ -499,6 +506,27 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const match = request.headers.authorization?.match(/^Bearer (\S+)$/);
         if (match) database.prepare("DELETE FROM sessions WHERE token_hash = ?").run(tokenHash(match[1]));
         json(response, 200, { ok: true });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/presence") {
+        const payload = await readJson(request);
+        if (typeof payload.client_id !== "string" || !/^[a-z\d_-]{16,128}$/i.test(payload.client_id)) {
+          json(response, 400, { error: "Presence requires a valid client_id" });
+          return;
+        }
+        const now = Math.floor(Date.now() / 1000);
+        const user = authenticatedUser(database, request);
+        database.prepare("DELETE FROM presence WHERE last_seen < ?").run(now - PRESENCE_LIFETIME_SECONDS);
+        database.prepare(`
+          INSERT INTO presence (client_id, user_id, last_seen) VALUES (?, ?, ?)
+          ON CONFLICT(client_id) DO UPDATE SET user_id = excluded.user_id, last_seen = excluded.last_seen
+        `).run(payload.client_id, user?.id ?? null, now);
+        const count = database.prepare(`
+          SELECT COUNT(DISTINCT CASE WHEN user_id IS NULL THEN 'client:' || client_id ELSE 'user:' || user_id END) AS count
+          FROM presence WHERE last_seen >= ?
+        `).get(now - PRESENCE_LIFETIME_SECONDS) as { count: number };
+        json(response, 200, count);
         return;
       }
 

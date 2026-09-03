@@ -27,7 +27,7 @@ import { NoteSkinCatalog } from "../noteskin/NoteSkinCatalog";
 import { deleteNoteSkinOverrides } from "../noteskin/NoteSkinOverrides";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
-import { currentUser, submitPlay, subscribeAccountChanges, type OnlineUser } from "../replay/ReplayServer";
+import { currentUser, reportPresence, submitPlay, subscribeAccountChanges, type OnlineUser } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog, readLocalAsset } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
@@ -84,6 +84,7 @@ export function App() {
   );
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const [online_user, setOnlineUser] = useState<OnlineUser | null>(null);
+  const [online_count, setOnlineCount] = useState<number | null>(null);
   const [preview_player] = useState(() => new SongPreviewPlayer());
   const active_view_transition = useRef<ViewTransition | null>(null);
   const pending_view_transition = useRef<PendingViewTransition | null>(null);
@@ -104,6 +105,7 @@ export function App() {
   const music_rate = useSetting(settings.music_rate);
   const constant_scroll = useSetting(settings.constant_scroll);
   const tap_only = useSetting(settings.tap_only);
+  const online_server_address = useSetting(settings.online_server_address);
   const replay_base = useMemo(() => {
     const base = new ManiaReplayBase();
     base.rate = music_rate;
@@ -117,6 +119,19 @@ export function App() {
     refresh();
     return subscribeAccountChanges(refresh);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => void reportPresence()
+      .then(({ count }) => { if (active) setOnlineCount(count); })
+      .catch(() => { if (active) setOnlineCount(null); });
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [online_server_address, online_user?.id]);
 
   const transitionTo = (next_screen: Screen, kind: ViewTransitionKind = "screen", updateState?: () => void) => {
     const update = () => {
@@ -441,6 +456,7 @@ export function App() {
             chart_selector={chart_selector}
             preview_player={preview_player}
             nickname={online_user?.name ?? "Anonymous"}
+            online_count={online_count}
             master_volume={master_volume}
             music_rate={replay_base.rate}
             constant_scroll={replay_base.const}

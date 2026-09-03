@@ -2,6 +2,7 @@ import type { ConfigStorage } from "../config/Config";
 import { appSettings, settings } from "../config/Settings";
 
 const TOKEN_KEY = "rizu.online.token";
+const CLIENT_ID_KEY = "rizu.online.client_id";
 
 export interface OnlineClientOptions {
   readonly serverAddress: () => string;
@@ -20,6 +21,7 @@ function browserStorage(): ConfigStorage | undefined {
 export class OnlineClient {
   private readonly account_listeners = new Set<() => void>();
   private readonly request_impl: typeof fetch;
+  private readonly transient_client_id = crypto.randomUUID();
 
   constructor(private readonly options: OnlineClientOptions) {
     this.request_impl = options.request ?? ((input, init) => fetch(input, init));
@@ -48,6 +50,17 @@ export class OnlineClient {
   authorizationHeaders(): Record<string, string> {
     const token = this.options.storage?.getItem(this.tokenKey());
     return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  clientId(): string {
+    try {
+      const stored_id = this.options.storage?.getItem(CLIENT_ID_KEY);
+      if (stored_id) return stored_id;
+      this.options.storage?.setItem(CLIENT_ID_KEY, this.transient_client_id);
+    } catch {
+      // A session-only identity still provides correct presence when storage is unavailable.
+    }
+    return this.transient_client_id;
   }
 
   setToken(token: string): void {

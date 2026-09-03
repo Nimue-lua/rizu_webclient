@@ -138,6 +138,32 @@ test("registers and logs in a case-insensitive user", async () => {
   assert.equal(me.result.user.name, "Nimue");
 });
 
+test("counts active clients and deduplicates logged-in users", async () => {
+  const { result: registration } = await auth("/register", "OnlinePlayer");
+  const heartbeat = (client_id: string, token?: string) => request("/presence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ client_id }),
+  });
+
+  assert.equal((await heartbeat("anonymous-client-1")).result.count, 1);
+  assert.equal((await heartbeat("anonymous-client-2")).result.count, 2);
+  assert.equal((await heartbeat("registered-client-1", registration.token)).result.count, 3);
+  assert.equal((await heartbeat("registered-client-2", registration.token)).result.count, 3);
+
+  database.prepare("UPDATE presence SET last_seen = 0 WHERE client_id = ?").run("anonymous-client-1");
+  assert.equal((await heartbeat("registered-client-1", registration.token)).result.count, 2);
+});
+
+test("rejects invalid presence client IDs", async () => {
+  const { response } = await request("/presence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: "short" }),
+  });
+  assert.equal(response.status, 400);
+});
+
 test("interpolates score skill rating through the accuracy curve", () => {
   const closeTo = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-12);
   closeTo(skillRating(8, 1), 10);

@@ -35,6 +35,7 @@ interface LocalPreviewMedia {
 interface SongSelectScreenProps {
   chart_selector: ChartSelector;
   nickname: string;
+  online_count: number | null;
   onPlay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
   preview_player: SongPreviewPlayer;
   onAutoplay: (chart: Chartview, input_bindings: readonly (string | null)[], song: { title: string; artist: string }) => void;
@@ -72,6 +73,7 @@ function formatSessionDuration(duration_seconds: number): string {
 export function SongSelectScreen({
   chart_selector,
   nickname,
+  online_count,
   onPlay,
   preview_player,
   onAutoplay,
@@ -359,7 +361,7 @@ export function SongSelectScreen({
       unlockPreview();
       changeMusicRateFromKeyboard(event);
     }}>
-      <SongSelectHeader nickname={nickname} date_text={date_text} session_duration={session_duration}
+      <SongSelectHeader nickname={nickname} online_count={online_count} date_text={date_text} session_duration={session_duration}
         onSettings={onSettings} onGlobalLeaderboard={() => setGlobalLeaderboardOpen(true)}
         onOpenLibrarySources={() => setLibrarySourcesOpen(true)} onRefreshLibrary={onRefreshLibrary} library_scanning={local_library_status.scanning} />
       {global_leaderboard_open ? <GlobalLeaderboardScreen onExit={() => setGlobalLeaderboardOpen(false)} /> : library_sources_open ? <LibrarySourcesScreen local_status={local_library_status} remote_providers={remote_providers}
