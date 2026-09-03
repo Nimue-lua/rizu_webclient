@@ -11,6 +11,7 @@ import {
   type ConfigSetting,
   type ConfigStorage,
   numberSetting,
+  stringSetting,
 } from "./Config";
 
 const STORAGE_KEY = "rizu.settings";
@@ -31,6 +32,7 @@ export const settings = {
   music_rate: numberSetting("gameplay.music_rate", 1, 0.25, 4, 0.001),
   constant_scroll: booleanSetting("gameplay.mania.constant_scroll", false),
   tap_only: booleanSetting("gameplay.mania.tap_only", false),
+  online_server_address: stringSetting("online.server_address", ""),
 } as const;
 
 const definitions: readonly ConfigDefinition[] = Object.values(settings);

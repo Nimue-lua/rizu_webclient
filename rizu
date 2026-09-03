@@ -5,14 +5,10 @@ export LC_ALL=C
 
 readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly DEPLOY_HOST="${DEPLOY_HOST:-root@nimue.mom}"
-readonly DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/rizu}"
-readonly DEPLOY_URL="${DEPLOY_URL:-https://rizu.kuudere.fun}"
 readonly LIBRARY_DIR="${LIBRARY_DIR:-/media/SSD/s3_test}"
 readonly LIBRARY_REMOTE="${LIBRARY_REMOTE:-catalog:rizu.catalog}"
 readonly LIBRARY_URL="${LIBRARY_URL:-https://s3.kuudere.fun}"
 readonly CHARTS_DIR="$LIBRARY_DIR/charts"
-readonly MIN_FREE_BYTES="${MIN_FREE_BYTES:-536870912}"
-readonly SSH_OPTIONS=(-o ServerAliveInterval=15 -o ServerAliveCountMax=6)
 
 usage() {
   cat <<'EOF'
@@ -71,26 +67,6 @@ create_catalog() {
     --skip-previews
 }
 
-prepare_remote_copy() {
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$DEPLOY_ROOT" <<'REMOTE'
-set -Eeuo pipefail
-deploy_root="$1"
-test -d "$deploy_root"
-rm -rf -- "$deploy_root.new" "$deploy_root.old"
-cp -al -- "$deploy_root" "$deploy_root.new"
-REMOTE
-}
-
-activate_remote_copy() {
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "bash -s" -- "$DEPLOY_ROOT" <<'REMOTE'
-set -Eeuo pipefail
-deploy_root="$1"
-chown -R www-data:www-data "$deploy_root.new"
-rm -rf -- "$deploy_root"
-mv -- "$deploy_root.new" "$deploy_root"
-REMOTE
-}
-
 upload_songs() {
   require_commands rclone
   local directory
@@ -144,46 +120,7 @@ upload_catalog() {
 }
 
 deploy_application() {
-  require_commands npm node rsync ssh curl grep perl
-  local stage_dir="${STAGE_DIR:-/tmp/rizu-deploy}"
-
-  printf 'Installing dependencies and running checks...\n'
-  npm --prefix "$ROOT_DIR" ci
-  npm --prefix "$ROOT_DIR" run typecheck
-  npm --prefix "$ROOT_DIR" test
-  npm --prefix "$ROOT_DIR" run build
-
-  rm -rf -- "$stage_dir"
-  mkdir -p -- "$stage_dir/dist" "$stage_dir/server/replay-server"
-  cp -a -- "$ROOT_DIR/dist/." "$stage_dir/dist/"
-  cp -a -- "$ROOT_DIR/server/replay-server/index.ts" "$stage_dir/server/replay-server/"
-  cp -a -- "$ROOT_DIR/server/rizu-replay.service" "$stage_dir/server/"
-
-  printf 'Preparing application deployment...\n'
-  prepare_remote_copy
-  local bundle_bytes available_bytes required_bytes
-  bundle_bytes="$(du -sb "$stage_dir" | cut -f1)"
-  available_bytes="$(ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "df --output=avail -B1 '$DEPLOY_ROOT.new'" | tr -dc '0-9')"
-  required_bytes=$((bundle_bytes + MIN_FREE_BYTES))
-  if (( available_bytes < required_bytes )); then
-    printf 'Insufficient VPS space: upload needs %d bytes plus %d bytes free; only %d bytes available.\n' \
-      "$bundle_bytes" "$MIN_FREE_BYTES" "$available_bytes" >&2
-    exit 1
-  fi
-
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "rm -rf -- '$DEPLOY_ROOT.new/dist' '$DEPLOY_ROOT.new/server'; mkdir -p -- '$DEPLOY_ROOT.new'"
-  rsync -a --delete --partial --info=progress2 \
-    -e "ssh ${SSH_OPTIONS[*]}" \
-    "$stage_dir/" "$DEPLOY_HOST:$DEPLOY_ROOT.new/"
-  activate_remote_copy
-  ssh "${SSH_OPTIONS[@]}" "$DEPLOY_HOST" "cp '$DEPLOY_ROOT/server/rizu-replay.service' /etc/systemd/system/rizu-replay.service; systemctl daemon-reload; systemctl restart rizu-replay; systemctl --quiet is-active rizu-replay"
-  curl -fsS --retry 30 --retry-delay 1 --retry-all-errors "$DEPLOY_URL/api/health" >/dev/null
-  local asset_path chart_path
-  asset_path="$(perl -ne 'print $1 if m{src="(/[^"]+\.js)"}' "$ROOT_DIR/dist/index.html")"
-  chart_path="$(node -e 'const {DatabaseSync}=require("node:sqlite"); const db=new DatabaseSync(process.argv[1],{readOnly:true}); const row=db.prepare("SELECT chart_md5, chart_index FROM charts LIMIT 1").get(); process.stdout.write(`/chart/${row.chart_md5}/${row.chart_index}`)' "$ROOT_DIR/server/replay-server/catalog.sqlite")"
-  curl -fsSI "$DEPLOY_URL$asset_path" | grep -qi '^content-type: text/javascript'
-  curl -fsS "$DEPLOY_URL$chart_path" | grep -q 'property="og:title"'
-  printf 'Application deployed: %s\n' "$DEPLOY_URL"
+  DEPLOY_HOST="$DEPLOY_HOST" "$ROOT_DIR/start_server.sh"
 }
 
 choose_command() {

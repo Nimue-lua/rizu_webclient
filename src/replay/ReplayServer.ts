@@ -1,4 +1,5 @@
 import type { StoredPlay } from "./ReplayStore";
+import { onlineClient } from "../online/OnlineClient";
 
 export interface OnlineScore {
   readonly id: number;
@@ -43,29 +44,8 @@ export interface SkillRanking {
 
 export type SkillLeaderboards = Record<SkillName, readonly SkillRanking[]>;
 
-const TOKEN_KEY = "rizu.online.token";
-const account_listeners = new Set<() => void>();
-
-function notifyAccountChange(): void {
-  for (const listener of account_listeners) listener();
-}
-
 export function subscribeAccountChanges(listener: () => void): () => void {
-  account_listeners.add(listener);
-  return () => account_listeners.delete(listener);
-}
-
-function storage(): Storage | undefined {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
-function authorizationHeaders(): Record<string, string> {
-  const token = storage()?.getItem(TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return onlineClient.subscribeAccountChanges(listener);
 }
 
 async function accountRequest(path: string, name: string, password: string, request: typeof fetch): Promise<OnlineUser> {
@@ -76,30 +56,28 @@ async function accountRequest(path: string, name: string, password: string, requ
   });
   const result = await response.json() as { user?: OnlineUser; token?: string; error?: string };
   if (!response.ok || !result.user || !result.token) throw new Error(result.error ?? `Replay server returned ${response.status}`);
-  storage()?.setItem(TOKEN_KEY, result.token);
-  notifyAccountChange();
+  onlineClient.setToken(result.token);
   return result.user;
 }
 
-export function register(name: string, password: string, request: typeof fetch = fetch): Promise<OnlineUser> {
+export function register(name: string, password: string, request: typeof fetch = onlineClient.request): Promise<OnlineUser> {
   return accountRequest("/api/register", name, password, request);
 }
 
-export function login(name: string, password: string, request: typeof fetch = fetch): Promise<OnlineUser> {
+export function login(name: string, password: string, request: typeof fetch = onlineClient.request): Promise<OnlineUser> {
   return accountRequest("/api/login", name, password, request);
 }
 
-export async function currentUser(request: typeof fetch = fetch): Promise<OnlineUser | null> {
-  const response = await request("/api/me", { headers: authorizationHeaders() });
+export async function currentUser(request: typeof fetch = onlineClient.request): Promise<OnlineUser | null> {
+  const response = await request("/api/me", { headers: onlineClient.authorizationHeaders() });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   return (await response.json() as { user?: OnlineUser | null }).user ?? null;
 }
 
-export async function logout(request: typeof fetch = fetch): Promise<void> {
-  const response = await request("/api/logout", { method: "POST", headers: authorizationHeaders() });
+export async function logout(request: typeof fetch = onlineClient.request): Promise<void> {
+  const response = await request("/api/logout", { method: "POST", headers: onlineClient.authorizationHeaders() });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
-  storage()?.removeItem(TOKEN_KEY);
-  notifyAccountChange();
+  onlineClient.clearToken();
 }
 
 function replayBase64(data: Uint8Array): string {
@@ -112,10 +90,10 @@ function replayBase64(data: Uint8Array): string {
 }
 
 export async function submitPlay(play: StoredPlay, chart_md5: string, chart_index: number,
-  request: typeof fetch = fetch): Promise<void> {
+  request: typeof fetch = onlineClient.request): Promise<void> {
   const response = await request("/api/scores", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authorizationHeaders() },
+    headers: { "Content-Type": "application/json", ...onlineClient.authorizationHeaders() },
     body: JSON.stringify({
       chart_md5,
       chart_index,
@@ -137,21 +115,21 @@ export async function submitPlay(play: StoredPlay, chart_md5: string, chart_inde
 }
 
 export async function listOnlineScores(chart_md5: string, chart_index: number, signal?: AbortSignal,
-  request: typeof fetch = fetch): Promise<OnlineScore[]> {
+  request: typeof fetch = onlineClient.request): Promise<OnlineScore[]> {
   const response = await request(`/api/leaderboard?chart_md5=${encodeURIComponent(chart_md5)}&chart_index=${chart_index}&limit=5`, { signal });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { scores?: unknown };
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
 }
 
-export async function listRecentPlays(signal?: AbortSignal, request: typeof fetch = fetch): Promise<OnlineScore[]> {
+export async function listRecentPlays(signal?: AbortSignal, request: typeof fetch = onlineClient.request): Promise<OnlineScore[]> {
   const response = await request("/api/scores/recent?limit=50", { signal });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { scores?: unknown };
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
 }
 
-export async function listSkillLeaderboards(signal?: AbortSignal, request: typeof fetch = fetch): Promise<SkillLeaderboards> {
+export async function listSkillLeaderboards(signal?: AbortSignal, request: typeof fetch = onlineClient.request): Promise<SkillLeaderboards> {
   const response = await request("/api/rankings", { signal, cache: "no-store" });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as { leaderboards?: Partial<Record<SkillName, unknown>> };
@@ -163,7 +141,7 @@ export async function listSkillLeaderboards(signal?: AbortSignal, request: typeo
   };
 }
 
-export async function loadScoreStats(signal?: AbortSignal, request: typeof fetch = fetch): Promise<ScoreStats> {
+export async function loadScoreStats(signal?: AbortSignal, request: typeof fetch = onlineClient.request): Promise<ScoreStats> {
   const response = await request("/api/scores/stats", { signal });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as Partial<ScoreStats>;

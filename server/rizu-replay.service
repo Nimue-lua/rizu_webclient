@@ -9,8 +9,9 @@ StateDirectory=rizu-replay
 Environment=RIZU_DATABASE=/var/lib/rizu-replay/scores.sqlite3
 Environment=RIZU_CATALOG=/var/lib/rizu-replay/catalog.sqlite
 Environment=RIZU_CATALOG_URL=https://s3.kuudere.fun/catalog.sqlite
-Environment=RIZU_WEB_ROOT=/srv/rizu/dist
-ExecStart=/opt/node-v24.20.0/bin/node /srv/rizu/server/replay-server/index.ts
+Environment=RIZU_WEB_ROOT=/srv/rizu-replay/repo/dist
+WorkingDirectory=/srv/rizu-replay/repo
+ExecStart=/opt/node-v24.20.0/bin/node /srv/rizu-replay/repo/server/replay-server/index.ts
 Restart=on-failure
 NoNewPrivileges=yes
 PrivateTmp=yes

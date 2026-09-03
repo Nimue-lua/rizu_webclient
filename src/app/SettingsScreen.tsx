@@ -16,7 +16,7 @@ import {
 import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
 import type { HitErrorMeterType } from "../gameplay/renderer/GameplayHudRenderer";
 import { appSettings, settings, useSetting } from "../config/Settings";
-import { currentUser, login, logout, register, type OnlineUser } from "../replay/ReplayServer";
+import { currentUser, login, logout, register, subscribeAccountChanges, type OnlineUser } from "../replay/ReplayServer";
 import { ConfigResetButton } from "./ConfigResetButton";
 import { RangeInput } from "./RangeInput";
 
@@ -56,12 +56,14 @@ export function SettingsScreen({
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
   const hit_registration = useSetting(settings.mania_hit_registration);
+  const online_server_address = useSetting(settings.online_server_address);
   const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
   const [online_user, setOnlineUser] = useState<OnlineUser | null>(null);
   const [account_name, setAccountName] = useState("");
   const [account_password, setAccountPassword] = useState("");
   const [account_error, setAccountError] = useState("");
   const [account_busy, setAccountBusy] = useState(false);
+  const [server_address, setServerAddress] = useState(online_server_address);
   const panel_ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -86,8 +88,16 @@ export function SettingsScreen({
   }, [onExit]);
 
   useEffect(() => {
-    void currentUser().then(setOnlineUser).catch(() => setOnlineUser(null));
+    const refresh = () => void currentUser().then(setOnlineUser).catch(() => setOnlineUser(null));
+    refresh();
+    return subscribeAccountChanges(refresh);
   }, []);
+
+  useEffect(() => setServerAddress(online_server_address), [online_server_address]);
+
+  const saveServerAddress = () => {
+    appSettings.set(settings.online_server_address, server_address.trim());
+  };
 
   const authenticate = async (action: typeof login) => {
     setAccountBusy(true);
@@ -282,6 +292,13 @@ export function SettingsScreen({
                 <UserRound aria-hidden="true" />
                 <h2>Online</h2>
               </header>
+              <label className="settings-control settings-text-control" htmlFor="settings-server-address">
+                <span>Server address</span>
+                <input id="settings-server-address" type="text" value={server_address}
+                  placeholder="Same origin (default)" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  onChange={(event) => setServerAddress(event.target.value)} onBlur={saveServerAddress}
+                  onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+              </label>
               {online_user ? <div className="settings-account-control">
                 <span>Logged in as <strong>{online_user.name}</strong></span>
                 <button type="button" onClick={() => void logout().then(() => setOnlineUser(null))}>Log out</button>

@@ -155,7 +155,7 @@ test("fullscreen hit error ticks stop rendering after 133ms", () => {
     { enabled: true, type: "fullscreen", scale: 1 })
     .drawHitErrorMeter({
       windows: [0.05, 0.1, 0.15],
-      ticks: [{ deltaTime: 0.075, age: 0 }, { deltaTime: 0.075, age: 0.0665 }, { deltaTime: 0.075, age: 0.133 }],
+      ticks: [{ deltaTime: 0.075, age: 0 }, { deltaTime: 0.075, age: 0.0665 }, { deltaTime: 0.075, age: 0.3 }],
       floatingError: 0,
       age: 0,
     }, { scoreRight: 848, scoreTop: 0, width: 854, height: 480 });

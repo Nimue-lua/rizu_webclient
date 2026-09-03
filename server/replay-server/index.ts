@@ -12,6 +12,7 @@ const SKILL_PLAY_COUNT = 20;
 const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_CATALOG_URL = "https://s3.kuudere.fun/catalog.sqlite";
 const DEFAULT_CATALOG_PATH = "server/replay-server/catalog.sqlite";
+const DEFAULT_WEB_ROOT = fileURLToPath(new URL("../../dist", import.meta.url));
 
 type JsonObject = Record<string, unknown>;
 
@@ -643,7 +644,7 @@ async function main(): Promise<void> {
   const host = process.env.HOST ?? "127.0.0.1";
   const catalog_url = process.env.RIZU_CATALOG_URL ?? DEFAULT_CATALOG_URL;
   const catalog_path = process.env.RIZU_CATALOG ?? DEFAULT_CATALOG_PATH;
-  const app_directory = path.resolve(process.env.RIZU_WEB_ROOT ?? "/srv/rizu/dist");
+  const app_directory = path.resolve(process.env.RIZU_WEB_ROOT ?? DEFAULT_WEB_ROOT);
   await prepareCatalog(catalog_url, catalog_path);
   const app_html = await readFile(path.join(app_directory, "index.html"), "utf8");
   createReplayServer({ database_path, catalog_path, app_html, app_directory, asset_base_url: new URL(".", catalog_url).href }).listen(port, host, () => {

@@ -34,3 +34,16 @@ test("limits hit error meter scale to 0.5x through 2x", () => {
   assert.throws(() => config.set(settings.hit_error_meter_scale, 0.49), /Invalid value/);
   assert.throws(() => config.set(settings.hit_error_meter_scale, 2.01), /Invalid value/);
 });
+
+test("persists the online server address", () => {
+  let stored: string | null = null;
+  const config = createSettingsConfig({
+    getItem: () => stored,
+    setItem: (_key, value) => { stored = value; },
+    removeItem: () => { stored = null; },
+  });
+
+  assert.equal(config.get(settings.online_server_address), "");
+  config.set(settings.online_server_address, "192.168.1.20:8765");
+  assert.equal(JSON.parse(stored!).values["online.server_address"], "192.168.1.20:8765");
+});
