@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Clock3, Metronome, Play, Star } from "lucide-react";
 import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
 import { JudgeSegmentsCanvas } from "./JudgeSegmentsCanvas";
+import { updateScoreComment } from "../replay/ReplayServer";
 
 const GRADE_COLORS: Readonly<Record<string, string>> = {
   X: "rgb(153 204 255)",
@@ -30,13 +31,30 @@ interface ResultScreenProps {
   difficulty: number;
   overall_difficulty: number;
   mode: "mania" | "osu";
+  online_score: { id: number | null; state: "pending" | "ready" | "error" } | null;
+  can_comment: boolean;
   onReplay: () => void;
   onExit: () => void;
 }
 
 export function ResultScreen({ score, title, artist, chart_name, duration_seconds,
-  long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, mode, onReplay, onExit }: ResultScreenProps) {
+  long_note_ratio, bpm, music_rate, difficulty, overall_difficulty, mode, online_score, can_comment, onReplay, onExit }: ResultScreenProps) {
   const grade_color = GRADE_COLORS[score?.grade ?? ""] ?? FALLBACK_GRADE_COLOR;
+  const [comment, setComment] = useState("");
+  const [comment_state, setCommentState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const submitComment = (event: FormEvent) => {
+    event.preventDefault();
+    if (!online_score?.id || comment_state === "saving") return;
+    setCommentState("saving");
+    void updateScoreComment(online_score.id, comment).then((saved_comment) => {
+      setComment(saved_comment ?? "");
+      setCommentState("saved");
+    }).catch((error: unknown) => {
+      console.error("Could not update score comment", error);
+      setCommentState("error");
+    });
+  };
 
   useEffect(() => {
     const handle_key_down = (event: KeyboardEvent) => {
@@ -55,6 +73,19 @@ export function ResultScreen({ score, title, artist, chart_name, duration_second
       <button className="result-replay" type="button" onClick={onReplay}>
         <Play fill="currentColor" aria-hidden="true" /> Watch replay
       </button>
+      {can_comment && online_score && (
+        <form className="result-comment" onSubmit={submitComment}>
+          <label htmlFor="result-score-comment">Score comment</label>
+          <div>
+            <input id="result-score-comment" value={comment} maxLength={160} placeholder="Say something funny..."
+              disabled={online_score.state !== "ready" || comment_state === "saving"}
+              onChange={(event) => { setComment(event.target.value); setCommentState("idle"); }} />
+            <button type="submit" disabled={online_score.state !== "ready" || comment_state === "saving"}>Apply</button>
+          </div>
+          <span role="status">{online_score.state === "pending" ? "Uploading score..." : online_score.state === "error" ? "Score upload failed" :
+            comment_state === "saving" ? "Saving..." : comment_state === "saved" ? "Comment applied" : comment_state === "error" ? "Could not apply comment" : ""}</span>
+        </form>
+      )}
       <div className="result-panels">
         <div className="result-side-panel">
           <div className="result-chart-meta">

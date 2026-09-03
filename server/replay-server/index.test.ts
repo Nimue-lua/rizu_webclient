@@ -209,6 +209,40 @@ test("shows only a registered user's best chart score and every anonymous score"
   assert.equal(result.scores[0].pp, undefined);
 });
 
+test("lets registered users comment on their own scores", async () => {
+  const { result: owner } = await auth("/register", "Owner");
+  const { result: stranger } = await auth("/register", "Stranger");
+  const { result: submission } = await submit({ token: owner.token, accuracy: 0.95 });
+
+  const unauthenticated = await request(`/scores/${submission.id}/comment`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comment: "nope" }),
+  });
+  assert.equal(unauthenticated.response.status, 401);
+  const forbidden = await request(`/scores/${submission.id}/comment`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${stranger.token}` },
+    body: JSON.stringify({ comment: "also nope" }),
+  });
+  assert.equal(forbidden.response.status, 404);
+  const updated = await request(`/scores/${submission.id}/comment`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${owner.token}` },
+    body: JSON.stringify({ comment: "  almost FC  " }),
+  });
+  assert.deepEqual(updated.result, { comment: "almost FC" });
+
+  const { result: leaderboard } = await request("/leaderboard?chart_md5=11111111111111111111111111111111&chart_index=1");
+  assert.equal(leaderboard.scores[0].comment, "almost FC");
+});
+
+test("rejects score comments longer than 160 characters", async () => {
+  const { result: owner } = await auth("/register", "Owner");
+  const { result: submission } = await submit({ token: owner.token, accuracy: 0.95 });
+  const result = await request(`/scores/${submission.id}/comment`, {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${owner.token}` },
+    body: JSON.stringify({ comment: "x".repeat(161) }),
+  });
+  assert.equal(result.response.status, 400);
+});
+
 test("lists recent plays newest first without deduplicating users", async () => {
   const { result: registration } = await auth("/register", "Player");
   await submit({ token: registration.token, accuracy: 0.8 });

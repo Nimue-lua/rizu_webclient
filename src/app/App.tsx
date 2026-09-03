@@ -74,6 +74,7 @@ export function App() {
   const [input_bindings, setInputBindings] = useState<readonly (string | null)[]>([]);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [completed_gameplay, setCompletedGameplay] = useState<CompletedGameplay | null>(null);
+  const [online_score, setOnlineScore] = useState<{ id: number | null; state: "pending" | "ready" | "error" } | null>(null);
   const [playback, setPlayback] = useState<CompletedGameplay | null>(null);
   const [autoplay, setAutoplay] = useState(false);
   const [note_skin_editor, setNoteSkinEditor] = useState(false);
@@ -408,13 +409,17 @@ export function App() {
               transitionTo("result", "gameplay-result", () => {
                 setCompletedGameplay(completed);
                 setScore(completed.score);
+                setOnlineScore({ id: null, state: "pending" });
               });
               const play = storedPlay(assets.chart_id, completed);
               void savePlay(play).catch((error: unknown) => {
                 console.error("Could not save gameplay replay", error);
               });
-              void submitPlay(play, assets.chart_md5, assets.chart_index).catch((error: unknown) => {
+              void submitPlay(play, assets.chart_md5, assets.chart_index).then((id) => {
+                setOnlineScore({ id, state: "ready" });
+              }).catch((error: unknown) => {
                 console.error("Could not submit gameplay replay", error);
+                setOnlineScore({ id: null, state: "error" });
               });
             }}
           />
@@ -452,6 +457,8 @@ export function App() {
             difficulty={loading_location?.difficulty ?? 0}
             overall_difficulty={assets?.chart.overall_difficulty ?? 5}
             mode={assets?.mode ?? "mania"}
+            online_score={online_score}
+            can_comment={online_user !== null}
             onReplay={() => {
               if (!completed_gameplay) return;
               transitionTo("gameplay", "gameplay-result", () => setPlayback(completed_gameplay));

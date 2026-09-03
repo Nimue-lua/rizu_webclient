@@ -387,6 +387,8 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .score-row.filled:focus-visible { outline: 2px solid var(--grade-color); outline-offset: -2px; }
 .score-avatar { display: grid; width: 64px; height: 100%; min-height: 52px; place-items: center; background: linear-gradient(145deg, color-mix(in srgb, var(--grade-color) 18%, var(--surface-raised)), var(--surface)); border-radius: 4px; }
 .score-player { overflow: hidden; font-size: 24px; text-overflow: ellipsis; white-space: nowrap; }
+.score-player-block { display: grid; min-width: 0; gap: 2px; }
+.score-comment { overflow: hidden; color: var(--muted); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .score-details { display: grid; justify-items: end; gap: 3px; }
 .score-details strong { color: var(--grade-color); font-size: 24px; font-weight: 400; }
 .score-details span { color: var(--grade-color); font-size: 16px; line-height: 1; white-space: nowrap; }
@@ -665,6 +667,13 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .result-replay { position: absolute; z-index: 2; top: 26px; right: 30px; display: flex; align-items: center; gap: 10px; padding: 12px 17px; color: var(--text); background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent); border-radius: 7px; box-shadow: 0 12px 30px color-mix(in srgb, var(--shadow) 35%, transparent); font-family: "Rubik", sans-serif; font-size: 15px; font-weight: 600; backdrop-filter: blur(8px); }
 .result-replay svg { width: 18px; height: 18px; color: var(--accent); }
 .result-replay:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.result-comment { position: absolute; z-index: 2; top: 88px; right: 30px; display: grid; width: min(390px, calc(100vw - 60px)); gap: 5px; padding: 12px; color: var(--text); background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--outline); border-radius: 7px; box-shadow: 0 12px 30px color-mix(in srgb, var(--shadow) 35%, transparent); font-family: "Rubik", sans-serif; font-size: 13px; backdrop-filter: blur(8px); }
+.result-comment label { color: var(--muted); font-weight: 600; }
+.result-comment > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.result-comment input { min-width: 0; padding: 9px 11px; color: var(--text); background: var(--background); border: 1px solid var(--outline); border-radius: 5px; font: inherit; }
+.result-comment button { padding: 0 14px; color: var(--background); background: var(--accent); border-radius: 5px; font: inherit; font-weight: 700; }
+.result-comment input:focus-visible, .result-comment button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.result-comment span { min-height: 1em; color: var(--muted); font-size: 11px; }
 .result-panels { position: relative; z-index: 1; width: min(900px, calc(100vw - 40px)); height: 500px; }
 .result-side-panel { position: absolute; top: 95px; right: 0; display: grid; grid-template-rows: auto auto auto; align-content: center; gap: 20px; width: 58%; height: 310px; padding: 27px 28px 25px 150px; background: var(--panel); border-radius: 0 40px 40px 0; box-shadow: 0 20px 50px color-mix(in srgb, var(--shadow) 33%, transparent); font-family: "Rubik", sans-serif; }
 .result-circle-panel { position: absolute; z-index: 1; top: 0; left: 0; display: grid; width: 500px; height: 500px; background: var(--panel); border-radius: 50%; box-shadow: 0 24px 65px color-mix(in srgb, var(--shadow) 47%, transparent); place-items: center; }

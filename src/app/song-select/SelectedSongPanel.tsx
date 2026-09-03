@@ -174,7 +174,10 @@ export function SelectedSongPanel({ nickname, background_url, background_loaded,
             return <div className="score-row filled" key={row.score.id}
               style={{ "--grade-color": row.color } as React.CSSProperties}>
               <div className="score-avatar" aria-label="Avatar placeholder" />
-              <span className="score-player">#{index + 1} {row.score.nickname || "Anonymous"}</span>
+              <div className="score-player-block">
+                <span className="score-player">#{index + 1} {row.score.nickname || "Anonymous"}</span>
+                {row.score.comment && <span className="score-comment">{row.score.comment}</span>}
+              </div>
               <span className="score-details">
                 <strong>{(row.accuracy * 100).toFixed(2)}%</strong>
                 <span><b>{row.score.max_skill_difficulty.toFixed(2)}<Sigma aria-hidden="true" /></b><time dateTime={row.score.played_at}>{formatPlayDate(row.score.played_at)}</time></span>

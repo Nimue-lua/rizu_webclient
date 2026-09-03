@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listOnlineScores, listRecentPlays, listSkillLeaderboards, loadScoreStats, reportPresence, submitPlay } from "../src/replay/ReplayServer";
+import { listOnlineScores, listRecentPlays, listSkillLeaderboards, loadScoreStats, reportPresence, submitPlay, updateScoreComment } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -26,7 +26,7 @@ test("submits score metadata and compressed replay bytes", async () => {
   await submitPlay(play, "0123456789abcdef0123456789abcdef", 2, async (input, init) => {
     submitted_url = String(input);
     submitted_init = init;
-    return new Response(null, { status: 201 });
+    return Response.json({ id: 42, submitted_at: "2026-08-27T12:35:00.000Z" }, { status: 201 });
   });
 
   assert.equal(submitted_url, "/api/scores");
@@ -38,6 +38,18 @@ test("submits score metadata and compressed replay bytes", async () => {
   assert.equal(payload.score, 123456);
   assert.deepEqual(payload.judges, { perfect: 40, miss: 2 });
   assert.equal(payload.replay, "AAEC/w==");
+});
+
+test("updates a score comment", async () => {
+  let submitted_init: RequestInit | undefined;
+  const comment = await updateScoreComment(42, "nice miss", async (input, init) => {
+    assert.equal(String(input), "/api/scores/42/comment");
+    submitted_init = init;
+    return Response.json({ comment: "nice miss" });
+  });
+  assert.equal(submitted_init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(submitted_init?.body)), { comment: "nice miss" });
+  assert.equal(comment, "nice miss");
 });
 
 test("rejects score submission server errors", async () => {

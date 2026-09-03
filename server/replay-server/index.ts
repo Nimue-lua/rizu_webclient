@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MAX_BODY_SIZE = 5 * 1024 * 1024;
+const MAX_COMMENT_LENGTH = 160;
 const MAX_RESULTS = 50;
 const SKILL_PLAY_COUNT = 20;
 const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
@@ -33,6 +34,7 @@ interface ScoreRow {
   played_at: string;
   submitted_at: string;
   metadata_json: string;
+  comment: string | null;
 }
 
 interface CatalogChartRow {
@@ -346,6 +348,7 @@ function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
   return {
     ...metadata,
     id: row.id,
+    comment: row.comment,
     nickname: row.user_name ?? "Anonymous",
     played_at: row.played_at,
     submitted_at: row.submitted_at,
@@ -438,6 +441,10 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
     CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
     CREATE INDEX IF NOT EXISTS presence_last_seen_idx ON presence(last_seen);
   `);
+  const score_columns = database.prepare("PRAGMA table_info(scores)").all() as unknown as { name: string }[];
+  if (!score_columns.some((column) => column.name === "comment")) {
+    database.exec("ALTER TABLE scores ADD COLUMN comment TEXT");
+  }
   return database;
 }
 
@@ -632,6 +639,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         delete metadata.nickname;
         delete metadata.difficulty;
         delete metadata.pp;
+        delete metadata.comment;
         const result = database.prepare(`
           INSERT INTO scores (chart_md5, chart_index, user_id, mode, accuracy, score, played_at,
             submitted_at, metadata_json, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -640,6 +648,33 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           typeof payload.score === "number" ? payload.score : null,
           played_at, submitted_at, JSON.stringify(metadata), replay);
         json(response, 201, { id: Number(result.lastInsertRowid), submitted_at });
+        return;
+      }
+
+      const comment_match = request.method === "POST" && url.pathname.match(/^\/api\/scores\/(\d+)\/comment$/);
+      if (comment_match) {
+        const user = authenticatedUser(database, request);
+        if (!user) {
+          json(response, 401, { error: "Authentication required" });
+          return;
+        }
+        const payload = await readJson(request);
+        if (typeof payload.comment !== "string") {
+          json(response, 400, { error: "Comment must be text" });
+          return;
+        }
+        const comment = payload.comment.trim();
+        if (comment.length > MAX_COMMENT_LENGTH) {
+          json(response, 400, { error: `Comment must contain at most ${MAX_COMMENT_LENGTH} characters` });
+          return;
+        }
+        const result = database.prepare("UPDATE scores SET comment = ? WHERE id = ? AND user_id = ?")
+          .run(comment || null, Number(comment_match[1]), user.id);
+        if (result.changes === 0) {
+          json(response, 404, { error: "Score not found" });
+          return;
+        }
+        json(response, 200, { comment: comment || null });
         return;
       }
 

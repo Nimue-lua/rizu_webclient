@@ -8,6 +8,7 @@ export interface OnlineScore {
   readonly nickname: string;
   readonly mode: "mania" | "osu";
   readonly registered: boolean;
+  readonly comment: string | null;
   readonly score: number | null;
   readonly accuracy: number | null;
   readonly grade: string | null;
@@ -118,7 +119,7 @@ function replayBase64(data: Uint8Array): string {
 }
 
 export async function submitPlay(play: StoredPlay, chart_md5: string, chart_index: number,
-  request: typeof fetch = onlineClient.request): Promise<void> {
+  request: typeof fetch = onlineClient.request): Promise<number> {
   const response = await request("/api/scores", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...onlineClient.authorizationHeaders() },
@@ -140,6 +141,22 @@ export async function submitPlay(play: StoredPlay, chart_md5: string, chart_inde
     }),
   });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
+  const result = await response.json() as { id?: unknown };
+  if (!Number.isSafeInteger(result.id) || (result.id as number) < 1) throw new Error("Replay server returned an invalid score ID");
+  return result.id as number;
+}
+
+export async function updateScoreComment(score_id: number, comment: string,
+  request: typeof fetch = onlineClient.request): Promise<string | null> {
+  const response = await request(`/api/scores/${score_id}/comment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...onlineClient.authorizationHeaders() },
+    body: JSON.stringify({ comment }),
+  });
+  const result = await response.json() as { comment?: unknown; error?: string };
+  if (!response.ok) throw new Error(result.error ?? `Replay server returned ${response.status}`);
+  if (result.comment !== null && typeof result.comment !== "string") throw new Error("Replay server returned an invalid comment");
+  return result.comment;
 }
 
 export async function listOnlineScores(chart_md5: string, chart_index: number, signal?: AbortSignal,
