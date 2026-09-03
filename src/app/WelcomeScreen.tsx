@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Play, Sigma, Trophy } from "lucide-react";
-import { listRecentPlays, loadScoreStats, type OnlineScore, type ScoreStats } from "../replay/ReplayServer";
+import { listRecentPlays, loadScoreStats, type OnlinePlayer, type OnlineScore, type ScoreStats } from "../replay/ReplayServer";
 
 interface WelcomeScreenProps {
+  online_count: number | null;
+  online_players: readonly OnlinePlayer[];
   onPlay: () => void;
 }
 
@@ -28,7 +30,7 @@ function constantScroll(play: OnlineScore): boolean {
     "const" in play.replay_base && play.replay_base.const === true;
 }
 
-export function WelcomeScreen({ onPlay }: WelcomeScreenProps) {
+export function WelcomeScreen({ online_count, online_players, onPlay }: WelcomeScreenProps) {
   const [active_tab, setActiveTab] = useState<"home" | "readme" | "privacy">("home");
   const [plays, setPlays] = useState<readonly OnlineScore[]>([]);
   const [plays_state, setPlaysState] = useState<"loading" | "loaded" | "error">("loading");
@@ -87,6 +89,21 @@ export function WelcomeScreen({ onPlay }: WelcomeScreenProps) {
               <div><dt>Set today</dt><dd>{score_stats?.today.toLocaleString() ?? "-"}</dd></div>
             </dl>
           </div>
+          <section className="welcome-online" aria-labelledby="welcome-online-title">
+            <h1 id="welcome-online-title">Online Players <span>{online_count ?? 0}</span></h1>
+            {online_players.length > 0 ? <div className="welcome-online-grid">
+              {online_players.map((player) => <article className="welcome-online-player" key={player.id}>
+                <div className="welcome-online-avatar" aria-hidden="true">?</div>
+                <strong title={player.name}>{player.name}</strong>
+                {player.accuracy === null ? <span className="welcome-online-no-stats">No stats</span> :
+                  <div className="welcome-online-sigma">
+                    <strong>{Math.hypot(player.speed, player.stamina, player.dexterity, player.technical).toFixed(2)}</strong>
+                    <Sigma aria-hidden="true" />
+                    <span>{(player.accuracy * 100).toFixed(2)}%</span>
+                  </div>}
+              </article>)}
+            </div> : <p className="welcome-online-empty">{online_count === null ? "Could not load online players" : "No players online"}</p>}
+          </section>
           <section className="welcome-recent" aria-labelledby="welcome-recent-title">
             <h1 id="welcome-recent-title"><Trophy aria-hidden="true" />Recent Plays</h1>
             <div className="welcome-recent-table-wrap">

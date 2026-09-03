@@ -104,10 +104,14 @@ test("reports presence and reads the online count", async () => {
   const status = await reportPresence(async (input, init) => {
     assert.equal(String(input), "/api/presence");
     submitted_init = init;
-    return Response.json({ count: 7 });
+    return Response.json({ count: 1, players: [{
+      id: "user:1", name: "Nimue", speed: 4, stamina: 3, dexterity: 2, technical: 1, accuracy: 0.98,
+    }] });
   });
 
   assert.equal(submitted_init?.method, "POST");
   assert.match(JSON.parse(String(submitted_init?.body)).client_id, /^[a-f\d-]{36}$/);
-  assert.deepEqual(status, { count: 7 });
+  assert.deepEqual(status, { count: 1, players: [{
+    id: "user:1", name: "Nimue", speed: 4, stamina: 3, dexterity: 2, technical: 1, accuracy: 0.98,
+  }] });
 });

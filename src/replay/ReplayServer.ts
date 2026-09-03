@@ -34,6 +34,17 @@ export interface ScoreStats {
 
 export interface PresenceStatus {
   readonly count: number;
+  readonly players: readonly OnlinePlayer[];
+}
+
+export interface OnlinePlayer {
+  readonly id: string;
+  readonly name: string;
+  readonly speed: number;
+  readonly stamina: number;
+  readonly dexterity: number;
+  readonly technical: number;
+  readonly accuracy: number | null;
 }
 
 export type SkillName = "speed" | "dexterity" | "stamina" | "technical";
@@ -93,7 +104,8 @@ export async function reportPresence(request: typeof fetch = onlineClient.reques
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
   const result = await response.json() as Partial<PresenceStatus>;
   if (!Number.isInteger(result.count) || (result.count ?? -1) < 0) throw new Error("Replay server returned an invalid presence count");
-  return { count: result.count! };
+  if (!Array.isArray(result.players)) throw new Error("Replay server returned an invalid player list");
+  return { count: result.count!, players: result.players };
 }
 
 function replayBase64(data: Uint8Array): string {

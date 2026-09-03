@@ -59,6 +59,13 @@ interface RankedSkillPlay {
   rating: number;
 }
 
+interface PlayerSkillSummary {
+  nickname: string;
+  ratings: Record<Skill, number>;
+  play_counts: Record<Skill, number>;
+  accuracy: number | null;
+}
+
 interface ReplayRow {
   replay: Uint8Array;
 }
@@ -231,11 +238,12 @@ function catalogChart(catalog: DatabaseSync, chart_md5: string, chart_index: num
   `).get(chart_md5.toLowerCase(), chart_index) as unknown as CatalogChartRow | undefined;
 }
 
-function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Record<Skill, JsonObject[]> {
+function playerSkillSummaries(database: DatabaseSync, catalog: DatabaseSync): Map<number, PlayerSkillSummary> {
   const rows = database.prepare(`${SCORE_SELECT}
     WHERE scores.user_id IS NOT NULL AND scores.accuracy IS NOT NULL
   `).all() as unknown as ScoreRow[];
   const plays: Record<Skill, RankedSkillPlay[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
+  const overall_plays = new Map<string, { user_id: number; nickname: string; accuracy: number; rating: number }>();
 
   for (const row of rows) {
     const metadata = JSON.parse(row.metadata_json) as JsonObject;
@@ -244,6 +252,15 @@ function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Recor
     const chart = catalogChart(catalog, metadata.chart_md5, metadata.chart_index);
     if (!chart) continue;
     const chart_id = `${metadata.chart_md5.toLowerCase()}:${metadata.chart_index}`;
+    const skill_ratings = SKILLS.map((skill) => skillRating(chart[skill], metadata.accuracy));
+    const overall_play = {
+      user_id: row.user_id as number,
+      nickname: row.user_name ?? "Unknown player",
+      accuracy: metadata.accuracy,
+      rating: Math.hypot(...skill_ratings),
+    };
+    const overall_key = `${overall_play.user_id}:${chart_id}`;
+    if (overall_play.rating > (overall_plays.get(overall_key)?.rating ?? -1)) overall_plays.set(overall_key, overall_play);
     for (const skill of SKILLS) {
       const difficulty = chart[skill];
       if (difficulty === null || !Number.isFinite(difficulty)) continue;
@@ -256,7 +273,7 @@ function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Recor
     }
   }
 
-  const leaderboards: Record<Skill, JsonObject[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
+  const summaries = new Map<number, PlayerSkillSummary>();
   for (const skill of SKILLS) {
     const best_plays = new Map<string, RankedSkillPlay>();
     for (const play of plays[skill]) {
@@ -269,20 +286,53 @@ function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Recor
       player.ratings.push(play.rating);
       players.set(play.user_id, player);
     }
-    const ranking = [...players.entries()].map(([user_id, player]) => {
+    for (const [user_id, player] of players) {
       player.ratings.sort((left, right) => right - left);
       const top_ratings = player.ratings.slice(0, SKILL_PLAY_COUNT);
-      return {
-        user_id,
+      const summary = summaries.get(user_id) ?? {
         nickname: player.nickname,
-        rating: Math.round(top_ratings.reduce((sum, value) => sum + value, 0) / SKILL_PLAY_COUNT * 100) / 100,
-        play_count: top_ratings.length,
+        ratings: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
+        play_counts: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
+        accuracy: null,
       };
-    }).filter((player) => player.rating > 0)
+      summary.ratings[skill] = Math.round(top_ratings.reduce((sum, value) => sum + value, 0) / SKILL_PLAY_COUNT * 100) / 100;
+      summary.play_counts[skill] = top_ratings.length;
+      summaries.set(user_id, summary);
+    }
+  }
+  const player_accuracies = new Map<number, { nickname: string; plays: { accuracy: number; rating: number }[] }>();
+  for (const play of overall_plays.values()) {
+    const player = player_accuracies.get(play.user_id) ?? { nickname: play.nickname, plays: [] };
+    player.plays.push(play);
+    player_accuracies.set(play.user_id, player);
+  }
+  for (const [user_id, player] of player_accuracies) {
+    const top_plays = player.plays.sort((left, right) => right.rating - left.rating).slice(0, 50);
+    const summary = summaries.get(user_id) ?? {
+      nickname: player.nickname,
+      ratings: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
+      play_counts: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
+      accuracy: null,
+    };
+    summary.accuracy = top_plays.reduce((sum, play) => sum + play.accuracy, 0) / top_plays.length;
+    summaries.set(user_id, summary);
+  }
+  return summaries;
+}
+
+function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Record<Skill, JsonObject[]> {
+  const summaries = playerSkillSummaries(database, catalog);
+  const leaderboards: Record<Skill, JsonObject[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
+  for (const skill of SKILLS) {
+    leaderboards[skill] = [...summaries.entries()].map(([user_id, player]) => ({
+      user_id,
+      nickname: player.nickname,
+      rating: player.ratings[skill],
+      play_count: player.play_counts[skill],
+    })).filter((player) => player.rating > 0)
       .sort((left, right) => right.rating - left.rating || left.nickname.localeCompare(right.nickname))
       .slice(0, MAX_RESULTS)
       .map((player, index) => ({ ...player, rank: index + 1 }));
-    leaderboards[skill] = ranking;
   }
   return leaderboards;
 }
@@ -526,7 +576,32 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           SELECT COUNT(DISTINCT CASE WHEN user_id IS NULL THEN 'client:' || client_id ELSE 'user:' || user_id END) AS count
           FROM presence WHERE last_seen >= ?
         `).get(now - PRESENCE_LIFETIME_SECONDS) as { count: number };
-        json(response, 200, count);
+        const active_rows = database.prepare(`
+          SELECT presence.client_id, presence.user_id, users.name
+          FROM presence LEFT JOIN users ON users.id = presence.user_id
+          WHERE presence.last_seen >= ?
+          ORDER BY presence.user_id IS NULL, users.name COLLATE NOCASE, presence.client_id
+        `).all(now - PRESENCE_LIFETIME_SECONDS) as unknown as {
+          client_id: string; user_id: number | null; name: string | null;
+        }[];
+        const skill_summaries = playerSkillSummaries(database, catalog);
+        const seen_users = new Set<number>();
+        let anonymous_index = 0;
+        const players = active_rows.flatMap((row) => {
+          if (row.user_id !== null && seen_users.has(row.user_id)) return [];
+          if (row.user_id !== null) seen_users.add(row.user_id);
+          const ratings = row.user_id === null ? undefined : skill_summaries.get(row.user_id)?.ratings;
+          return [{
+            id: row.user_id === null ? `anonymous:${anonymous_index++}` : `user:${row.user_id}`,
+            name: row.name ?? "Anonymous",
+            speed: ratings?.speed ?? 0,
+            stamina: ratings?.stamina ?? 0,
+            dexterity: ratings?.dexterity ?? 0,
+            technical: ratings?.technical ?? 0,
+            accuracy: row.user_id === null ? null : skill_summaries.get(row.user_id)?.accuracy ?? null,
+          }];
+        });
+        json(response, 200, { count: count.count, players });
         return;
       }
 

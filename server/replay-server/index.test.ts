@@ -140,16 +140,31 @@ test("registers and logs in a case-insensitive user", async () => {
 
 test("counts active clients and deduplicates logged-in users", async () => {
   const { result: registration } = await auth("/register", "OnlinePlayer");
+  await submit({ token: registration.token, accuracy: 1 });
   const heartbeat = (client_id: string, token?: string) => request("/presence", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify({ client_id }),
   });
 
-  assert.equal((await heartbeat("anonymous-client-1")).result.count, 1);
+  const anonymous = await heartbeat("anonymous-client-1");
+  assert.equal(anonymous.result.count, 1);
+  assert.deepEqual(anonymous.result.players[0], {
+    id: "anonymous:0", name: "Anonymous", speed: 0, stamina: 0, dexterity: 0, technical: 0, accuracy: null,
+  });
   assert.equal((await heartbeat("anonymous-client-2")).result.count, 2);
   assert.equal((await heartbeat("registered-client-1", registration.token)).result.count, 3);
-  assert.equal((await heartbeat("registered-client-2", registration.token)).result.count, 3);
+  const deduplicated = await heartbeat("registered-client-2", registration.token);
+  assert.equal(deduplicated.result.count, 3);
+  assert.deepEqual(deduplicated.result.players.find((player: ApiResult) => player.name === "OnlinePlayer"), {
+    id: `user:${registration.user.id}`,
+    name: "OnlinePlayer",
+    speed: 0.5,
+    stamina: 0.3,
+    dexterity: 0.2,
+    technical: 0.15,
+    accuracy: 1,
+  });
 
   database.prepare("UPDATE presence SET last_seen = 0 WHERE client_id = ?").run("anonymous-client-1");
   assert.equal((await heartbeat("registered-client-1", registration.token)).result.count, 2);

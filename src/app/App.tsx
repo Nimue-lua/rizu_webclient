@@ -27,7 +27,7 @@ import { NoteSkinCatalog } from "../noteskin/NoteSkinCatalog";
 import { deleteNoteSkinOverrides } from "../noteskin/NoteSkinOverrides";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
-import { currentUser, reportPresence, submitPlay, subscribeAccountChanges, type OnlineUser } from "../replay/ReplayServer";
+import { currentUser, reportPresence, submitPlay, subscribeAccountChanges, type OnlinePlayer, type OnlineUser } from "../replay/ReplayServer";
 import { appSettings, settings, useSetting } from "../config/Settings";
 import { LocalLibraryCatalog, readLocalAsset } from "../library/LocalLibraryStore";
 import { RemoteLibraryStore } from "../library/RemoteLibraryStore";
@@ -85,6 +85,7 @@ export function App() {
   const [available_note_skins, setAvailableNoteSkins] = useState<readonly NoteSkinOption[]>(note_skin_options);
   const [online_user, setOnlineUser] = useState<OnlineUser | null>(null);
   const [online_count, setOnlineCount] = useState<number | null>(null);
+  const [online_players, setOnlinePlayers] = useState<readonly OnlinePlayer[]>([]);
   const [preview_player] = useState(() => new SongPreviewPlayer());
   const active_view_transition = useRef<ViewTransition | null>(null);
   const pending_view_transition = useRef<PendingViewTransition | null>(null);
@@ -123,8 +124,16 @@ export function App() {
   useEffect(() => {
     let active = true;
     const refresh = () => void reportPresence()
-      .then(({ count }) => { if (active) setOnlineCount(count); })
-      .catch(() => { if (active) setOnlineCount(null); });
+      .then(({ count, players }) => {
+        if (!active) return;
+        setOnlineCount(count);
+        setOnlinePlayers(players);
+      })
+      .catch(() => {
+        if (!active) return;
+        setOnlineCount(null);
+        setOnlinePlayers([]);
+      });
     refresh();
     const timer = window.setInterval(refresh, 30_000);
     return () => {
@@ -328,6 +337,8 @@ export function App() {
       return (
         <ScreenContainer key="welcome">
           <WelcomeScreen
+            online_count={online_count}
+            online_players={online_players}
             onPlay={() => {
               transitionTo("catalog-loading");
             }}
