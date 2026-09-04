@@ -393,15 +393,24 @@ body {
 }
 
 .windows-xp-song-list {
+  position: relative;
   min-height: 0;
   overflow: auto;
   outline: none;
 }
 
-.windows-xp-song-list > button {
-  display: grid;
+.windows-xp-song-list-space {
   position: relative;
+  min-width: 100%;
+}
+
+.windows-xp-song-list-space > button {
+  display: grid;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
+  height: 52px;
   min-width: 0;
   padding: 7px 42px 7px 9px;
   border: 0;
@@ -412,11 +421,11 @@ body {
   text-align: left;
 }
 
-.windows-xp-song-list > button:hover {
+.windows-xp-song-list-space > button:hover {
   background: #e8f1ff;
 }
 
-.windows-xp-song-list > button.selected {
+.windows-xp-song-list-space > button.selected {
   color: #fff;
   background: #316ac5;
 }

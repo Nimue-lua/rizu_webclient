@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { SongPreviewPlayer } from "../../audio/SongPreviewPlayer";
 import type { LibraryController } from "../../library/LibraryController";
 import { readLocalFile } from "../../library/LocalLibraryStore";
@@ -10,6 +10,9 @@ interface LocalPreviewMedia {
   audio_url: string;
   background_url: string | null;
 }
+
+const SONG_ROW_HEIGHT = 52;
+const SONG_ROW_OVERSCAN = 5;
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -45,6 +48,8 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
   const selection = useSyncExternalStore(selector.subscribe, selector.getSnapshot);
   const preview_paused = useSyncExternalStore(previewPlayer.subscribe, previewPlayer.getPaused);
   const [local_media, setLocalMedia] = useState<LocalPreviewMedia | null>(null);
+  const song_list_ref = useRef<HTMLDivElement>(null);
+  const [song_window, setSongWindow] = useState({ first_index: 0, visible_count: SONG_ROW_OVERSCAN * 2 + 1 });
 
   useEffect(() => {
     void library.load().catch(() => undefined);
@@ -56,8 +61,24 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
   }, [masterVolume, previewPlayer]);
 
   const songs = useMemo(() => sortSongs(selector.getFilteredSongs(), selection.sort_mode), [selector, selection]);
-  const selected_song = selector.getSelectedSong();
-  const selected_chart = selector.getSelectedChart();
+  const selected_song = songs.find((song) => song.id === selection.selected_song_id) ?? songs[0];
+  const selected_chart = selected_song?.charts.find((chart) => chart.id === selection.selected_chart_id) ?? selected_song?.charts.at(-1);
+  const visible_songs = songs.slice(song_window.first_index, song_window.first_index + song_window.visible_count);
+
+  useLayoutEffect(() => {
+    const song_list = song_list_ref.current;
+    if (!song_list) return;
+    const updateVisibleCount = (height: number) => {
+      const visible_count = Math.ceil(height / SONG_ROW_HEIGHT) + SONG_ROW_OVERSCAN * 2;
+      setSongWindow((current) => current.visible_count === visible_count ? current : { ...current, visible_count });
+    };
+    updateVisibleCount(song_list.clientHeight);
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) updateVisibleCount(entry.contentRect.height);
+    });
+    observer.observe(song_list);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setLocalMedia(null);
@@ -136,19 +157,25 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
       <div className="windows-xp-chart-workspace">
         <aside className="windows-xp-song-pane" aria-label="Songs">
           <div className="windows-xp-pane-heading">Music Library</div>
-          <div className="windows-xp-song-list" role="listbox" tabIndex={0} onKeyDown={(event) => {
+          <div className="windows-xp-song-list" ref={song_list_ref} role="listbox" tabIndex={0} onScroll={(event) => {
+            const first_index = Math.max(0, Math.floor(event.currentTarget.scrollTop / SONG_ROW_HEIGHT) - SONG_ROW_OVERSCAN);
+            setSongWindow((current) => current.first_index === first_index ? current : { ...current, first_index });
+          }} onKeyDown={(event) => {
             if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
             event.preventDefault();
             selector.scrollLevel(event.key === "ArrowUp" ? -1 : 1);
           }}>
-            {songs.map((song) => (
+            <div className="windows-xp-song-list-space" style={{ height: songs.length * SONG_ROW_HEIGHT }}>
+            {visible_songs.map((song, offset) => (
               <button key={song.id} type="button" role="option" aria-selected={song.id === selected_song?.id}
+                style={{ transform: `translateY(${(song_window.first_index + offset) * SONG_ROW_HEIGHT}px)` }}
                 className={song.id === selected_song?.id ? "selected" : ""} onClick={() => selector.selectSong(song.id)}>
                 <strong>{song.title}</strong>
                 <span>{song.artist}</span>
                 <small>{song.charts.length} chart{song.charts.length === 1 ? "" : "s"}</small>
               </button>
             ))}
+            </div>
             {!loading && songs.length === 0 && <p>{selection.query ? "No matching songs." : "No songs in this collection."}</p>}
           </div>
         </aside>

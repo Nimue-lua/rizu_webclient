@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type PointerEvent, type PropsWithChildren } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type PropsWithChildren } from "react";
 
 interface WindowFrame {
   x: number;
@@ -46,7 +46,13 @@ export function WindowsXpWindow({ title, children, className = "", active = true
   resizable = true, onActivate, onMinimize, onClose }: WindowsXpWindowProps) {
   const window_ref = useRef<HTMLElement>(null);
   const interaction_ref = useRef<WindowInteraction>(null);
+  const pending_frame_ref = useRef<WindowFrame>(null);
+  const animation_frame_ref = useRef<number>(null);
   const [frame, setFrame] = useState<WindowFrame>({ ...initialPosition, ...initialSize });
+
+  useEffect(() => () => {
+    if (animation_frame_ref.current !== null) cancelAnimationFrame(animation_frame_ref.current);
+  }, []);
 
   useLayoutEffect(() => {
     const bounds = window_ref.current?.parentElement;
@@ -62,6 +68,18 @@ export function WindowsXpWindow({ title, children, className = "", active = true
       };
     });
   }, []);
+
+  const scheduleFrame = (next_frame: WindowFrame) => {
+    pending_frame_ref.current = next_frame;
+    if (animation_frame_ref.current !== null) return;
+    animation_frame_ref.current = requestAnimationFrame(() => {
+      animation_frame_ref.current = null;
+      const pending_frame = pending_frame_ref.current;
+      if (!pending_frame) return;
+      setFrame((current) => current.x === pending_frame.x && current.y === pending_frame.y &&
+        current.width === pending_frame.width && current.height === pending_frame.height ? current : pending_frame);
+    });
+  };
 
   const startInteraction = (event: PointerEvent<HTMLElement>, kind: WindowInteraction["kind"],
     direction?: ResizeDirection) => {
@@ -90,7 +108,7 @@ export function WindowsXpWindow({ title, children, className = "", active = true
     const start = interaction.start_frame;
 
     if (interaction.kind === "drag") {
-      setFrame({ ...start,
+      scheduleFrame({ ...start,
         x: clamp(start.x + dx, 0, interaction.bounds_width - start.width),
         y: clamp(start.y + dy, 0, interaction.bounds_height - start.height),
       });
@@ -109,7 +127,7 @@ export function WindowsXpWindow({ title, children, className = "", active = true
       height = clamp(start.height - dy, minSize.height, start.y + start.height);
       y = start.y + start.height - height;
     }
-    setFrame({ x, y, width, height });
+    scheduleFrame({ x, y, width, height });
   };
 
   const stopInteraction = (event: PointerEvent<HTMLElement>) => {
@@ -118,7 +136,7 @@ export function WindowsXpWindow({ title, children, className = "", active = true
 
   return (
     <section ref={window_ref} className={`window windows-xp-window${active ? " active" : " inactive"} ${className}`}
-      style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height, zIndex }}
+      style={{ transform: `translate3d(${frame.x}px, ${frame.y}px, 0)`, width: frame.width, height: frame.height, zIndex }}
       onPointerDownCapture={onActivate}>
       <div className="title-bar windows-xp-window-title-bar"
         onPointerDown={(event) => {
