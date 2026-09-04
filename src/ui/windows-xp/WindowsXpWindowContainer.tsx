@@ -6,6 +6,7 @@ export interface WindowsXpApplication {
   id: string;
   title: string;
   content: ReactNode;
+  iconUrl?: string;
   defaultOpen?: boolean;
   initialPosition?: { x: number; y: number };
   initialSize?: { width: number; height: number };
@@ -54,7 +55,9 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
           {applications.map((application) => (
             <button key={application.id} className="windows-xp-desktop-icon" type="button"
               onDoubleClick={() => activate(application.id)}>
-              <span className="windows-xp-program-icon" aria-hidden="true">R</span>
+              {application.iconUrl
+                ? <img className="windows-xp-program-icon" src={application.iconUrl} alt="" />
+                : <span className="windows-xp-program-icon windows-xp-program-icon-fallback" aria-hidden="true">R</span>}
               <span>{application.title}</span>
             </button>
           ))}
@@ -63,7 +66,7 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
           const state = application_states.find((item) => item.id === application.id);
           if (!state?.open || !state.visible) return null;
           return (
-            <WindowsXpWindow key={application.id} title={application.title}
+            <WindowsXpWindow key={application.id} title={application.title} iconUrl={application.iconUrl}
               initialPosition={application.initialPosition} initialSize={application.initialSize}
               minSize={application.minSize} resizable={application.resizable}
               active={application.id === active_id} zIndex={state.z_index}
@@ -84,6 +87,7 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
         application_states.some((state) => state.id === application.id && state.open)).map((application) => ({
           id: application.id,
           title: application.title,
+          iconUrl: application.iconUrl,
           active: application.id === active_id,
         }))} onApplicationClick={(id) => {
           const state = application_states.find((item) => item.id === id);

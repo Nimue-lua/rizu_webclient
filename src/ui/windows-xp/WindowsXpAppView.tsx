@@ -7,6 +7,7 @@ import { inputLayout, loadInputBindings } from "../../gameplay/InputBindings";
 import { GameplayScreen } from "../default/GameplayScreen";
 import { ChartBrowserWindow } from "./ChartBrowserWindow";
 import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
+import { GameControlsWindow } from "./GameControlsWindow";
 import { OnlinePlayersWindow } from "./OnlinePlayersWindow";
 import { PlayResultWindow } from "./PlayResultWindow";
 import { WindowsXpGameplayLoading } from "./WindowsXpGameplayLoading";
@@ -44,7 +45,8 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
     <WindowsXpWindowContainer backgroundUrl={background_url} applications={[
       {
         id: "chart-browser",
-        title: "Rizu Music Library",
+        title: "Music Library",
+        iconUrl: "/dmca_incoming/music_folder.png",
         defaultOpen: true,
         initialPosition: { x: 112, y: 28 },
         initialSize: { width: 900, height: 620 },
@@ -61,14 +63,25 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
       {
         id: "online-players",
         title: "Online Players",
+        iconUrl: "/dmca_incoming/people.avif",
         initialPosition: { x: 72, y: 52 },
         initialSize: { width: 560, height: 400 },
         minSize: { width: 300, height: 220 },
         content: <OnlinePlayersWindow count={online.count} players={online.players} />,
       },
       {
+        id: "game-controls",
+        title: "Game Controls",
+        iconUrl: "/dmca_incoming/game_controller.avif",
+        initialPosition: { x: 190, y: 42 },
+        initialSize: { width: 600, height: 550 },
+        minSize: { width: 430, height: 390 },
+        content: <GameControlsWindow />,
+      },
+      {
         id: "desktop-background",
         title: "Desktop Background",
+        iconUrl: "/dmca_incoming/display.avif",
         initialPosition: { x: 150, y: 80 },
         initialSize: { width: 420, height: 390 },
         minSize: { width: 330, height: 320 },
@@ -77,7 +90,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
       },
       ...(gameplay.status === "completed" && gameplay.location && gameplay.assets && results.completed ? [{
         id: "play-result",
-        title: "Rizu - Play Result",
+        title: "Play Result",
         defaultOpen: true,
         initialPosition: { x: 180, y: 44 },
         initialSize: { width: 680, height: 570 },

@@ -65,10 +65,14 @@ img {
 }
 
 .windows-xp-program-icon {
-  display: grid;
   width: 32px;
   height: 32px;
   margin-bottom: 4px;
+  object-fit: contain;
+}
+
+.windows-xp-program-icon-fallback {
+  display: grid;
   place-items: center;
   border: 2px outset #ece9d8;
   background: #fff;
@@ -138,14 +142,30 @@ img {
 }
 
 .windows-xp-task-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   width: min(160px, 35vw);
   padding: 0 10px !important;
   overflow: hidden;
+  border-radius: 3px !important;
   background: #3c81ed !important;
   box-shadow: inset 1px 1px #6fa7f3, inset -1px -1px #174da8 !important;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.windows-xp-task-button img {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.windows-xp-task-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .windows-xp-task-button.active {
@@ -192,6 +212,26 @@ img {
   cursor: move;
   touch-action: none;
   user-select: none;
+}
+
+.windows-xp-window-title-bar .title-bar-text {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+.windows-xp-window-title-bar .title-bar-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-title-bar-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 .windows-xp-window-body {
@@ -721,6 +761,141 @@ img {
   font-size: 10px;
 }
 
+.windows-xp-game-controls {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-controls-intro {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 7px 10px;
+  border: 1px solid #7f9db9;
+  background: linear-gradient(90deg, #fff, #e9f1fc);
+}
+
+.windows-xp-controls-intro img {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.windows-xp-controls-intro div {
+  min-width: 0;
+}
+
+.windows-xp-controls-intro strong {
+  color: #003399;
+  font-size: 16px;
+}
+
+.windows-xp-controls-intro p {
+  margin: 3px 0 0;
+  color: #555;
+}
+
+.windows-xp-controls-profile,
+.windows-xp-controls-bindings {
+  margin: 0;
+}
+
+.windows-xp-controls-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+.windows-xp-controls-profile select {
+  width: min(230px, 65%);
+}
+
+.windows-xp-controls-bindings {
+  min-height: 0;
+  padding: 9px;
+}
+
+.windows-xp-controls-table {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #7f9db9;
+  background: #fff;
+}
+
+.windows-xp-controls-table > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(120px, 1fr) 164px;
+  align-items: center;
+  min-height: 34px;
+  border-bottom: 1px solid #ddd;
+}
+
+.windows-xp-controls-table > div.listening {
+  color: #fff;
+  background: #316ac5;
+}
+
+.windows-xp-controls-table > div > span:first-child,
+.windows-xp-controls-table kbd {
+  padding: 6px 8px;
+}
+
+.windows-xp-controls-table kbd {
+  overflow: hidden;
+  color: inherit;
+  font: bold 11px Tahoma, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-controls-table-header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  min-height: 24px !important;
+  border-bottom-color: #aca899 !important;
+  background: #ece9d8;
+  font-weight: 400;
+}
+
+.windows-xp-controls-table-header span {
+  align-self: stretch;
+  padding: 4px 7px !important;
+  border-right: 1px solid #aca899;
+  box-shadow: inset 1px 1px #fff;
+}
+
+.windows-xp-control-actions {
+  display: flex;
+  gap: 5px;
+  padding: 4px 6px;
+}
+
+.windows-xp-control-actions button {
+  width: 76px;
+  min-width: 0;
+}
+
+.windows-xp-controls-footer {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.windows-xp-controls-footer button {
+  flex: none;
+}
+
 .windows-xp-game-loading {
   position: fixed;
   inset: 0;
@@ -1128,6 +1303,18 @@ img {
 
   .windows-xp-online-header div span {
     display: none;
+  }
+
+  .windows-xp-controls-table > div {
+    grid-template-columns: minmax(80px, 1fr) minmax(90px, 1fr) 80px;
+  }
+
+  .windows-xp-control-actions {
+    display: grid;
+  }
+
+  .windows-xp-control-actions button {
+    width: 68px;
   }
 }
 

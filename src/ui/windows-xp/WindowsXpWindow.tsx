@@ -22,6 +22,7 @@ interface WindowInteraction {
 
 interface WindowsXpWindowProps extends PropsWithChildren {
   title: string;
+  iconUrl?: string;
   className?: string;
   active?: boolean;
   zIndex?: number;
@@ -40,7 +41,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
-export function WindowsXpWindow({ title, children, className = "", active = true, zIndex = 1,
+export function WindowsXpWindow({ title, iconUrl, children, className = "", active = true, zIndex = 1,
   initialPosition = { x: 24, y: 24 },
   initialSize = { width: 360, height: 160 }, minSize = { width: 200, height: 100 },
   resizable = true, onActivate, onMinimize, onClose }: WindowsXpWindowProps) {
@@ -144,7 +145,10 @@ export function WindowsXpWindow({ title, children, className = "", active = true
           startInteraction(event, "drag");
         }}
         onPointerMove={moveInteraction} onPointerUp={stopInteraction} onPointerCancel={stopInteraction}>
-        <div className="title-bar-text">{title}</div>
+        <div className="title-bar-text">
+          {iconUrl && <img className="windows-xp-title-bar-icon" src={iconUrl} alt="" />}
+          <span>{title}</span>
+        </div>
         <div className="title-bar-controls">
           <button type="button" aria-label="Minimize" onClick={onMinimize} />
           <button type="button" aria-label="Maximize" disabled />

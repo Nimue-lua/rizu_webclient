@@ -31,7 +31,9 @@ export default defineConfig({
     {
       name: "public-assets",
       buildStart() {
-        for (const fileName of ["rizu-logo.svg", "skins/osu-default.osk", "skins/pivnoi_skoof.osk"]) {
+        for (const fileName of ["rizu-logo.svg", "skins/osu-default.osk", "skins/pivnoi_skoof.osk",
+          "dmca_incoming/music_folder.png", "dmca_incoming/people.avif", "dmca_incoming/display.avif",
+          "dmca_incoming/game_controller.avif"]) {
           this.emitFile({
             type: "asset",
             fileName,
