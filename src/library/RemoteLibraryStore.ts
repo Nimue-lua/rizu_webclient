@@ -67,7 +67,7 @@ async function persistProvider(provider: RemoteProvider, catalog: Uint8Array): P
 async function fetchCatalog(url: string, signal?: AbortSignal, onProgress?: DownloadProgressCallback): Promise<Uint8Array> {
   const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   const combined_signal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  return new Uint8Array(await downloadArrayBuffer(url, { cache: "no-cache", signal: combined_signal }, onProgress));
+  return new Uint8Array(await downloadArrayBuffer(url, { cache: "no-store", signal: combined_signal }, onProgress));
 }
 
 function providerName(url: string): string {
