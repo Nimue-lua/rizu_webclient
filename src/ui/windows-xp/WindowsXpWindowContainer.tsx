@@ -20,7 +20,10 @@ interface ApplicationState {
   z_index: number;
 }
 
-export function WindowsXpWindowContainer({ applications }: { applications: WindowsXpApplication[] }) {
+export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
+  applications: WindowsXpApplication[];
+  backgroundUrl?: string | null;
+}) {
   const next_z_index = useRef(applications.length + 1);
   const [application_states, setApplicationStates] = useState<ApplicationState[]>(() =>
     applications.map((application, index) => ({
@@ -45,7 +48,7 @@ export function WindowsXpWindowContainer({ applications }: { applications: Windo
 
   return (
     <main className="windows-xp-shell">
-      <div className="windows-xp-desktop">
+      <div className="windows-xp-desktop" style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined}>
         <div className="windows-xp-desktop-icons">
           {applications.map((application) => (
             <button key={application.id} className="windows-xp-desktop-icon" type="button"

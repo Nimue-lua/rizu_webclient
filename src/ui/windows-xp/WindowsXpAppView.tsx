@@ -1,16 +1,19 @@
 import "xp.css/dist/XP.css";
 import "./windows-xp.css";
+import { useState } from "react";
 import type { GameController } from "../../app/GameController";
 import { useRizuAppController } from "../../app/controller/useRizuAppController";
 import { ChartBrowserWindow } from "./ChartBrowserWindow";
+import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { OnlinePlayersWindow } from "./OnlinePlayersWindow";
 import { WindowsXpWindowContainer } from "./WindowsXpWindowContainer";
 
 export function WindowsXpAppView({ game }: { game: GameController }) {
   const { library, online, preview_player } = useRizuAppController(game);
+  const [background_url, setBackgroundUrl] = useState<string | null>(null);
 
   return (
-    <WindowsXpWindowContainer applications={[
+    <WindowsXpWindowContainer backgroundUrl={background_url} applications={[
       {
         id: "chart-browser",
         title: "Rizu Music Library",
@@ -27,6 +30,15 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         initialSize: { width: 560, height: 400 },
         minSize: { width: 300, height: 220 },
         content: <OnlinePlayersWindow count={online.count} players={online.players} />,
+      },
+      {
+        id: "desktop-background",
+        title: "Desktop Background",
+        initialPosition: { x: 150, y: 80 },
+        initialSize: { width: 420, height: 390 },
+        minSize: { width: 330, height: 320 },
+        resizable: false,
+        content: <DesktopBackgroundWindow backgroundUrl={background_url} onBackgroundChange={setBackgroundUrl} />,
       },
     ]} />
   );
