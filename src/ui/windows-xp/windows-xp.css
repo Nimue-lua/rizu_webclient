@@ -701,6 +701,222 @@ body {
   font-size: 10px;
 }
 
+.windows-xp-game-loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  min-width: 320px;
+  min-height: 320px;
+  overflow: hidden;
+  color: #fff;
+  background: #003399;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-game-loading::before {
+  position: absolute;
+  top: 0;
+  right: 12%;
+  width: 44%;
+  height: 100%;
+  content: "";
+  background: linear-gradient(115deg, transparent 15%, rgba(49, 106, 197, .5) 16%, transparent 58%);
+  transform: skewX(-12deg);
+}
+
+.windows-xp-game-loading-copy {
+  z-index: 1;
+  align-self: end;
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto 34px;
+}
+
+.windows-xp-game-loading-copy > p:first-child {
+  margin: 0 0 8px;
+  color: #f5b93d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.windows-xp-game-loading-copy h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 54px);
+  font-weight: 400;
+}
+
+.windows-xp-game-loading-rule {
+  width: 100%;
+  height: 2px;
+  margin: 18px 0;
+  background: linear-gradient(90deg, #f2a900, rgba(242, 169, 0, 0));
+}
+
+.windows-xp-game-loading-copy h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-game-loading-copy > p:last-child {
+  margin: 6px 0 0;
+  color: #bed4f5;
+}
+
+.windows-xp-game-loading-panel {
+  z-index: 1;
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto 26px;
+  padding: 18px;
+  border: 1px solid #88aee3;
+  color: #222;
+  background: #ece9d8;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, .3);
+}
+
+.windows-xp-game-loading-panel > strong {
+  color: #003399;
+  font-size: 14px;
+}
+
+.windows-xp-game-loading-panel > p {
+  margin: 5px 0 14px;
+  color: #555;
+}
+
+.windows-xp-game-loading-items {
+  display: grid;
+  gap: 9px;
+}
+
+.windows-xp-game-loading-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+}
+
+.windows-xp-game-loading-item > span:last-of-type {
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+.windows-xp-game-loading-item progress {
+  grid-column: 1 / 3;
+  width: 100%;
+  height: 18px;
+}
+
+.windows-xp-game-loading-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #a00000;
+}
+
+.windows-xp-game-loading-error p {
+  margin: 12px 0 0;
+}
+
+.windows-xp-game-loading > footer {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 6px max(24px, calc((100% - 760px) / 2));
+  border-top: 1px solid #7896c0;
+  color: #bed4f5;
+  background: #00266f;
+}
+
+.windows-xp-gameplay-container {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.windows-xp-gameplay-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 1;
+}
+
+.windows-xp-gameplay-background.hidden {
+  opacity: 0;
+}
+
+.gameplay-screen,
+.gameplay-screen * {
+  cursor: none;
+}
+
+.gameplay-screen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.gameplay-screen canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.gameplay-screen .gameplay-performance-graph {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gameplay-screen .gameplay-performance-graph.hidden {
+  display: none;
+}
+
+.gameplay-screen::after {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  content: "";
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gameplay-screen.restart-holding::after {
+  opacity: 1;
+}
+
+.gameplay-touch-zones {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  touch-action: none;
+}
+
+.gameplay-touch-zones button {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  touch-action: none;
+}
+
 @media (max-width: 540px) {
   .windows-xp-online-grid {
     grid-template-columns: 1fr;

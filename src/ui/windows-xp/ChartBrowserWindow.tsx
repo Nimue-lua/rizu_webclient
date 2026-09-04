@@ -35,9 +35,11 @@ function sortSongs(songs: readonly ChartfileSetView[], mode: ChartSortMode) {
   });
 }
 
-export function ChartBrowserWindow({ library, previewPlayer }: {
+export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPlay }: {
   library: LibraryController;
   previewPlayer: SongPreviewPlayer;
+  masterVolume: number;
+  onPlay: (chart: Chartview, song: ChartfileSetView) => void;
 }) {
   const selector = library.chart_selector;
   const selection = useSyncExternalStore(selector.subscribe, selector.getSnapshot);
@@ -48,6 +50,10 @@ export function ChartBrowserWindow({ library, previewPlayer }: {
     void library.load().catch(() => undefined);
     return () => previewPlayer.stop(200);
   }, [library.load, previewPlayer]);
+
+  useEffect(() => {
+    previewPlayer.setVolume(masterVolume);
+  }, [masterVolume, previewPlayer]);
 
   const songs = useMemo(() => sortSongs(selector.getFilteredSongs(), selection.sort_mode), [selector, selection]);
   const selected_song = selector.getSelectedSong();
@@ -174,11 +180,12 @@ export function ChartBrowserWindow({ library, previewPlayer }: {
             </div>
           </fieldset>
 
-          {selected_chart && <div className="windows-xp-chart-properties">
+          {selected_chart && selected_song && <div className="windows-xp-chart-properties">
             <span><b>{Math.round(selected_chart.bpm_avg)}</b> BPM</span>
             <span><b>{selected_chart.note_count.toLocaleString()}</b> notes</span>
             <span><b>{Math.round(selected_chart.long_note_ratio * 100)}%</b> LN</span>
             <span><b>{selected_chart.format.toUpperCase()}</b> format</span>
+            <button type="button" onClick={() => onPlay(selected_chart, selected_song)}>Play</button>
           </div>}
         </div>
       </div>
