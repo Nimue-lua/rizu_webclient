@@ -1241,6 +1241,7 @@ img {
   height: 100%;
   object-fit: cover;
   opacity: 1;
+  transition: opacity 320ms ease-out;
 }
 
 .windows-xp-gameplay-background.hidden {
@@ -1469,6 +1470,7 @@ img {
   background: #000;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 240ms linear;
 }
 
 .gameplay-screen.restart-holding::after {
