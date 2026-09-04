@@ -27,8 +27,8 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { Chartview } from "../../library/views";
-import type { ChartSortMode } from "../../select/ChartSelector";
+import type { Chartview } from "../../../library/views";
+import type { ChartSortMode } from "../../../select/ChartSelector";
 
 type IconName = "arrow-up-down" | "bell" | "chevron-down" | "chevron-left" |
   "chevron-right" | "clock" | "download" | "file" | "filter" | "folder" | "globe" | "keyboard" |

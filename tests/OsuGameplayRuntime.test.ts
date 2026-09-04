@@ -93,12 +93,27 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
     },
   };
   const runtime_playback = playback ?? (autoplay ? createOsuAutoplayReplay(data.chart) : undefined);
-  const runtime = new OsuGameplayRuntime({} as HTMLCanvasElement, data, 0.5, 1, 0,
-    1, "webgl", true, "normal", 1, createOsuReplayBase(1, 5), ["KeyZ", "KeyX"], (completed, reached_end) => {
+  const runtime = new OsuGameplayRuntime({
+    canvas: {} as HTMLCanvasElement,
+    data,
+    configuration: {
+      master_volume: 0.5,
+      hit_sound_volume: 1,
+      music_offset: 0,
+      cursor_scale: 1,
+      cursor_renderer: "webgl",
+      raw_input: false,
+      hit_error_meter: { enabled: true, type: "normal", scale: 1 },
+      replay_base: createOsuReplayBase(1, 5),
+    },
+    input_bindings: ["KeyZ", "KeyX"],
+    finish: (completed, reached_end) => {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       results.push(completed.score);
-    }, dependencies, runtime_playback);
+    },
+    playback_replay: runtime_playback,
+  }, dependencies);
   return { runtime, events, frames, cursor_states, cursor_renderers, source_offsets, results, completions, reached_chart_end,
     get destroy_calls() { return destroy_calls; } };
 }

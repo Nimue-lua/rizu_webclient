@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Trophy } from "lucide-react";
-import { listSkillLeaderboards, type SkillLeaderboards, type SkillName } from "../replay/ReplayServer";
+import { listSkillLeaderboards, type SkillLeaderboards, type SkillName } from "../../replay/ReplayServer";
 
 interface GlobalLeaderboardScreenProps {
   onExit: () => void;

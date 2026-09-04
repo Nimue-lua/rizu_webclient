@@ -4,7 +4,7 @@ import {
   noteSkinSelectionKey,
   type NoteSkinOption,
   type NoteSkinSelections,
-} from "../noteskin/NoteSkinSelection";
+} from "../../noteskin/NoteSkinSelection";
 
 interface NoteSkinsModalProps {
   selections: NoteSkinSelections;

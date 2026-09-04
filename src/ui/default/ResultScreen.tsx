@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Clock3, Metronome, Play, Star } from "lucide-react";
-import type { ScoreResult } from "../gameplay/scoring/ScoreResult";
+import type { ScoreResult } from "../../gameplay/scoring/ScoreResult";
 import { JudgeSegmentsCanvas } from "./JudgeSegmentsCanvas";
-import { updateScoreComment } from "../replay/ReplayServer";
+import { updateScoreComment } from "../../replay/ReplayServer";
 
 const GRADE_COLORS: Readonly<Record<string, string>> = {
   X: "rgb(153 204 255)",

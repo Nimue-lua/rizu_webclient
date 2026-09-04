@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
 import { Star } from "lucide-react";
-import type { ChartfileSetView, Chartview } from "../../library/views";
-import type { ChartSelectionEntry, ChartSortMode } from "../../select/ChartSelector";
+import type { ChartfileSetView, Chartview } from "../../../library/views";
+import type { ChartSelectionEntry, ChartSortMode } from "../../../select/ChartSelector";
 import { ChartModeBadge, chartSummaryMode, difficultyColor, formatDuration, SongSelectIcon } from "./SongSelectUi";
 
 interface ChartBrowserProps {

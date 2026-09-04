@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Play, Sigma, Trophy } from "lucide-react";
-import { listRecentPlays, loadScoreStats, type OnlinePlayer, type OnlineScore, type ScoreStats } from "../replay/ReplayServer";
+import { listRecentPlays, loadScoreStats, type OnlinePlayer, type OnlineScore, type ScoreStats } from "../../replay/ReplayServer";
 
 interface WelcomeScreenProps {
   online_count: number | null;

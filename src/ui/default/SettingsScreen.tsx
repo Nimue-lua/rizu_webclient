@@ -8,15 +8,15 @@ import {
   UserRound,
   Volume2,
 } from "lucide-react";
-import type { ManiaHitRegistration } from "../gameplay/mania/ManiaRulesEngine";
+import type { ManiaHitRegistration } from "../../gameplay/mania/ManiaRulesEngine";
 import {
   scrollSpeedToCanonical,
   scrollSpeedToDisplay,
-} from "../gameplay/mania/ScrollSpeed";
-import type { OsuCursorRendererMode } from "../gameplay/osu/OsuHardwareCursor";
-import type { HitErrorMeterType } from "../gameplay/renderer/GameplayHudRenderer";
-import { appSettings, settings, useSetting } from "../config/Settings";
-import { currentUser, login, logout, register, subscribeAccountChanges, type OnlineUser } from "../replay/ReplayServer";
+} from "../../gameplay/mania/ScrollSpeed";
+import type { OsuCursorRendererMode } from "../../gameplay/osu/OsuHardwareCursor";
+import type { HitErrorMeterType } from "../../gameplay/renderer/GameplayHudRenderer";
+import { appSettings, settings, useSetting } from "../../config/Settings";
+import { currentUser, login, logout, register, subscribeAccountChanges, type OnlineUser } from "../../replay/ReplayServer";
 import { ConfigResetButton } from "./ConfigResetButton";
 import { RangeInput } from "./RangeInput";
 

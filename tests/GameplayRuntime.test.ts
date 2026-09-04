@@ -197,12 +197,25 @@ function createRuntime(notes: readonly ManiaNoteEvent[], options: {
     }),
   };
   const playback = options.playback ?? (options.autoplay ? createManiaAutoplayReplay(data.chart, replay.tap_only) : undefined);
-  const runtime = new ManiaGameplayRuntime({} as HTMLCanvasElement, data, 0.6, options.offset ?? 0, 2,
-    true, "normal", 1, replay, ["KeyA"], "earliest", (completed, reached_end) => {
+  const runtime = new ManiaGameplayRuntime({
+    canvas: {} as HTMLCanvasElement,
+    data,
+    configuration: {
+      master_volume: 0.6,
+      music_offset: options.offset ?? 0,
+      hit_error_meter: { enabled: true, type: "normal", scale: 1 },
+      scroll_speed: 2,
+      replay_base: replay,
+      hit_registration: "earliest",
+    },
+    input_bindings: ["KeyA"],
+    finish: (completed, reached_end) => {
       completions.push(completed);
       reached_chart_end.push(reached_end);
       scores.push(completed.score);
-    }, dependencies, playback);
+    },
+    playback_replay: playback,
+  }, dependencies);
   return { runtime, events, frames, source, gain, renderer, scores, completions, reached_chart_end };
 }
 

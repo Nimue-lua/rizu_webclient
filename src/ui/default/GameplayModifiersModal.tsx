@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { settings } from "../config/Settings";
+import { settings } from "../../config/Settings";
 import { ConfigNumberControl } from "./ConfigNumberControl";
 
 interface GameplayModifiersModalProps {

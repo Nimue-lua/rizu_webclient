@@ -1,5 +1,5 @@
 import type { ManiaGameplayData } from "../../library/GameplayLoader";
-import { ManiaRulesEngine, type ManiaHitRegistration, type ManiaVisualNote } from "./ManiaRulesEngine";
+import { ManiaRulesEngine, type ManiaVisualNote } from "./ManiaRulesEngine";
 import type { GameplayBackgroundState, GameplaySession, ManiaPointerInput } from "../GameplaySession";
 import { ManiaRenderer as WebGlManiaRenderer } from "./rendering/ManiaRenderer";
 import { HudStateDeriver, type GameplayPresentationState } from "../HudState";
@@ -13,6 +13,7 @@ import { replayTick, replayValue, type CompletedGameplay, type ManiaRecordedInpu
 import type { GameplayPerformanceSample } from "../GameplayPerformance";
 import type { GameplayRenderStats } from "../renderer/GameplayRenderStats";
 import type { HitErrorMeterType } from "../renderer/GameplayHudRenderer";
+import type { ManiaRuntimeConfiguration } from "../GameplayConfiguration";
 
 interface ManiaRenderer {
   getTimeRange(column_count: number, scroll_speed: number): { past: number; future: number };
@@ -29,6 +30,18 @@ export interface ManiaGameplayRuntimeDependencies {
   performance_now: () => number;
   create_renderer: (canvas: HTMLCanvasElement, data: ManiaGameplayData,
     hit_error_meter: boolean, hit_error_meter_type: HitErrorMeterType, hit_error_meter_scale: number) => ManiaRenderer;
+}
+
+export interface ManiaGameplayRuntimeOptions {
+  canvas: HTMLCanvasElement;
+  data: ManiaGameplayData;
+  configuration: ManiaRuntimeConfiguration;
+  input_bindings: readonly (string | null)[];
+  finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
+  playback_replay?: ManiaRecordedReplay;
+  initial_lead_in?: number;
+  background_state_change?: (state: GameplayBackgroundState) => void;
+  performance_sample?: (sample: GameplayPerformanceSample) => void;
 }
 
 function createDefaultDependencies(): ManiaGameplayRuntimeDependencies {
@@ -74,15 +87,15 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
   private readonly music_offset_time: number;
   private background_state: GameplayBackgroundState | null = null;
 
-  constructor(canvas: HTMLCanvasElement, data: ManiaGameplayData, master_volume: number, music_offset: number,
-    scroll_speed: number, hit_error_meter: boolean, hit_error_meter_type: HitErrorMeterType, hit_error_meter_scale: number,
-    replay_base: ManiaReplayBase, input_bindings: readonly (string | null)[], hit_registration: ManiaHitRegistration,
-    finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
-    dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies(),
-    private readonly playback_replay?: ManiaRecordedReplay,
-    private readonly initial_lead_in = 0,
-    private readonly background_state_change?: (state: GameplayBackgroundState) => void,
-    private readonly performance_sample?: (sample: GameplayPerformanceSample) => void) {
+  private readonly playback_replay?: ManiaRecordedReplay;
+  private readonly initial_lead_in: number;
+  private readonly background_state_change?: (state: GameplayBackgroundState) => void;
+  private readonly performance_sample?: (sample: GameplayPerformanceSample) => void;
+
+  constructor(options: ManiaGameplayRuntimeOptions,
+    dependencies: ManiaGameplayRuntimeDependencies = createDefaultDependencies()) {
+    const { canvas, data, configuration, input_bindings, finish } = options;
+    const { master_volume, music_offset, scroll_speed, replay_base, hit_registration, hit_error_meter } = configuration;
     this.data = data;
     this.scroll_speed = scroll_speed;
     this.music_rate = replay_base.rate;
@@ -95,12 +108,16 @@ export class ManiaGameplayRuntime implements GameplaySession, ManiaPointerInput 
     this.first_note_time = data.chart.notes.reduce((first, note) => Math.min(first, note.absolute_time), Infinity);
     this.finish = finish;
     this.dependencies = dependencies;
+    this.playback_replay = options.playback_replay;
+    this.initial_lead_in = options.initial_lead_in ?? 0;
+    this.background_state_change = options.background_state_change;
+    this.performance_sample = options.performance_sample;
     const timing_identity = replay_base.timings.name === "sphere" && replay_base.subtimings === null
       ? undefined
       : { timings: replay_base.timings, subtimings: replay_base.subtimings };
     this.rules_engine = new ManiaRulesEngine(data.chart, hit_registration, this.music_rate, replay_base.const,
       replay_base.tap_only, timing_identity);
-    this.renderer = dependencies.create_renderer(canvas, data, hit_error_meter, hit_error_meter_type, hit_error_meter_scale);
+    this.renderer = dependencies.create_renderer(canvas, data, hit_error_meter.enabled, hit_error_meter.type, hit_error_meter.scale);
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,
       audio_buffer: data.audio_buffer,

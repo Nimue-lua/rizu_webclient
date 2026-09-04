@@ -1,4 +1,4 @@
-import type { ChartSelectorSnapshot, ChartSortMode } from "../../select/ChartSelector";
+import type { ChartSelectorSnapshot, ChartSortMode } from "../../../select/ChartSelector";
 import { mode_names, SongSelectIcon, sort_names } from "./SongSelectUi";
 
 interface LibraryToolbarProps {

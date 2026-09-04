@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, FolderOpen, Globe2, HardDrive, Link2 } from "lucide-react";
-import type { LocalLibraryStatus } from "../library/LocalLibraryStore";
-import type { RemoteProviderView } from "../library/RemoteLibraryStore";
+import type { LocalLibraryStatus } from "../../library/LocalLibraryStore";
+import type { RemoteProviderView } from "../../library/RemoteLibraryStore";
 
 interface LibrarySourcesScreenProps {
   local_status: LocalLibraryStatus;

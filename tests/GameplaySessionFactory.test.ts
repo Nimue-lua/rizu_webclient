@@ -7,6 +7,8 @@ import type { GameplaySession, ManiaPointerInput, OsuPointerInput } from "../src
 import { ManiaReplayBase } from "../src/replay/mania/ManiaReplayBase";
 import type { CompletedGameplay } from "../src/replay/RecordedReplay";
 import { createOsuReplayBase } from "../src/replay/osu/OsuReplayBase";
+import type { ManiaGameplayRuntimeOptions } from "../src/gameplay/mania/ManiaGameplayRuntime";
+import type { OsuGameplayRuntimeOptions } from "../src/gameplay/osu/OsuGameplayRuntime";
 
 function createManiaData(): ManiaGameplayData {
   return {
@@ -36,26 +38,29 @@ function createOptions(data: ManiaGameplayData | OsuGameplayData): GameplaySessi
   return {
     canvas: {} as HTMLCanvasElement,
     data,
-    master_volume: 0.5,
-    osu_hit_sound_volume: 0.75,
-    music_offset: 10,
-    scroll_speed: 1.2,
-    cursor_scale: 1.25,
-    hit_error_meter: true,
-    hit_error_meter_type: "fullscreen",
-    hit_error_meter_scale: 1.5,
-    osu_cursor_renderer: "webgl",
-    replay_base: new ManiaReplayBase(),
-    osu_replay_base: createOsuReplayBase(),
+    configuration: {
+      common: {
+        master_volume: 0.5,
+        music_offset: 10,
+        hit_error_meter: { enabled: true, type: "fullscreen", scale: 1.5 },
+      },
+      mania: { scroll_speed: 1.2, replay_base: new ManiaReplayBase(), hit_registration: "nearest" },
+      osu: {
+        hit_sound_volume: 0.75,
+        cursor_scale: 1.25,
+        cursor_renderer: "webgl",
+        raw_input: false,
+        replay_base: createOsuReplayBase(),
+      },
+    },
     input_bindings: ["KeyA"],
-    hit_registration: "nearest",
     finish: () => {},
   };
 }
 
 function createDependencies() {
-  const mania_options: Array<GameplaySessionOptions & { data: ManiaGameplayData }> = [];
-  const osu_options: Array<GameplaySessionOptions & { data: OsuGameplayData }> = [];
+  const mania_options: ManiaGameplayRuntimeOptions[] = [];
+  const osu_options: OsuGameplayRuntimeOptions[] = [];
   const mania_sessions: Array<GameplaySession & ManiaPointerInput & { starts: number; destroys: number }> = [];
   const osu_sessions: Array<GameplaySession & OsuPointerInput & { starts: number; destroys: number }> = [];
   const dependencies: GameplaySessionFactoryDependencies = {
@@ -100,9 +105,9 @@ test("creates a mania session with a separate narrowed pointer capability", () =
   assert.equal(harness.mania_options.length, 1);
   assert.equal(harness.osu_options.length, 0);
   assert.equal(harness.mania_options[0]?.data, options.data);
-  assert.deepEqual(harness.mania_options[0]?.replay_base.timings.toJSON(), { name: "osuod", data: 5 });
-  assert.deepEqual(harness.mania_options[0]?.replay_base.subtimings?.toJSON(), { name: "scorev", data: 2 });
-  assert.equal(harness.mania_options[0]?.replay_base.nearest, true);
+  assert.deepEqual(harness.mania_options[0]?.configuration.replay_base.timings.toJSON(), { name: "osuod", data: 5 });
+  assert.deepEqual(harness.mania_options[0]?.configuration.replay_base.subtimings?.toJSON(), { name: "scorev", data: 2 });
+  assert.equal(harness.mania_options[0]?.configuration.replay_base.nearest, true);
   if (binding.mode === "mania") {
     assert.equal(binding.pointer_input, binding.session);
     binding.pointer_input.pressPointer(1, 0, 1000);
@@ -118,37 +123,36 @@ test("creates an osu session without exposing mania column input", () => {
   assert.equal(harness.osu_options.length, 1);
   assert.equal(harness.mania_options.length, 0);
   assert.equal(harness.osu_options[0]?.data, options.data);
-  assert.equal(harness.osu_options[0]?.replay_base.mode, "osu");
-  assert.equal(harness.osu_options[0]?.replay_base.rate, options.replay_base.rate);
-  assert.equal(harness.osu_options[0]?.cursor_scale, options.cursor_scale);
-  assert.equal(harness.osu_options[0]?.hit_error_meter, true);
-  assert.equal(harness.osu_options[0]?.hit_error_meter_type, "fullscreen");
-  assert.equal(harness.osu_options[0]?.hit_error_meter_scale, 1.5);
-  assert.equal(harness.osu_options[0]?.osu_cursor_renderer, "webgl");
-  assert.equal(harness.osu_options[0]?.osu_hit_sound_volume, 0.75);
-  assert.deepEqual(harness.osu_options[0]?.replay_base.timings, { name: "osu_std_od", data: 5 });
-  assert.deepEqual(harness.osu_options[0]?.replay_base.timing_values,
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.mode, "osu");
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.rate, options.configuration.osu.replay_base.rate);
+  assert.equal(harness.osu_options[0]?.configuration.cursor_scale, options.configuration.osu.cursor_scale);
+  assert.deepEqual(harness.osu_options[0]?.configuration.hit_error_meter,
+    { enabled: true, type: "fullscreen", scale: 1.5 });
+  assert.equal(harness.osu_options[0]?.configuration.cursor_renderer, "webgl");
+  assert.equal(harness.osu_options[0]?.configuration.hit_sound_volume, 0.75);
+  assert.deepEqual(harness.osu_options[0]?.configuration.replay_base.timings, { name: "osu_std_od", data: 5 });
+  assert.deepEqual(harness.osu_options[0]?.configuration.replay_base.timing_values,
     { hit_300: 0.05, hit_100: 0.1, hit_50: 0.15, early_miss: 0.4, late_miss: 0.15 });
-  assert.equal("subtimings" in harness.osu_options[0]!.replay_base, false);
-  assert.equal("const" in harness.osu_options[0]!.replay_base, false);
+  assert.equal("subtimings" in harness.osu_options[0]!.configuration.replay_base, false);
+  assert.equal("const" in harness.osu_options[0]!.configuration.replay_base, false);
   assert.equal(binding.pointer_input, binding.session);
 });
 
 test("applies configured osu difficulty overrides", () => {
   const harness = createDependencies();
   const options = createOptions(createOsuData());
-  options.osu_replay_base = createOsuReplayBase(1.25, 12);
-  options.osu_replay_base.overall_difficulty = 12;
-  options.osu_replay_base.circle_size = 6.5;
-  options.osu_replay_base.approach_rate = 10.5;
+  options.configuration.osu.replay_base = createOsuReplayBase(1.25, 12);
+  options.configuration.osu.replay_base.overall_difficulty = 12;
+  options.configuration.osu.replay_base.circle_size = 6.5;
+  options.configuration.osu.replay_base.approach_rate = 10.5;
 
   createGameplaySession(options, harness.dependencies);
 
-  assert.equal(harness.osu_options[0]?.replay_base.rate, 1.25);
-  assert.equal(harness.osu_options[0]?.replay_base.overall_difficulty, 12);
-  assert.equal(harness.osu_options[0]?.replay_base.circle_size, 6.5);
-  assert.equal(harness.osu_options[0]?.replay_base.approach_rate, 10.5);
-  assert.deepEqual(harness.osu_options[0]?.replay_base.timings, { name: "osu_std_od", data: 12 });
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.rate, 1.25);
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.overall_difficulty, 12);
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.circle_size, 6.5);
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.approach_rate, 10.5);
+  assert.deepEqual(harness.osu_options[0]?.configuration.replay_base.timings, { name: "osu_std_od", data: 12 });
 });
 
 test("each factory call creates an independently owned play attempt", () => {
@@ -181,16 +185,16 @@ test("uses recorded mania rules during replay playback", () => {
 
   createGameplaySession(options, harness.dependencies);
 
-  assert.equal(harness.mania_options[0]?.replay_base.rate, 1.5);
-  assert.equal(harness.mania_options[0]?.replay_base.tap_only, true);
-  assert.equal(harness.mania_options[0]?.hit_registration, "earliest");
+  assert.equal(harness.mania_options[0]?.configuration.replay_base.rate, 1.5);
+  assert.equal(harness.mania_options[0]?.configuration.replay_base.tap_only, true);
+  assert.equal(harness.mania_options[0]?.configuration.hit_registration, "earliest");
   assert.equal(harness.mania_options[0]?.playback_replay, options.playback.replay);
 });
 
 test("uses recorded osu rules and forces the WebGL cursor during playback", () => {
   const harness = createDependencies();
   const options = createOptions(createOsuData());
-  options.osu_cursor_renderer = "os";
+  options.configuration.osu.cursor_renderer = "os";
   const replay_base = createOsuReplayBase(1.75, 8);
   const playback: CompletedGameplay = {
     score: {},
@@ -201,8 +205,8 @@ test("uses recorded osu rules and forces the WebGL cursor during playback", () =
 
   createGameplaySession(options, harness.dependencies);
 
-  assert.equal(harness.osu_options[0]?.replay_base, replay_base);
-  assert.equal(harness.osu_options[0]?.osu_cursor_renderer, "webgl");
+  assert.equal(harness.osu_options[0]?.configuration.replay_base, replay_base);
+  assert.equal(harness.osu_options[0]?.configuration.cursor_renderer, "webgl");
   assert.equal(harness.osu_options[0]?.playback_replay, playback.replay);
 });
 
@@ -234,11 +238,11 @@ test("generates an interpolated osu replay for autoplay", () => {
   ];
   const options = createOptions(data);
   options.autoplay = true;
-  options.osu_cursor_renderer = "os";
+  options.configuration.osu.cursor_renderer = "os";
 
   createGameplaySession(options, harness.dependencies);
 
-  assert.equal(harness.osu_options[0]?.osu_cursor_renderer, "webgl");
+  assert.equal(harness.osu_options[0]?.configuration.cursor_renderer, "webgl");
   const aims = harness.osu_options[0]?.playback_replay?.input_events.filter((event) => event.type === "aim");
   assert.deepEqual(aims, [
     { type: "aim", time: 4096, x: 819200, y: 819200 },

@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { ManiaPointerInput } from "../gameplay/GameplaySession";
+import type { ManiaPointerInput } from "../../gameplay/GameplaySession";
 
 interface ManiaTouchControlsProps {
   column_count: number;

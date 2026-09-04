@@ -1,5 +1,5 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
-import type { NumberDefinition } from "../config/Config";
+import type { NumberDefinition } from "../../config/Config";
 import { ConfigResetButton } from "./ConfigResetButton";
 import { RangeInput } from "./RangeInput";
 

@@ -21,6 +21,7 @@ import type { GameplayPerformanceSample } from "../GameplayPerformance";
 import { createOsuSliderPaths, type OsuSliderPath } from "./OsuSliderPath";
 import type { OsuSlider } from "../../chart/Chart";
 import type { HitErrorMeterType } from "../renderer/GameplayHudRenderer";
+import type { OsuRuntimeConfiguration } from "../GameplayConfiguration";
 
 export interface OsuGameplayRuntimeDependencies {
   event_target: Pick<Window, "addEventListener" | "removeEventListener">;
@@ -31,6 +32,18 @@ export interface OsuGameplayRuntimeDependencies {
     replay_base: OsuReplayBaseValues, cursor_scale: number, cursor_renderer: OsuCursorRendererMode,
     slider_paths: ReadonlyMap<OsuSlider, OsuSliderPath>, hit_error_meter: boolean,
     hit_error_meter_type: HitErrorMeterType, hit_error_meter_scale: number) => OsuGameplayRenderer;
+}
+
+export interface OsuGameplayRuntimeOptions {
+  canvas: HTMLCanvasElement;
+  data: OsuGameplayData;
+  configuration: OsuRuntimeConfiguration;
+  input_bindings: readonly (string | null)[];
+  finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
+  playback_replay?: OsuRecordedReplay;
+  initial_lead_in?: number;
+  background_state_change?: (state: GameplayBackgroundState) => void;
+  performance_sample?: (sample: GameplayPerformanceSample) => void;
 }
 
 function createDefaultDependencies(): OsuGameplayRuntimeDependencies {
@@ -79,25 +92,31 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
   private readonly outro_start_time: number;
   private background_state: GameplayBackgroundState | null = null;
 
-  constructor(canvas: HTMLCanvasElement, private readonly data: OsuGameplayData,
-    master_volume: number, hit_sound_volume: number, music_offset: number, cursor_scale: number,
-    cursor_renderer: OsuCursorRendererMode, hit_error_meter: boolean, hit_error_meter_type: HitErrorMeterType,
-    hit_error_meter_scale: number,
-    replay_base: OsuReplayBaseValues,
-    input_bindings: readonly (string | null)[],
-    private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void,
-    dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies(),
-    private readonly playback_replay?: OsuRecordedReplay,
-    private readonly initial_lead_in = 0,
-    private readonly background_state_change?: (state: GameplayBackgroundState) => void,
-    private readonly performance_sample?: (sample: GameplayPerformanceSample) => void) {
+  private readonly data: OsuGameplayData;
+  private readonly finish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
+  private readonly playback_replay?: OsuRecordedReplay;
+  private readonly initial_lead_in: number;
+  private readonly background_state_change?: (state: GameplayBackgroundState) => void;
+  private readonly performance_sample?: (sample: GameplayPerformanceSample) => void;
+
+  constructor(options: OsuGameplayRuntimeOptions,
+    dependencies: OsuGameplayRuntimeDependencies = createDefaultDependencies()) {
+    const { canvas, data, configuration, input_bindings, finish } = options;
+    const { master_volume, hit_sound_volume, music_offset, cursor_scale, cursor_renderer, replay_base,
+      hit_error_meter } = configuration;
+    this.data = data;
+    this.finish = finish;
     this.dependencies = dependencies;
+    this.playback_replay = options.playback_replay;
+    this.initial_lead_in = options.initial_lead_in ?? 0;
+    this.background_state_change = options.background_state_change;
+    this.performance_sample = options.performance_sample;
     this.music_rate = replay_base.rate;
     this.music_offset_time = music_offset / 1000 * this.music_rate;
     this.replay_base = replay_base;
     this.progress_range = getGameplayProgressRange(data, this.music_rate);
     this.intro_skip_time = getIntroSkipTime(data, this.music_rate);
-    this.replay_aim_events = (playback_replay?.input_events ?? []).flatMap((event) => event.type === "aim"
+    this.replay_aim_events = (this.playback_replay?.input_events ?? []).flatMap((event) => event.type === "aim"
       ? [{ time: replayValue(event.time), x: replayValue(event.x), y: replayValue(event.y) }]
       : []);
     const timing_configuration = resolveOsuStandardTimingValues(Timings.fromValue(replay_base.timings));
@@ -107,7 +126,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const slider_paths = createOsuSliderPaths(chart);
     this.outro_start_time = chart.end_time + timing_configuration.values.hit_50;
     this.renderer = dependencies.create_renderer(canvas, { ...data, chart }, replay_base, cursor_scale, cursor_renderer,
-      slider_paths, hit_error_meter, hit_error_meter_type, hit_error_meter_scale);
+      slider_paths, hit_error_meter.enabled, hit_error_meter.type, hit_error_meter.scale);
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
       replay_base.overall_difficulty ?? chart.overall_difficulty ?? 5,
       replay_base.circle_size ?? chart.circle_size, chart.object_count, chart.drain_length_seconds);

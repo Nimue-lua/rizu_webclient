@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Sigma } from "lucide-react";
-import type { ChartfileSetView, Chartview } from "../../library/views";
-import { listOnlineScores, type OnlineScore } from "../../replay/ReplayServer";
-import type { StoredPlay } from "../../replay/ReplayStore";
+import type { ChartfileSetView, Chartview } from "../../../library/views";
+import { listOnlineScores, type OnlineScore } from "../../../replay/ReplayServer";
+import type { StoredPlay } from "../../../replay/ReplayStore";
 import { SongSelectIcon } from "./SongSelectUi";
 
 const GRADE_COLORS: Readonly<Record<string, string>> = {

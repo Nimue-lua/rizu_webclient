@@ -68,8 +68,10 @@ export interface GameplayLoadProgress extends DownloadProgress {
 export type GameplayProgressCallback = (progress: GameplayLoadProgress) => void;
 
 export interface GameplayLoader {
+  loadAudio(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal,
+    onProgress?: (progress: DownloadProgress) => void): Promise<AudioBuffer>;
   load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal,
-    onProgress?: GameplayProgressCallback): Promise<GameplayData>;
+    onProgress?: GameplayProgressCallback, audio_buffer?: AudioBuffer): Promise<GameplayData>;
 }
 
 async function fetchAsset(url: string, signal: AbortSignal,
@@ -87,22 +89,25 @@ async function fetchChart(url: string, signal: AbortSignal,
 }
 
 export class HttpGameplayLoader implements GameplayLoader {
+  async loadAudio(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal,
+    onProgress?: (progress: DownloadProgress) => void): Promise<AudioBuffer> {
+    const audio_data = location.source_id && location.audio_path
+      ? await readLocalAsset(location.source_id, location.audio_path)
+      : await fetchAsset(location.audio_url, signal, onProgress);
+    return audio_context.decodeAudioData(audio_data);
+  }
+
   async load(location: GameplayLocation, audio_context: AudioContext, signal: AbortSignal,
-    onProgress?: GameplayProgressCallback): Promise<GameplayData> {
+    onProgress?: GameplayProgressCallback, prepared_audio?: AudioBuffer): Promise<GameplayData> {
     const skin_url = location.note_skin_url;
     if (!skin_url) throw new Error("No note skin is selected for this key mode");
     const local = location.source_id && location.audio_path && location.chart_path;
-    const [audio_data, chart_source] = local
-      ? await Promise.all([
-        readLocalAsset(location.source_id!, location.audio_path!),
-        readLocalChart(location.source_id!, location.chart_path!),
-      ])
-      : await Promise.all([
-        fetchAsset(location.audio_url, signal, (progress) => onProgress?.({ ...progress, id: "audio", label: "Music" })),
-        fetchChart(location.chart_url, signal, (progress) => onProgress?.({ ...progress, id: "chart", label: "Chart" })),
-      ]);
+    const chart_source = local
+      ? await readLocalChart(location.source_id!, location.chart_path!)
+      : await fetchChart(location.chart_url, signal, (progress) => onProgress?.({ ...progress, id: "chart", label: "Chart" }));
     const [audio_buffer, chart] = await Promise.all([
-      audio_context.decodeAudioData(audio_data),
+      prepared_audio ?? this.loadAudio(location, audio_context, signal,
+        (progress) => onProgress?.({ ...progress, id: "audio", label: "Music" })),
       Promise.resolve(parseOsuChart(chart_source)),
     ]);
     if (chart.mode === "osu") {

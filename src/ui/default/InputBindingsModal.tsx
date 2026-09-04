@@ -1,12 +1,12 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import type { Chartview } from "../library/views";
+import type { Chartview } from "../../library/views";
 import {
   inputCodeLabel,
   inputLayout,
   loadInputBindings,
   saveInputBindings,
-} from "../gameplay/InputBindings";
-import { getColumnColors } from "../gameplay/mania/ColumnColors";
+} from "../../gameplay/InputBindings";
+import { getColumnColors } from "../../gameplay/mania/ColumnColors";
 
 interface InputBindingsModalProps {
   chart: Chartview;

@@ -1,30 +1,26 @@
 import { Clock3, Star } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import type { GameplayData, GameplayLoader, GameplayLocation, GameplayLoadProgress } from "../library/GameplayLoader";
+import { useLayoutEffect, useRef, type CSSProperties } from "react";
+import type { GameplayLocation, GameplayLoadProgress } from "../../library/GameplayLoader";
 import { difficultyColor, formatDuration } from "./song-select/SongSelectUi";
-import { DownloadProgressList, type DownloadProgressItem } from "./DownloadProgressList";
+import { DownloadProgressList } from "./DownloadProgressList";
 
 const MODE_NAMES = ["OSU!", "TAIKO", "FRUITS", "MANIA"] as const;
 
 interface LoadingScreenProps {
-  gameplay_loader: GameplayLoader;
   location: GameplayLocation;
-  audio_context: AudioContext;
   onCancel: () => void;
-  onLoaded: (assets: GameplayData) => void;
   background_url: string | null;
+  progress: ReadonlyMap<string, GameplayLoadProgress>;
+  error: string | null;
 }
 
 export function LoadingScreen({
-  gameplay_loader,
   location,
-  audio_context,
   onCancel,
-  onLoaded,
   background_url,
+  progress,
+  error,
 }: LoadingScreenProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<ReadonlyMap<string, DownloadProgressItem>>(() => new Map());
   const title_container_ref = useRef<HTMLHeadingElement>(null);
   const title_ref = useRef<HTMLSpanElement>(null);
   const mode_name = location.mode === 3 && location.keys !== null
@@ -45,28 +41,6 @@ export function LoadingScreen({
     document.fonts.ready.then(fitTitle).catch(() => undefined);
     return () => observer.disconnect();
   }, [location.title]);
-
-  useEffect(() => {
-    const abort_controller = new AbortController();
-
-    void gameplay_loader
-      .load(location, audio_context, abort_controller.signal, (item: GameplayLoadProgress) => {
-        setProgress((current) => new Map(current).set(item.id, item));
-      })
-      .then((assets) => {
-        if (!abort_controller.signal.aborted) {
-          onLoaded(assets);
-        }
-      })
-      .catch((reason: unknown) => {
-        if (!abort_controller.signal.aborted) {
-          console.error("Failed to load gameplay assets", reason);
-          setError(reason instanceof Error ? reason.message : "Failed to load gameplay assets");
-        }
-      });
-
-    return () => abort_controller.abort();
-  }, [audio_context, gameplay_loader, location, onLoaded]);
 
   return (
     <main

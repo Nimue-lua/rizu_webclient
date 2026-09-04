@@ -1,4 +1,4 @@
-import type { DownloadProgress } from "../download/Download";
+import type { DownloadProgress } from "../../download/Download";
 
 export interface DownloadProgressItem extends DownloadProgress {
   readonly id: string;
