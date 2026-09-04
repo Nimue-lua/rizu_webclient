@@ -172,7 +172,6 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
                 className={song.id === selected_song?.id ? "selected" : ""} onClick={() => selector.selectSong(song.id)}>
                 <strong>{song.title}</strong>
                 <span>{song.artist}</span>
-                <small>{song.charts.length} chart{song.charts.length === 1 ? "" : "s"}</small>
               </button>
             ))}
             </div>
