@@ -7,6 +7,7 @@ import { inputLayout, loadInputBindings } from "../../gameplay/InputBindings";
 import { GameplayScreen } from "../default/GameplayScreen";
 import { ChartBrowserWindow } from "./ChartBrowserWindow";
 import { ChartFilterWindow } from "./ChartFilterWindow";
+import { ChartScoresWindow } from "./ChartScoresWindow";
 import { deleteDesktopBackground, loadDesktopBackground, saveDesktopBackground } from "./DesktopBackgroundStore";
 import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { GameControlsWindow } from "./GameControlsWindow";
@@ -22,6 +23,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [filter_open_request, setFilterOpenRequest] = useState(0);
   const [modifiers_open_request, setModifiersOpenRequest] = useState(0);
+  const [scores_open_request, setScoresOpenRequest] = useState(0);
   const background_url_ref = useRef<string | null>(null);
   const background_revision = useRef(0);
   const background_storage = useRef(Promise.resolve());
@@ -93,6 +95,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         content: <ChartBrowserWindow library={library} previewPlayer={preview_player}
           masterVolume={modifiers.master_volume} onOpenFilter={() => setFilterOpenRequest((request) => request + 1)}
           onOpenModifiers={() => setModifiersOpenRequest((request) => request + 1)}
+          onOpenScores={() => setScoresOpenRequest((request) => request + 1)}
           onPlay={(chart, song) => {
           gameplay.begin({
             kind: "play",
@@ -100,6 +103,17 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
           });
           void gameplay.prepare().catch(() => undefined);
         }} />,
+      },
+      {
+        id: "chart-scores",
+        title: "Chart Scores",
+        desktopIcon: false,
+        initialPosition: { x: 260, y: 110 },
+        initialSize: { width: 720, height: 390 },
+        minSize: { width: 520, height: 280 },
+        openRequest: scores_open_request,
+        content: <ChartScoresWindow selector={library.chart_selector} gameplay={gameplay}
+          nickname={online.user?.name ?? "Anonymous"} scoreRevision={results.score_revision} />,
       },
       {
         id: "chart-filter",

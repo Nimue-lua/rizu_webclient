@@ -38,12 +38,13 @@ function sortSongs(songs: readonly ChartfileSetView[], mode: ChartSortMode) {
   });
 }
 
-export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onOpenFilter, onOpenModifiers, onPlay }: {
+export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onOpenFilter, onOpenModifiers, onOpenScores, onPlay }: {
   library: LibraryController;
   previewPlayer: SongPreviewPlayer;
   masterVolume: number;
   onOpenFilter: () => void;
   onOpenModifiers: () => void;
+  onOpenScores: () => void;
   onPlay: (chart: Chartview, song: ChartfileSetView) => void;
 }) {
   const selector = library.chart_selector;
@@ -240,6 +241,7 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onOpe
             <span><b>{selected_chart.note_count.toLocaleString()}</b> notes</span>
             <span><b>{Math.round(selected_chart.long_note_ratio * 100)}%</b> LN</span>
             <span><b>{selected_chart.format.toUpperCase()}</b> format</span>
+            <button type="button" onClick={onOpenScores}>Scores...</button>
             <button type="button" onClick={onOpenModifiers}>Mods...</button>
             <button type="button" onClick={() => onPlay(selected_chart, selected_song)}>Play</button>
           </div>}

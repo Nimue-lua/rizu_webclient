@@ -427,6 +427,140 @@ img {
   flex: none;
 }
 
+.windows-xp-chart-scores {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-chart-scores > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border: 1px solid #7f9db9;
+  background: linear-gradient(90deg, #fff, #e9f1fc);
+}
+
+.windows-xp-chart-scores > header > div:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.windows-xp-chart-scores > header strong {
+  overflow: hidden;
+  color: #003399;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-chart-scores > header span {
+  overflow: hidden;
+  color: #555;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-score-source {
+  display: flex;
+  flex: none;
+}
+
+.windows-xp-score-source button {
+  min-width: 78px;
+}
+
+.windows-xp-score-source button.selected {
+  border-color: #003c74;
+  background: #dce9fa;
+  box-shadow: inset 1px 1px #7f9db9;
+}
+
+.windows-xp-score-table {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #7f9db9;
+  background: #fff;
+}
+
+.windows-xp-score-table-header,
+.windows-xp-score-row {
+  display: grid;
+  grid-template-columns: 48px minmax(100px, 1fr) 52px 82px minmax(90px, 1fr) 130px;
+  align-items: center;
+  min-width: 560px;
+}
+
+.windows-xp-score-table-header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  color: #222;
+  background: #ece9d8;
+}
+
+.windows-xp-score-table-header span {
+  padding: 4px 6px;
+  border-right: 1px solid #aca899;
+  box-shadow: inset 1px 1px #fff;
+}
+
+.windows-xp-score-row {
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #ddd;
+  border-radius: 0;
+  color: #222;
+  background: #fff;
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+}
+
+button.windows-xp-score-row:hover,
+button.windows-xp-score-row:focus-visible {
+  color: #fff;
+  background: #316ac5;
+  outline: 0;
+}
+
+.windows-xp-score-row > * {
+  min-width: 0;
+  padding: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-score-row strong {
+  font-size: 16px;
+  text-align: center;
+  text-shadow: 1px 1px #555;
+}
+
+.windows-xp-score-row .grade-x { color: #00a4e8; }
+.windows-xp-score-row .grade-s { color: #c69b00; }
+.windows-xp-score-row .grade-a { color: #318b16; }
+.windows-xp-score-row .grade-b { color: #8146ae; }
+.windows-xp-score-row .grade-c { color: #c13a7c; }
+.windows-xp-score-row .grade-d { color: #c8323e; }
+
+.windows-xp-score-table > p {
+  margin: 0;
+  padding: 24px 12px;
+  color: #666;
+  text-align: center;
+}
+
 .windows-xp-chart-filter {
   display: grid;
   align-content: start;
