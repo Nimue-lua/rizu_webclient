@@ -104,7 +104,7 @@ img {
   gap: 5px;
   width: 98px;
   padding: 0 15px 1px 10px;
-  border-radius: 0 14px 14px 0 !important;
+  border-radius: 0 10px 10px 0 !important;
   background: linear-gradient(#70b96a 0, #3f9c35 8%, #3c8d32 92%, #225e20 100%) !important;
   box-shadow: inset 0 1px 2px #b9e2b3, 2px 0 4px #123d94 !important;
   font-size: 16px !important;
@@ -155,13 +155,25 @@ img {
 
 .windows-xp-taskbar-clock {
   display: grid;
+  position: relative;
   min-width: 78px;
   padding: 0 10px;
   place-items: center;
-  background: linear-gradient(90deg, #0d85df, #16a6e9);
-  box-shadow: inset 1px 0 #18bbef;
+  border-left: 2px solid #0b4da2;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .28) 0, transparent 12%, transparent 86%, rgba(0, 51, 139, .35) 100%),
+    linear-gradient(90deg, #0d85df, #16a6e9);
   font-size: 11px;
   white-space: nowrap;
+}
+
+.windows-xp-taskbar-clock::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  content: "";
+  background: linear-gradient(90deg, #18bbef, transparent);
+  pointer-events: none;
 }
 
 .windows-xp-window {
