@@ -33,7 +33,7 @@ export const settings = {
   osu_cursor_renderer: choiceSetting<OsuCursorRendererMode>("renderer.osu.cursor", "os", ["os", "webgl"]),
   osu_raw_input: booleanSetting("gameplay.osu.raw_input", true),
   mania_hit_registration: choiceSetting<ManiaHitRegistration>("gameplay.mania.hit_registration", "earliest", ["earliest", "nearest"]),
-  music_rate: numberSetting("gameplay.music_rate", 1, 0.25, 4, 0.001),
+  music_rate: numberSetting("gameplay.music_rate", 1, 0.25, 4, 0.05),
   constant_scroll: booleanSetting("gameplay.mania.constant_scroll", false),
   tap_only: booleanSetting("gameplay.mania.tap_only", false),
   customize_osu_overall_difficulty: booleanSetting("gameplay.osu.customize_overall_difficulty", false),

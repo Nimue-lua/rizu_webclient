@@ -460,6 +460,55 @@ img {
   background: #316ac5;
 }
 
+.windows-xp-gameplay-modifiers {
+  display: grid;
+  align-content: start;
+  height: 100%;
+  gap: 10px;
+  overflow: auto;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-gameplay-modifiers fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 10px;
+}
+
+.windows-xp-modifier-checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.windows-xp-modifier-slider {
+  display: grid;
+  gap: 5px;
+}
+
+.windows-xp-modifier-slider > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.windows-xp-modifier-slider output {
+  min-width: 48px;
+  text-align: right;
+}
+
+.windows-xp-modifier-slider input {
+  width: 100%;
+}
+
+.windows-xp-gameplay-modifiers > p {
+  margin: 0;
+  padding: 10px;
+  border: 1px inset #fff;
+  color: #555;
+}
+
 .windows-xp-chart-workspace {
   display: grid;
   grid-template-columns: minmax(180px, 28%) minmax(0, 1fr);

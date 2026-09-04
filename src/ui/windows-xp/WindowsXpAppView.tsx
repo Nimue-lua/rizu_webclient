@@ -10,6 +10,7 @@ import { ChartFilterWindow } from "./ChartFilterWindow";
 import { deleteDesktopBackground, loadDesktopBackground, saveDesktopBackground } from "./DesktopBackgroundStore";
 import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { GameControlsWindow } from "./GameControlsWindow";
+import { GameplayModifiersWindow } from "./GameplayModifiersWindow";
 import { OnlinePlayersWindow } from "./OnlinePlayersWindow";
 import { PlayResultWindow } from "./PlayResultWindow";
 import { SettingsWindow } from "./SettingsWindow";
@@ -20,6 +21,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
   const { gameplay, library, modifiers, online, preview_player, results } = useRizuAppController(game);
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [filter_open_request, setFilterOpenRequest] = useState(0);
+  const [modifiers_open_request, setModifiersOpenRequest] = useState(0);
   const background_url_ref = useRef<string | null>(null);
   const background_revision = useRef(0);
   const background_storage = useRef(Promise.resolve());
@@ -90,6 +92,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         minSize: { width: 560, height: 360 },
         content: <ChartBrowserWindow library={library} previewPlayer={preview_player}
           masterVolume={modifiers.master_volume} onOpenFilter={() => setFilterOpenRequest((request) => request + 1)}
+          onOpenModifiers={() => setModifiersOpenRequest((request) => request + 1)}
           onPlay={(chart, song) => {
           gameplay.begin({
             kind: "play",
@@ -107,6 +110,15 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         resizable: false,
         openRequest: filter_open_request,
         content: <ChartFilterWindow selector={library.chart_selector} />,
+      },
+      {
+        id: "gameplay-modifiers",
+        title: "Gameplay Modifiers",
+        initialPosition: { x: 350, y: 80 },
+        initialSize: { width: 420, height: 500 },
+        minSize: { width: 340, height: 300 },
+        openRequest: modifiers_open_request,
+        content: <GameplayModifiersWindow selector={library.chart_selector} modifiers={modifiers} />,
       },
       {
         id: "online-players",
