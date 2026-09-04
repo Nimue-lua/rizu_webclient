@@ -426,6 +426,40 @@ img {
   flex: none;
 }
 
+.windows-xp-chart-filter {
+  display: grid;
+  align-content: start;
+  height: 100%;
+  gap: 10px;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-chart-filter > p {
+  margin: 0;
+}
+
+.windows-xp-chart-filter fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+}
+
+.windows-xp-chart-filter label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+}
+
+.windows-xp-chart-filter label.selected {
+  border-color: #0a246a;
+  color: #fff;
+  background: #316ac5;
+}
+
 .windows-xp-chart-workspace {
   display: grid;
   grid-template-columns: minmax(180px, 28%) minmax(0, 1fr);

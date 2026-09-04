@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { appSettings, settings, useSetting } from "../../config/Settings";
 import { WindowsXpTaskbar } from "./WindowsXpTaskbar";
 import { WindowsXpWindow, type WindowFrame } from "./WindowsXpWindow";
@@ -13,6 +13,7 @@ export interface WindowsXpApplication {
   initialSize?: { width: number; height: number };
   minSize?: { width: number; height: number };
   resizable?: boolean;
+  openRequest?: number;
   onClose?: () => void;
 }
 
@@ -44,6 +45,7 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
   const serialized_frames = useSetting(settings.windows_xp_window_frames);
   const stored_frames = storedWindowFrames(serialized_frames);
   const next_z_index = useRef(applications.length + 1);
+  const open_requests = useRef(new Map(applications.map((application) => [application.id, application.openRequest ?? 0])));
   const [application_states, setApplicationStates] = useState<ApplicationState[]>(() =>
     applications.map((application, index) => ({
       id: application.id,
@@ -60,6 +62,15 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
   const activate = (id: string) => {
     updateApplication(id, { open: true, visible: true, z_index: next_z_index.current++ });
   };
+
+  useEffect(() => {
+    for (const application of applications) {
+      const request = application.openRequest ?? 0;
+      const previous = open_requests.current.get(application.id) ?? 0;
+      open_requests.current.set(application.id, request);
+      if (request > previous) activate(application.id);
+    }
+  }, [applications]);
 
   const active_id = application_states
     .filter((state) => state.open && state.visible)

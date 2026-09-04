@@ -6,6 +6,7 @@ import { useRizuAppController } from "../../app/controller/useRizuAppController"
 import { inputLayout, loadInputBindings } from "../../gameplay/InputBindings";
 import { GameplayScreen } from "../default/GameplayScreen";
 import { ChartBrowserWindow } from "./ChartBrowserWindow";
+import { ChartFilterWindow } from "./ChartFilterWindow";
 import { deleteDesktopBackground, loadDesktopBackground, saveDesktopBackground } from "./DesktopBackgroundStore";
 import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { GameControlsWindow } from "./GameControlsWindow";
@@ -18,6 +19,7 @@ import { WindowsXpWindowContainer } from "./WindowsXpWindowContainer";
 export function WindowsXpAppView({ game }: { game: GameController }) {
   const { gameplay, library, modifiers, online, preview_player, results } = useRizuAppController(game);
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
+  const [filter_open_request, setFilterOpenRequest] = useState(0);
   const background_url_ref = useRef<string | null>(null);
   const background_revision = useRef(0);
   const background_storage = useRef(Promise.resolve());
@@ -87,13 +89,24 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         initialSize: { width: 900, height: 620 },
         minSize: { width: 560, height: 360 },
         content: <ChartBrowserWindow library={library} previewPlayer={preview_player}
-          masterVolume={modifiers.master_volume} onPlay={(chart, song) => {
+          masterVolume={modifiers.master_volume} onOpenFilter={() => setFilterOpenRequest((request) => request + 1)}
+          onPlay={(chart, song) => {
           gameplay.begin({
             kind: "play",
             request: { chart, song: { title: song.title, artist: song.artist }, input_bindings: loadInputBindings(inputLayout(chart)) },
           });
           void gameplay.prepare().catch(() => undefined);
         }} />,
+      },
+      {
+        id: "chart-filter",
+        title: "Chart Filter",
+        initialPosition: { x: 310, y: 130 },
+        initialSize: { width: 360, height: 250 },
+        minSize: { width: 300, height: 220 },
+        resizable: false,
+        openRequest: filter_open_request,
+        content: <ChartFilterWindow selector={library.chart_selector} />,
       },
       {
         id: "online-players",

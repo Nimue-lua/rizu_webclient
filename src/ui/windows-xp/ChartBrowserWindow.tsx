@@ -38,10 +38,11 @@ function sortSongs(songs: readonly ChartfileSetView[], mode: ChartSortMode) {
   });
 }
 
-export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPlay }: {
+export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onOpenFilter, onPlay }: {
   library: LibraryController;
   previewPlayer: SongPreviewPlayer;
   masterVolume: number;
+  onOpenFilter: () => void;
   onPlay: (chart: Chartview, song: ChartfileSetView) => void;
 }) {
   const selector = library.chart_selector;
@@ -177,6 +178,7 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
             <option value="duration">Length</option>
           </select>
         </label>
+        <button type="button" onClick={onOpenFilter}>Filter...</button>
         <button type="button" onClick={library.refresh} disabled={loading}>{loading ? "Loading..." : "Refresh"}</button>
       </div>
 
