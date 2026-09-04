@@ -11,6 +11,7 @@ export interface WindowsXpApplication {
   initialSize?: { width: number; height: number };
   minSize?: { width: number; height: number };
   resizable?: boolean;
+  onClose?: () => void;
 }
 
 interface ApplicationState {
@@ -70,7 +71,10 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
                 if (application.id !== active_id) activate(application.id);
               }}
               onMinimize={() => updateApplication(application.id, { visible: false })}
-              onClose={() => updateApplication(application.id, { open: false, visible: false })}>
+              onClose={() => {
+                updateApplication(application.id, { open: false, visible: false });
+                application.onClose?.();
+              }}>
               {application.content}
             </WindowsXpWindow>
           );

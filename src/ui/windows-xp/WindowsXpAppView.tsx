@@ -8,17 +8,18 @@ import { GameplayScreen } from "../default/GameplayScreen";
 import { ChartBrowserWindow } from "./ChartBrowserWindow";
 import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { OnlinePlayersWindow } from "./OnlinePlayersWindow";
+import { PlayResultWindow } from "./PlayResultWindow";
 import { WindowsXpGameplayLoading } from "./WindowsXpGameplayLoading";
 import { WindowsXpWindowContainer } from "./WindowsXpWindowContainer";
 
 export function WindowsXpAppView({ game }: { game: GameController }) {
-  const { gameplay, library, modifiers, online, preview_player } = useRizuAppController(game);
+  const { gameplay, library, modifiers, online, preview_player, results } = useRizuAppController(game);
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (gameplay.status === "ready") gameplay.start();
-    if (gameplay.status === "completed") gameplay.discard();
-  }, [gameplay.status]);
+    if (gameplay.status === "completed" && !results.completed) gameplay.discard();
+  }, [gameplay.status, results.completed]);
 
   if (gameplay.status === "setup" || gameplay.status === "preparing" || gameplay.status === "ready") {
     return <WindowsXpGameplayLoading gameplay={gameplay} />;
@@ -30,10 +31,10 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         {gameplay.background_url && <img className={`windows-xp-gameplay-background ${gameplay.background_state}`}
           src={gameplay.background_url} alt="" />}
         <GameplayScreen assets={gameplay.assets} configuration={gameplay.configuration}
-          input_bindings={gameplay.input_bindings} initial_lead_in={1.15}
+          input_bindings={gameplay.input_bindings} autoplay={gameplay.autoplay}
+          playback={gameplay.playback ?? undefined} initial_lead_in={1.15}
           onBackgroundStateChange={gameplay.set_background_state} onFinish={(completed, reached_chart_end) => {
             gameplay.finish(completed, reached_chart_end);
-            gameplay.discard();
           }} />
       </div>
     );
@@ -74,6 +75,18 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         resizable: false,
         content: <DesktopBackgroundWindow backgroundUrl={background_url} onBackgroundChange={setBackgroundUrl} />,
       },
+      ...(gameplay.status === "completed" && gameplay.location && gameplay.assets && results.completed ? [{
+        id: "play-result",
+        title: "Rizu - Play Result",
+        defaultOpen: true,
+        initialPosition: { x: 180, y: 44 },
+        initialSize: { width: 680, height: 570 },
+        minSize: { width: 480, height: 420 },
+        content: <PlayResultWindow completed={results.completed} location={gameplay.location}
+          overallDifficulty={gameplay.assets.chart.overall_difficulty ?? 5}
+          onReplay={gameplay.replay} />,
+        onClose: gameplay.discard,
+      }] : []),
     ]} />
   );
 }

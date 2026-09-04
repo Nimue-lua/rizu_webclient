@@ -863,6 +863,190 @@ body {
   opacity: 0;
 }
 
+.windows-xp-play-result {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-result-song {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 9px 12px;
+  color: #fff;
+  background: linear-gradient(90deg, #003399, #6d9cdd);
+}
+
+.windows-xp-result-song > div {
+  display: grid;
+  min-width: 0;
+}
+
+.windows-xp-result-song strong,
+.windows-xp-result-song span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-result-song strong {
+  font-size: 15px;
+}
+
+.windows-xp-result-song > div span {
+  margin-top: 2px;
+  color: #dbe9ff;
+}
+
+.windows-xp-result-song > span {
+  max-width: 42%;
+  text-align: right;
+}
+
+.windows-xp-result-summary {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.windows-xp-result-grade {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  align-content: center;
+  border: 1px solid #7f9db9;
+  color: #fff;
+  background: #316ac5;
+  text-shadow: 1px 1px #183d79;
+}
+
+.windows-xp-result-grade small {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.windows-xp-result-grade strong {
+  font: bold 52px/1 "Trebuchet MS", sans-serif;
+}
+
+.windows-xp-result-grade.grade-x { background: #3f75a7; }
+.windows-xp-result-grade.grade-s { background: #bf8500; }
+.windows-xp-result-grade.grade-a { background: #238458; }
+.windows-xp-result-grade.grade-b { background: #316ac5; }
+.windows-xp-result-grade.grade-c { background: #68777e; }
+.windows-xp-result-grade.grade-d { background: #765900; }
+
+.windows-xp-result-summary > dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid #7f9db9;
+  background: #aca899;
+}
+
+.windows-xp-result-summary > dl > div {
+  display: grid;
+  padding: 7px 10px;
+  background: #fff;
+}
+
+.windows-xp-result-summary dt {
+  color: #666;
+  font-size: 10px;
+}
+
+.windows-xp-result-summary dd {
+  margin: 2px 0 0;
+  color: #003399;
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.windows-xp-result-judgments,
+.windows-xp-result-details {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+
+.windows-xp-result-judgments > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  align-content: start;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.windows-xp-result-judgments dl {
+  display: grid;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid #aca899;
+  background: #fff;
+  text-align: center;
+}
+
+.windows-xp-result-judgments dt {
+  overflow: hidden;
+  color: #555;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-result-judgments dd {
+  margin: 3px 0 0;
+  color: #003399;
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.windows-xp-result-details > dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px 12px;
+  margin: 0;
+}
+
+.windows-xp-result-details dl > div {
+  min-width: 0;
+  padding: 3px;
+}
+
+.windows-xp-result-details dt {
+  color: #666;
+  font-size: 10px;
+}
+
+.windows-xp-result-details dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-play-result > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #aca899;
+  color: #555;
+}
+
 .gameplay-screen,
 .gameplay-screen * {
   cursor: none;
