@@ -49,6 +49,9 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
   const preview_paused = useSyncExternalStore(previewPlayer.subscribe, previewPlayer.getPaused);
   const [local_media, setLocalMedia] = useState<LocalPreviewMedia | null>(null);
   const song_list_ref = useRef<HTMLDivElement>(null);
+  const restored_song_scroll_ref = useRef(false);
+  const chart_list_ref = useRef<HTMLDivElement>(null);
+  const selected_chart_ref = useRef<HTMLButtonElement>(null);
   const [song_window, setSongWindow] = useState({ first_index: 0, visible_count: SONG_ROW_OVERSCAN * 2 + 1 });
 
   useEffect(() => {
@@ -79,6 +82,29 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
     observer.observe(song_list);
     return () => observer.disconnect();
   }, []);
+
+  useLayoutEffect(() => {
+    if (restored_song_scroll_ref.current) return;
+    const song_list = song_list_ref.current;
+    const selected_index = songs.findIndex((song) => song.id === selected_song?.id);
+    if (!song_list || selected_index < 0 || song_list.clientHeight === 0) return;
+    const centered_scroll_top = Math.max(0,
+      selected_index * SONG_ROW_HEIGHT + SONG_ROW_HEIGHT / 2 - song_list.clientHeight / 2);
+    song_list.scrollTop = centered_scroll_top;
+    const first_index = Math.max(0, Math.floor(centered_scroll_top / SONG_ROW_HEIGHT) - SONG_ROW_OVERSCAN);
+    setSongWindow((current) => current.first_index === first_index ? current : { ...current, first_index });
+    restored_song_scroll_ref.current = true;
+  }, [selected_song?.id, selection.sort_mode, songs]);
+
+  useLayoutEffect(() => {
+    const chart_list = chart_list_ref.current;
+    const selected_button = selected_chart_ref.current;
+    if (!chart_list || !selected_button) return;
+    const list_bounds = chart_list.getBoundingClientRect();
+    const button_bounds = selected_button.getBoundingClientRect();
+    chart_list.scrollTop += button_bounds.top + button_bounds.height / 2
+      - (list_bounds.top + list_bounds.height / 2);
+  }, [selected_chart?.id, selected_song?.id]);
 
   useEffect(() => {
     setLocalMedia(null);
@@ -193,9 +219,10 @@ export function ChartBrowserWindow({ library, previewPlayer, masterVolume, onPla
 
           <fieldset className="windows-xp-difficulty-group">
             <legend>Available charts</legend>
-            <div className="windows-xp-difficulty-list">
+            <div className="windows-xp-difficulty-list" ref={chart_list_ref}>
               {selected_song?.charts.map((chart) => (
-                <button key={chart.id} type="button" className={chart.id === selected_chart?.id ? "selected" : ""}
+                <button key={chart.id} type="button" ref={chart.id === selected_chart?.id ? selected_chart_ref : undefined}
+                  className={chart.id === selected_chart?.id ? "selected" : ""}
                   onClick={() => selector.selectChart(chart.id)}>
                   <span className="windows-xp-chart-rating">{chart.difficulty.toFixed(1)}</span>
                   <span className="windows-xp-chart-name"><strong>{chart.name}</strong><small>Mapped by {chart.creator}</small></span>
