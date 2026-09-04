@@ -19,7 +19,7 @@ const STORAGE_KEY = "rizu.settings";
 export type UserInterface = "default" | "windows-xp";
 
 export const settings = {
-  user_interface: choiceSetting<UserInterface>("ui", "windows-xp", ["default", "windows-xp"]),
+  user_interface: choiceSetting<UserInterface>("ui", "default", ["default", "windows-xp"]),
   master_volume: numberSetting("audio.volume.master", 0.2, 0, 1, 0.01),
   osu_hit_sound_volume: numberSetting("audio.volume.osu_hit_sound", 1, 0, 1, 0.01),
   music_offset: numberSetting("gameplay.offset.music", 0, -200, 200, 1),
