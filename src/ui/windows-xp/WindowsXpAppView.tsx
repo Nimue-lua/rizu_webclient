@@ -104,6 +104,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
       {
         id: "chart-filter",
         title: "Chart Filter",
+        desktopIcon: false,
         initialPosition: { x: 310, y: 130 },
         initialSize: { width: 360, height: 250 },
         minSize: { width: 300, height: 220 },
@@ -114,6 +115,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
       {
         id: "gameplay-modifiers",
         title: "Gameplay Modifiers",
+        desktopIcon: false,
         initialPosition: { x: 350, y: 80 },
         initialSize: { width: 420, height: 500 },
         minSize: { width: 340, height: 300 },
@@ -161,6 +163,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
       ...(gameplay.status === "completed" && gameplay.location && gameplay.assets && results.completed ? [{
         id: "play-result",
         title: "Play Result",
+        desktopIcon: false,
         defaultOpen: true,
         initialPosition: { x: 180, y: 44 },
         initialSize: { width: 680, height: 570 },

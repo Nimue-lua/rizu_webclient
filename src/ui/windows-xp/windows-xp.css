@@ -109,12 +109,19 @@ img {
   width: 98px;
   padding: 0 15px 1px 10px;
   border-radius: 0 10px 10px 0 !important;
-  background: linear-gradient(#70b96a 0, #3f9c35 8%, #3c8d32 92%, #225e20 100%) !important;
-  box-shadow: inset 0 1px 2px #b9e2b3, 2px 0 4px #123d94 !important;
+  background: linear-gradient(to bottom,
+    #a3d99c 0,
+    #68be65 10%,
+    #48a847 38%,
+    #48a847 68%,
+    #388d37 86%,
+    #1e5f22 100%) !important;
+  box-shadow: inset 0 2px 2px rgba(221, 255, 216, .8), inset 0 -2px 3px rgba(20, 79, 24, .8),
+    2px 0 4px #123d94 !important;
   font-size: 16px !important;
   font-style: italic !important;
   font-weight: 700 !important;
-  text-shadow: 1px 1px #245d20;
+  text-shadow: 1px 2px 1px #256b29;
 }
 
 .windows-xp-start-button:hover {
@@ -122,16 +129,10 @@ img {
 }
 
 .windows-xp-start-icon {
-  display: grid;
-  grid-template-columns: repeat(2, 7px);
-  gap: 1px;
-  transform: skewY(-5deg);
-}
-
-.windows-xp-start-icon i {
-  width: 7px;
-  height: 7px;
-  background: #fff;
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(1px 2px 1px rgba(23, 83, 27, .85));
+  object-fit: contain;
 }
 
 .windows-xp-task-list {

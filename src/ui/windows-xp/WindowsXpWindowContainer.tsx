@@ -8,6 +8,7 @@ export interface WindowsXpApplication {
   title: string;
   content: ReactNode;
   iconUrl?: string;
+  desktopIcon?: boolean;
   defaultOpen?: boolean;
   initialPosition?: { x: number; y: number };
   initialSize?: { width: number; height: number };
@@ -80,7 +81,7 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
     <main className="windows-xp-shell">
       <div className="windows-xp-desktop" style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined}>
         <div className="windows-xp-desktop-icons">
-          {applications.map((application) => (
+          {applications.filter((application) => application.desktopIcon !== false).map((application) => (
             <button key={application.id} className="windows-xp-desktop-icon" type="button"
               onDoubleClick={() => activate(application.id)}>
               {application.iconUrl

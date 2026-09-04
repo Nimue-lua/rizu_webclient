@@ -21,10 +21,8 @@ export function WindowsXpTaskbar({ applications, onApplicationClick }: {
   return (
     <footer className="windows-xp-taskbar">
       <button className="windows-xp-start-button" type="button">
-        <span className="windows-xp-start-icon" aria-hidden="true">
-          <i /><i /><i /><i />
-        </span>
-        Start
+        <img className="windows-xp-start-icon" src="/dmca_incoming/windows_logo.png" alt="" />
+        <span>Start</span>
       </button>
       <div className="windows-xp-task-list">
         {applications.map((application) => (
