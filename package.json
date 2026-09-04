@@ -21,7 +21,8 @@
     "react-dom": "latest",
     "sql.js": "^1.14.2",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "xp.css": "^0.2.6"
   },
   "devDependencies": {
     "@types/node": "latest",

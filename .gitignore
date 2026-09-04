@@ -1,11 +1,11 @@
 node_modules/
 dist/
 *.local
-public/catalog.sqlite
-public/catalog.sqlite-*
+library/
 server/catalog.sqlite
 server/catalog.sqlite-*
-public/charts
-public/chart-previews
-public/audio-previews
 server/__pycache__
+server/replay-server/catalog.sqlite*
+scores.sqlite
+scores.sqlite-shm
+scores.sqlite-wal

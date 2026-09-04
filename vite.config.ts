@@ -15,6 +15,8 @@ export default defineConfig({
   },
   build: {
     copyPublicDir: false,
+    // XP.css is already minified and contains a legacy selector rejected by Lightning CSS.
+    cssMinify: "esbuild",
   },
   server: {
     proxy: {

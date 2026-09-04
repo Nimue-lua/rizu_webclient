@@ -1,0 +1,370 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  overflow: hidden;
+}
+
+.windows-xp-shell {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 30px;
+  min-height: 100%;
+}
+
+.windows-xp-desktop {
+  position: relative;
+  min-height: 0;
+  background: #3a6ea5;
+}
+
+.windows-xp-desktop-icons {
+  display: grid;
+  position: absolute;
+  z-index: 0;
+  top: 12px;
+  left: 8px;
+  gap: 12px;
+}
+
+.windows-xp-desktop-icon {
+  display: grid;
+  width: 72px;
+  min-width: 0;
+  padding: 4px;
+  place-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #fff;
+  font-family: Tahoma, sans-serif;
+  font-size: 11px;
+  text-shadow: 1px 1px #000;
+  user-select: none;
+}
+
+.windows-xp-desktop-icon:focus {
+  border-color: #bdd6ff;
+  background: rgba(49, 106, 197, .55);
+  outline: 1px dotted #fff;
+  outline-offset: -4px;
+}
+
+.windows-xp-program-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+  place-items: center;
+  border: 2px outset #ece9d8;
+  background: #fff;
+  color: #245edb;
+  font: bold 20px "Trebuchet MS", sans-serif;
+  text-shadow: none;
+}
+
+.windows-xp-taskbar {
+  z-index: 1000;
+  display: flex;
+  min-width: 0;
+  color: #fff;
+  background: linear-gradient(#3168d5 0, #4993e6 3%, #245edb 12%, #245edb 88%, #1941a5 100%);
+  box-shadow: inset 0 1px 1px #1552c9;
+  font-family: "Trebuchet MS", Tahoma, sans-serif;
+  user-select: none;
+}
+
+.windows-xp-taskbar button {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+}
+
+.windows-xp-start-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 98px;
+  padding: 0 15px 1px 10px;
+  border-radius: 0 14px 14px 0 !important;
+  background: linear-gradient(#70b96a 0, #3f9c35 8%, #3c8d32 92%, #225e20 100%) !important;
+  box-shadow: inset 0 1px 2px #b9e2b3, 2px 0 4px #123d94 !important;
+  font-size: 16px !important;
+  font-style: italic !important;
+  font-weight: 700 !important;
+  text-shadow: 1px 1px #245d20;
+}
+
+.windows-xp-start-button:hover {
+  filter: brightness(1.08);
+}
+
+.windows-xp-start-icon {
+  display: grid;
+  grid-template-columns: repeat(2, 7px);
+  gap: 1px;
+  transform: skewY(-5deg);
+}
+
+.windows-xp-start-icon i {
+  width: 7px;
+  height: 7px;
+  background: #fff;
+}
+
+.windows-xp-task-list {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+}
+
+.windows-xp-task-button {
+  width: min(160px, 35vw);
+  padding: 0 10px !important;
+  overflow: hidden;
+  background: #3c81ed !important;
+  box-shadow: inset 1px 1px #6fa7f3, inset -1px -1px #174da8 !important;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-task-button.active {
+  background: #1e52b7 !important;
+  box-shadow: inset 1px 1px #123d91, inset -1px -1px #407dd8 !important;
+}
+
+.windows-xp-taskbar-clock {
+  display: grid;
+  min-width: 78px;
+  padding: 0 10px;
+  place-items: center;
+  background: linear-gradient(90deg, #0d85df, #16a6e9);
+  box-shadow: inset 1px 0 #18bbef;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.windows-xp-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+}
+
+.windows-xp-window.inactive .title-bar {
+  background: linear-gradient(#9db9dc, #7697c5 12%, #7c9bc6 88%, #6b88b1);
+  text-shadow: 1px 1px #596d87;
+}
+
+.windows-xp-window-title-bar {
+  flex: none;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.windows-xp-window-body {
+  flex: 1;
+  min-height: 0;
+  margin: 16px;
+  overflow: auto;
+}
+
+.windows-xp-online-players {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-online-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 2px 12px;
+}
+
+.windows-xp-online-header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.windows-xp-online-header strong {
+  color: #003399;
+  font-size: 16px;
+}
+
+.windows-xp-online-header div span {
+  color: #666;
+}
+
+.windows-xp-online-count {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid #36933a;
+  border-radius: 10px;
+  color: #176d1c;
+  background: #e5f5df;
+  font-weight: 700;
+}
+
+.windows-xp-online-count.offline {
+  border-color: #999;
+  color: #666;
+  background: #eee;
+}
+
+.windows-xp-online-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 2px inset #fff;
+  background: #fff;
+}
+
+.windows-xp-online-player {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: start;
+  column-gap: 9px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #aca899;
+  background: linear-gradient(135deg, #fff, #f0f3fa);
+}
+
+.windows-xp-online-avatar {
+  display: grid;
+  grid-row: 1 / 3;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #7f9db9;
+  color: #fff;
+  background: linear-gradient(135deg, #6ba5e7, #245edb);
+  font: bold 20px "Trebuchet MS", sans-serif;
+}
+
+.windows-xp-online-player > strong {
+  grid-column: 2;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windows-xp-online-stats {
+  display: flex;
+  grid-column: 2;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #333;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.windows-xp-online-stats span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: #9b5700;
+}
+
+.windows-xp-online-stats svg {
+  width: 11px;
+  height: 11px;
+}
+
+.windows-xp-online-rank {
+  margin-left: auto;
+  color: #666;
+}
+
+.windows-xp-online-no-stats {
+  grid-column: 2;
+  align-self: start;
+  color: #777;
+}
+
+.windows-xp-online-empty {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  border: 2px inset #fff;
+  color: #666;
+  background: #fff;
+}
+
+.windows-xp-online-status {
+  margin-top: 8px;
+  padding: 3px 5px;
+  border: 1px inset #fff;
+  color: #555;
+}
+
+@media (max-width: 540px) {
+  .windows-xp-online-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .windows-xp-online-header div span {
+    display: none;
+  }
+}
+
+.windows-xp-resize-handle {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+}
+
+.resize-n,
+.resize-s {
+  right: 5px;
+  left: 5px;
+  height: 6px;
+}
+
+.resize-e,
+.resize-w {
+  top: 5px;
+  bottom: 5px;
+  width: 6px;
+}
+
+.resize-n { top: -2px; cursor: ns-resize; }
+.resize-ne { top: -2px; right: -2px; cursor: nesw-resize; }
+.resize-e { right: -2px; cursor: ew-resize; }
+.resize-se { right: -2px; bottom: -2px; cursor: nwse-resize; }
+.resize-s { bottom: -2px; cursor: ns-resize; }
+.resize-sw { bottom: -2px; left: -2px; cursor: nesw-resize; }
+.resize-w { left: -2px; cursor: ew-resize; }
+.resize-nw { top: -2px; left: -2px; cursor: nwse-resize; }
+
+.resize-ne,
+.resize-se,
+.resize-sw,
+.resize-nw {
+  width: 9px;
+  height: 9px;
+}
