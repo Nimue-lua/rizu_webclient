@@ -48,15 +48,16 @@ test("persists the online server address", () => {
   assert.equal(JSON.parse(stored!).values["online.server_address"], "192.168.1.20:8765");
 });
 
-test("persists the selected user interface", () => {
+test("persists Windows XP window frames", () => {
   let stored: string | null = null;
-  const config = createSettingsConfig({
+  const storage: ConfigStorage = {
     getItem: () => stored,
     setItem: (_key, value) => { stored = value; },
     removeItem: () => { stored = null; },
-  });
+  };
+  const frame = JSON.stringify({ "chart-browser": { x: 40, y: 30, width: 800, height: 600 } });
 
-  assert.equal(config.get(settings.user_interface), "windows-xp");
-  config.set(settings.user_interface, "default");
-  assert.equal(JSON.parse(stored!).values.ui, "default");
+  createSettingsConfig(storage).set(settings.windows_xp_window_frames, frame);
+
+  assert.equal(createSettingsConfig(storage).get(settings.windows_xp_window_frames), frame);
 });

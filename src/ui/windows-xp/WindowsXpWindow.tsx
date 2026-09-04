@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type PropsWithChildren } from "react";
 
-interface WindowFrame {
+export interface WindowFrame {
   x: number;
   y: number;
   width: number;
@@ -33,6 +33,7 @@ interface WindowsXpWindowProps extends PropsWithChildren {
   onActivate?: () => void;
   onMinimize?: () => void;
   onClose?: () => void;
+  onFrameChange?: (frame: WindowFrame) => void;
 }
 
 const resize_directions: ResizeDirection[] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
@@ -44,7 +45,7 @@ function clamp(value: number, min: number, max: number) {
 export function WindowsXpWindow({ title, iconUrl, children, className = "", active = true, zIndex = 1,
   initialPosition = { x: 24, y: 24 },
   initialSize = { width: 360, height: 160 }, minSize = { width: 200, height: 100 },
-  resizable = true, onActivate, onMinimize, onClose }: WindowsXpWindowProps) {
+  resizable = true, onActivate, onMinimize, onClose, onFrameChange }: WindowsXpWindowProps) {
   const window_ref = useRef<HTMLElement>(null);
   const interaction_ref = useRef<WindowInteraction>(null);
   const pending_frame_ref = useRef<WindowFrame>(null);
@@ -99,6 +100,7 @@ export function WindowsXpWindow({ title, iconUrl, children, className = "", acti
       bounds_width: bounds.clientWidth,
       bounds_height: bounds.clientHeight,
     };
+    pending_frame_ref.current = frame;
   };
 
   const moveInteraction = (event: PointerEvent<HTMLElement>) => {
@@ -132,7 +134,9 @@ export function WindowsXpWindow({ title, iconUrl, children, className = "", acti
   };
 
   const stopInteraction = (event: PointerEvent<HTMLElement>) => {
-    if (interaction_ref.current?.pointer_id === event.pointerId) interaction_ref.current = null;
+    if (interaction_ref.current?.pointer_id !== event.pointerId) return;
+    interaction_ref.current = null;
+    if (pending_frame_ref.current) onFrameChange?.(pending_frame_ref.current);
   };
 
   return (

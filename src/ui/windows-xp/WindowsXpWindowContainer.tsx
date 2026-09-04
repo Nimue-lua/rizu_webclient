@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
+import { appSettings, settings, useSetting } from "../../config/Settings";
 import { WindowsXpTaskbar } from "./WindowsXpTaskbar";
-import { WindowsXpWindow } from "./WindowsXpWindow";
+import { WindowsXpWindow, type WindowFrame } from "./WindowsXpWindow";
 
 export interface WindowsXpApplication {
   id: string;
@@ -22,10 +23,26 @@ interface ApplicationState {
   z_index: number;
 }
 
+function storedWindowFrames(serialized: string): Record<string, WindowFrame> {
+  try {
+    const frames: unknown = JSON.parse(serialized);
+    if (typeof frames !== "object" || frames === null || Array.isArray(frames)) return {};
+    return Object.fromEntries(Object.entries(frames).filter((entry): entry is [string, WindowFrame] => {
+      const frame = entry[1] as Partial<WindowFrame> | null;
+      return frame !== null && typeof frame === "object" && Number.isFinite(frame.x) && Number.isFinite(frame.y)
+        && Number.isFinite(frame.width) && Number.isFinite(frame.height) && frame.width! > 0 && frame.height! > 0;
+    }));
+  } catch {
+    return {};
+  }
+}
+
 export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
   applications: WindowsXpApplication[];
   backgroundUrl?: string | null;
 }) {
+  const serialized_frames = useSetting(settings.windows_xp_window_frames);
+  const stored_frames = storedWindowFrames(serialized_frames);
   const next_z_index = useRef(applications.length + 1);
   const [application_states, setApplicationStates] = useState<ApplicationState[]>(() =>
     applications.map((application, index) => ({
@@ -65,11 +82,17 @@ export function WindowsXpWindowContainer({ applications, backgroundUrl }: {
         {applications.map((application) => {
           const state = application_states.find((item) => item.id === application.id);
           if (!state?.open || !state.visible) return null;
+          const stored_frame = stored_frames[application.id];
           return (
             <WindowsXpWindow key={application.id} title={application.title} iconUrl={application.iconUrl}
-              initialPosition={application.initialPosition} initialSize={application.initialSize}
+              initialPosition={stored_frame ?? application.initialPosition}
+              initialSize={stored_frame ?? application.initialSize}
               minSize={application.minSize} resizable={application.resizable}
               active={application.id === active_id} zIndex={state.z_index}
+              onFrameChange={(frame) => {
+                const frames = storedWindowFrames(appSettings.get(settings.windows_xp_window_frames));
+                appSettings.set(settings.windows_xp_window_frames, JSON.stringify({ ...frames, [application.id]: frame }));
+              }}
               onActivate={() => {
                 if (application.id !== active_id) activate(application.id);
               }}
