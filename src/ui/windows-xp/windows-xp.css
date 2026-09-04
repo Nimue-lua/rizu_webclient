@@ -896,6 +896,110 @@ img {
   flex: none;
 }
 
+.windows-xp-settings {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  gap: 11px;
+  height: 100%;
+  color: #222;
+  font-family: Tahoma, sans-serif;
+}
+
+.windows-xp-settings-intro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #7f9db9;
+  background: linear-gradient(90deg, #fff, #e9f1fc);
+}
+
+.windows-xp-settings-icon {
+  display: grid;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #17458b;
+  border-radius: 50%;
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, #82b6f1, #245edb 65%, #123e98);
+  font: bold 27px "Trebuchet MS", sans-serif;
+  text-shadow: 1px 1px #173c79;
+}
+
+.windows-xp-settings-intro strong {
+  color: #003399;
+  font-size: 15px;
+}
+
+.windows-xp-settings-intro p {
+  margin: 3px 0 0;
+  color: #555;
+}
+
+.windows-xp-settings fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.windows-xp-settings-control {
+  display: grid;
+  gap: 5px;
+}
+
+.windows-xp-settings-control > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.windows-xp-settings-control output {
+  min-width: 50px;
+  color: #003399;
+  text-align: right;
+  font-weight: 700;
+}
+
+.windows-xp-settings-slider {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-size: 10px;
+}
+
+.windows-xp-settings-slider input {
+  width: 100%;
+  margin: 0;
+}
+
+.windows-xp-settings-slider span:last-child {
+  text-align: right;
+}
+
+.windows-xp-settings-help {
+  margin: -3px 0 0;
+  color: #666;
+  font-size: 10px;
+}
+
+.windows-xp-settings > footer {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  color: #666;
+  font-size: 10px;
+}
+
+.windows-xp-settings > footer button {
+  flex: none;
+}
+
 .windows-xp-game-loading {
   position: fixed;
   inset: 0;

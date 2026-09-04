@@ -10,6 +10,7 @@ import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { GameControlsWindow } from "./GameControlsWindow";
 import { OnlinePlayersWindow } from "./OnlinePlayersWindow";
 import { PlayResultWindow } from "./PlayResultWindow";
+import { SettingsWindow } from "./SettingsWindow";
 import { WindowsXpGameplayLoading } from "./WindowsXpGameplayLoading";
 import { WindowsXpWindowContainer } from "./WindowsXpWindowContainer";
 
@@ -77,6 +78,16 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         initialSize: { width: 600, height: 550 },
         minSize: { width: 430, height: 390 },
         content: <GameControlsWindow />,
+      },
+      {
+        id: "settings",
+        title: "Settings",
+        iconUrl: "/dmca_incoming/system_properties.avif",
+        initialPosition: { x: 230, y: 66 },
+        initialSize: { width: 510, height: 440 },
+        minSize: { width: 400, height: 360 },
+        resizable: false,
+        content: <SettingsWindow />,
       },
       {
         id: "desktop-background",
