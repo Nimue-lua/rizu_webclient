@@ -142,6 +142,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         minSize: { width: 480, height: 420 },
         content: <PlayResultWindow completed={results.completed} location={gameplay.location}
           overallDifficulty={gameplay.assets.chart.overall_difficulty ?? 5}
+          approachRate={gameplay.assets.mode === "osu" ? gameplay.assets.chart.approach_rate : null}
           onReplay={gameplay.replay} />,
         onClose: gameplay.discard,
       }] : []),

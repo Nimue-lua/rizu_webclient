@@ -10,16 +10,20 @@ function judgeLabel(name: string) {
   return name.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export function PlayResultWindow({ completed, location, overallDifficulty, onReplay }: {
+export function PlayResultWindow({ completed, location, overallDifficulty, approachRate, onReplay }: {
   completed: CompletedGameplay;
   location: GameplayLocation;
   overallDifficulty: number;
+  approachRate: number | null;
   onReplay: () => void;
 }) {
   const score = completed.score;
   const rate = completed.replay_base.rate;
   const judge_names = score.judge_names ?? Object.keys(score.judges ?? {});
   const max_combo = score.max_combo ?? score.combo;
+  const effective_approach_rate = completed.replay_base.mode === "osu"
+    ? completed.replay_base.approach_rate ?? approachRate
+    : null;
 
   return (
     <section className="windows-xp-play-result">
@@ -66,7 +70,10 @@ export function PlayResultWindow({ completed, location, overallDifficulty, onRep
           <div><dt>Music rate</dt><dd>{rate.toFixed(2)}x</dd></div>
           <div><dt>Duration</dt><dd>{formatDuration(location.duration_seconds / rate)}</dd></div>
           <div><dt>Tempo</dt><dd>{Math.round(location.bpm * rate)} BPM</dd></div>
-          <div><dt>Long notes</dt><dd>{Math.round(location.long_note_ratio * 100)}%</dd></div>
+          {completed.replay.mode === "osu"
+            ? <div><dt>Approach rate</dt><dd>{effective_approach_rate === null
+              ? "-" : `AR${effective_approach_rate.toFixed(1).replace(/\.0$/, "")}`}</dd></div>
+            : <div><dt>Long notes</dt><dd>{Math.round(location.long_note_ratio * 100)}%</dd></div>}
           <div><dt>Final combo</dt><dd>{score.combo === undefined ? "-" : `${score.combo.toLocaleString()}x`}</dd></div>
         </dl>
       </fieldset>
