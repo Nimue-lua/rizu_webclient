@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 interface TaskbarApplication {
   id: string;
   title: string;
@@ -9,6 +11,13 @@ export function WindowsXpTaskbar({ applications, onApplicationClick }: {
   applications: TaskbarApplication[];
   onApplicationClick: (id: string) => void;
 }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   return (
     <footer className="windows-xp-taskbar">
       <button className="windows-xp-start-button" type="button">
@@ -26,7 +35,9 @@ export function WindowsXpTaskbar({ applications, onApplicationClick }: {
           </button>
         ))}
       </div>
-      <time className="windows-xp-taskbar-clock">12:00 PM</time>
+      <time className="windows-xp-taskbar-clock" dateTime={now.toISOString()}>
+        {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+      </time>
     </footer>
   );
 }
