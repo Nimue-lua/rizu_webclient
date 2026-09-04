@@ -2,18 +2,14 @@ import { useRef, type ChangeEvent } from "react";
 
 export function DesktopBackgroundWindow({ backgroundUrl, onBackgroundChange }: {
   backgroundUrl: string | null;
-  onBackgroundChange: (url: string | null) => void;
+  onBackgroundChange: (file: File | null) => void;
 }) {
   const input_ref = useRef<HTMLInputElement>(null);
 
   const selectImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") onBackgroundChange(reader.result);
-    }, { once: true });
-    reader.readAsDataURL(file);
+    onBackgroundChange(file);
     event.target.value = "";
   };
 

@@ -1,11 +1,12 @@
 import "xp.css/dist/XP.css";
 import "./windows-xp.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GameController } from "../../app/GameController";
 import { useRizuAppController } from "../../app/controller/useRizuAppController";
 import { inputLayout, loadInputBindings } from "../../gameplay/InputBindings";
 import { GameplayScreen } from "../default/GameplayScreen";
 import { ChartBrowserWindow } from "./ChartBrowserWindow";
+import { deleteDesktopBackground, loadDesktopBackground, saveDesktopBackground } from "./DesktopBackgroundStore";
 import { DesktopBackgroundWindow } from "./DesktopBackgroundWindow";
 import { GameControlsWindow } from "./GameControlsWindow";
 import { OnlinePlayersWindow } from "./OnlinePlayersWindow";
@@ -17,6 +18,39 @@ import { WindowsXpWindowContainer } from "./WindowsXpWindowContainer";
 export function WindowsXpAppView({ game }: { game: GameController }) {
   const { gameplay, library, modifiers, online, preview_player, results } = useRizuAppController(game);
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
+  const background_url_ref = useRef<string | null>(null);
+  const background_revision = useRef(0);
+  const background_storage = useRef(Promise.resolve());
+
+  const replaceBackground = (background: Blob | null) => {
+    const previous_url = background_url_ref.current;
+    const next_url = background ? URL.createObjectURL(background) : null;
+    background_url_ref.current = next_url;
+    setBackgroundUrl(next_url);
+    if (previous_url) URL.revokeObjectURL(previous_url);
+  };
+
+  useEffect(() => {
+    let active = true;
+    const revision = background_revision.current;
+    void loadDesktopBackground().then((background) => {
+      if (active && revision === background_revision.current && background) replaceBackground(background);
+    }).catch(() => undefined);
+
+    return () => {
+      active = false;
+      if (background_url_ref.current) URL.revokeObjectURL(background_url_ref.current);
+      background_url_ref.current = null;
+    };
+  }, []);
+
+  const changeBackground = (background: File | null) => {
+    background_revision.current += 1;
+    replaceBackground(background);
+    background_storage.current = background_storage.current
+      .then(() => background ? saveDesktopBackground(background) : deleteDesktopBackground())
+      .catch(() => undefined);
+  };
 
   useEffect(() => {
     if (gameplay.status === "ready") gameplay.start();
@@ -97,7 +131,7 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
         initialSize: { width: 420, height: 390 },
         minSize: { width: 330, height: 320 },
         resizable: false,
-        content: <DesktopBackgroundWindow backgroundUrl={background_url} onBackgroundChange={setBackgroundUrl} />,
+        content: <DesktopBackgroundWindow backgroundUrl={background_url} onBackgroundChange={changeBackground} />,
       },
       ...(gameplay.status === "completed" && gameplay.location && gameplay.assets && results.completed ? [{
         id: "play-result",
