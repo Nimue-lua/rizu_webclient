@@ -15,7 +15,7 @@ import {
 } from "../../gameplay/mania/ScrollSpeed";
 import type { OsuCursorRendererMode } from "../../gameplay/osu/OsuHardwareCursor";
 import type { HitErrorMeterType } from "../../gameplay/renderer/GameplayHudRenderer";
-import { appSettings, settings, useSetting } from "../../config/Settings";
+import { appSettings, settings, useSetting, type UserInterface } from "../../config/Settings";
 import { currentUser, login, logout, register, subscribeAccountChanges, type OnlineUser } from "../../replay/ReplayServer";
 import { ConfigResetButton } from "./ConfigResetButton";
 import { RangeInput } from "./RangeInput";
@@ -45,6 +45,7 @@ export function SettingsScreen({
   onExit,
 }: SettingsScreenProps) {
   const master_volume = useSetting(settings.master_volume);
+  const user_interface = useSetting(settings.user_interface);
   const osu_hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
   const music_offset = useSetting(settings.music_offset);
   const scroll_speed = useSetting(settings.scroll_speed);
@@ -246,6 +247,16 @@ export function SettingsScreen({
                 <Image aria-hidden="true" />
                 <h2>Renderer</h2>
               </header>
+              <label className="settings-control settings-select-control" htmlFor="settings-user-interface">
+                <span>User interface</span>
+                <select id="settings-user-interface" value={user_interface} onChange={(event) => {
+                  appSettings.set(settings.user_interface, event.target.value as UserInterface);
+                  window.location.reload();
+                }}>
+                  <option value="default">Rizu</option>
+                  <option value="windows-xp">Windows XP</option>
+                </select>
+              </label>
               <div className="settings-control settings-slider-control">
                 <div className="config-control-label"><ConfigResetButton label="Reset osu! cursor scale to default"
                   onReset={() => appSettings.set(settings.cursor_scale, settings.cursor_scale.default)} />

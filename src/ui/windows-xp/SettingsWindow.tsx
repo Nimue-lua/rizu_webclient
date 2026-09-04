@@ -1,4 +1,4 @@
-import { appSettings, settings, useSetting } from "../../config/Settings";
+import { appSettings, settings, useSetting, type UserInterface } from "../../config/Settings";
 
 interface SettingsSliderProps {
   id: string;
@@ -29,6 +29,7 @@ function SettingsSlider({ id, label, min, max, step, value, output, onChange }: 
 }
 
 export function SettingsWindow() {
+  const user_interface = useSetting(settings.user_interface);
   const master_volume = useSetting(settings.master_volume);
   const hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
   const music_offset = useSetting(settings.music_offset);
@@ -42,6 +43,20 @@ export function SettingsWindow() {
           <p>Adjust music volume, osu! hit sounds, and music timing.</p>
         </div>
       </header>
+
+      <fieldset>
+        <legend>User interface</legend>
+        <label className="windows-xp-settings-select" htmlFor="windows-xp-user-interface">
+          <span>Interface</span>
+          <select id="windows-xp-user-interface" value={user_interface} onChange={(event) => {
+            appSettings.set(settings.user_interface, event.target.value as UserInterface);
+            window.location.reload();
+          }}>
+            <option value="default">Rizu</option>
+            <option value="windows-xp">Windows XP</option>
+          </select>
+        </label>
+      </fieldset>
 
       <fieldset>
         <legend>Volume</legend>

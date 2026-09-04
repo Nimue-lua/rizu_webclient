@@ -950,6 +950,17 @@ img {
   gap: 5px;
 }
 
+.windows-xp-settings-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.windows-xp-settings-select select {
+  min-width: 160px;
+}
+
 .windows-xp-settings-control > div:first-child {
   display: flex;
   justify-content: space-between;

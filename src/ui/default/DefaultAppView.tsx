@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import "./app.css";
 import type { GameController } from "../../app/GameController";
 import { parseChartLink } from "../../app/ChartLink";
 import { useRizuAppController } from "../../app/controller/useRizuAppController";
