@@ -18,8 +18,9 @@ const MAX_REPLAY_EVENTS = 2_000_000;
 const MAX_EVENT_TICK = 24 * 60 * 60 * 8192;
 const OSU_SAMPLE_RATE = 120;
 const MAX_CHART_END_TIME = 4 * 60 * 60;
-export const REPLAY_COMPUTE_VERSION = 3;
+export const REPLAY_COMPUTE_VERSION = 4;
 const REPLAY_TIME_EPSILON = 0.5 / 8192;
+const MAX_REPLAY_TAIL_DURATION = 10;
 
 function object(value: unknown, name: string): JsonObject {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${name} must be an object`);
@@ -159,7 +160,7 @@ function verifyOsu(parsed_chart: OsuChart, replay_value: JsonObject, base_value:
   };
   const actions = { primary: false, secondary: false };
   const maximum_event_time = events.reduce((maximum, event) => Math.max(maximum, replayValue(event.time)), Number.NEGATIVE_INFINITY);
-  if (maximum_event_time > chart.end_time + 1.2 * base.rate + REPLAY_TIME_EPSILON) {
+  if (maximum_event_time > chart.end_time + MAX_REPLAY_TAIL_DURATION * base.rate + REPLAY_TIME_EPSILON) {
     throw new Error("Replay continues after gameplay ends");
   }
   let event_index = 0;

@@ -136,3 +136,27 @@ test("accepts client-supported negative AR and quantized gameplay-end timestamps
     assert.equal(verified.accuracy, 0);
   });
 });
+
+test("allows up to ten seconds of replay input after the last object", async () => {
+  const source = `osu file format v14\n[General]\nMode:0\n[Difficulty]\nCircleSize:5\nOverallDifficulty:5\nHPDrainRate:5\n[HitObjects]\n256,192,1000,1,0,0:0:0:0:`;
+  await withStore(source, 0, null, async (store, md5) => {
+    const replay = { version: 1, mode: "osu", time_unit: "1/8192 second", judgment_events: [], input_events: [
+      { type: "aim", time: Math.round(10.9 * 8192), x: 256 * 8192, y: 192 * 8192 },
+    ] } as const;
+    const verified = await createReplayValidator(store)({ id: 1, chart_md5: md5, chart_index: 1, mode: "osu",
+      replay: zlibSync(strToU8(JSON.stringify(replay))), replay_base: createOsuReplayBase(1, 5) });
+    assert.equal(verified.accuracy, 0);
+  });
+});
+
+test("rejects osu input more than ten seconds after the last object", async () => {
+  const source = `osu file format v14\n[General]\nMode:0\n[Difficulty]\nCircleSize:5\nOverallDifficulty:5\nHPDrainRate:5\n[HitObjects]\n256,192,1000,1,0,0:0:0:0:`;
+  await withStore(source, 0, null, async (store, md5) => {
+    const replay = { version: 1, mode: "osu", time_unit: "1/8192 second", judgment_events: [], input_events: [
+      { type: "aim", time: Math.round(11.1 * 8192), x: 256 * 8192, y: 192 * 8192 },
+    ] } as const;
+    await assert.rejects(createReplayValidator(store)({ id: 1, chart_md5: md5, chart_index: 1, mode: "osu",
+      replay: zlibSync(strToU8(JSON.stringify(replay))), replay_base: createOsuReplayBase(1, 5) }),
+    /Replay continues after gameplay ends/);
+  });
+});

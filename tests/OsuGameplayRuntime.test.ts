@@ -217,6 +217,16 @@ test("autoplay hits osu objects with its synthesized WebGL cursor", () => {
   assert.deepEqual(harness.completions[0]?.replay.input_events, []);
 });
 
+test("does not save input recorded during the gameplay-end frame overrun", () => {
+  const harness = createHarness();
+  harness.runtime.start();
+  harness.runtime.aimPointer(1, 100, 100, { left: 0, top: 0, width: 640, height: 480 }, 12305);
+  harness.frames.run(12310);
+
+  assert.equal(harness.completions.length, 1);
+  assert.deepEqual(harness.completions[0]?.replay.input_events, []);
+});
+
 test("autoplay follows osu sliders and completes spinners", () => {
   const base = { hit_sound: 0, hit_sample: { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" },
     new_combo: false, combo_skip: 0, combo_number: 1, combo_color_index: 0 } as const;

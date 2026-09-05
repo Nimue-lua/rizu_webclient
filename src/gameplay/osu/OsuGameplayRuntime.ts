@@ -275,6 +275,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     if (this.finished) return;
     this.finished = true;
     this.flushPendingAim(Number.POSITIVE_INFINITY, true);
+    const gameplay_end_time = getGameplayEndTime(this.data, this.music_rate);
     this.finish({
       score: this.rules_engine.score,
       replay_base: this.replay_base,
@@ -282,7 +283,7 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
         version: 1,
         mode: "osu",
         time_unit: "1/8192 second",
-        input_events: this.input_events.map((event) => event.type === "aim"
+        input_events: this.input_events.filter((event) => event.time <= gameplay_end_time).map((event) => event.type === "aim"
           ? { ...event, time: replayTick(event.time), x: replayTick(event.x), y: replayTick(event.y) }
           : { ...event, time: replayTick(event.time) }),
         judgment_events: this.rules_engine.judgment_events.map((event) => ({
