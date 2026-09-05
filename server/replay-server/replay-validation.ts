@@ -24,7 +24,8 @@ export async function processValidationJobs(database: DatabaseSync, catalog: Dat
     SELECT scores.id AS score_id, scores.user_id, scores.chart_md5, scores.chart_index, scores.mode,
       scores.replay, scores.metadata_json
     FROM validation_jobs JOIN scores ON scores.id = validation_jobs.score_id
-    WHERE validation_jobs.state = 'queued' AND validation_jobs.compute_version = ? ORDER BY scores.id LIMIT ?
+    WHERE validation_jobs.state = 'queued' AND validation_jobs.compute_version = ?
+      AND scores.validation_state = 'queued' ORDER BY scores.id LIMIT ?
   `).all(REPLAY_COMPUTE_VERSION, limit) as unknown as JobRow[];
   let valid = 0;
   let invalid = 0;
@@ -44,10 +45,14 @@ export async function processValidationJobs(database: DatabaseSync, catalog: Dat
       const duration_seconds = chart.duration_seconds / result.music_rate;
       database.exec("BEGIN IMMEDIATE");
       try {
-        database.prepare(`UPDATE scores SET score = ?, accuracy = ?, duration_seconds = ?, metadata_json = ?, validation_state = 'valid',
-          validation_error = NULL WHERE id = ?`).run(result.score, result.accuracy, duration_seconds, JSON.stringify(next_metadata), job.score_id);
-        database.prepare("UPDATE validation_jobs SET state = 'succeeded', updated_at = ?, last_error = NULL WHERE score_id = ?")
-          .run(new Date().toISOString(), job.score_id);
+        const completed = database.prepare(`UPDATE validation_jobs SET state = 'succeeded', updated_at = ?, last_error = NULL
+          WHERE score_id = ? AND state = 'running' AND compute_version = ?`)
+          .run(new Date().toISOString(), job.score_id, REPLAY_COMPUTE_VERSION);
+        if (completed.changes !== 1) throw new Error("Validation job claim was lost");
+        const promoted = database.prepare(`UPDATE scores SET score = ?, accuracy = ?, duration_seconds = ?, metadata_json = ?,
+          validation_state = 'valid', validation_error = NULL WHERE id = ? AND validation_state = 'queued'`)
+          .run(result.score, result.accuracy, duration_seconds, JSON.stringify(next_metadata), job.score_id);
+        if (promoted.changes !== 1) throw new Error("Score validation state changed while processing");
         if (job.user_id !== null) {
           database.prepare(`UPDATE users SET score_count = score_count + 1, total_score = total_score + ?,
             play_time_seconds = play_time_seconds + ? WHERE id = ?`)
@@ -68,10 +73,14 @@ export async function processValidationJobs(database: DatabaseSync, catalog: Dat
           .run(new Date().toISOString(), error, job.score_id);
         continue;
       }
-      database.prepare(`UPDATE scores SET validation_state = 'invalid', validation_error = ? WHERE id = ?`).run(error, job.score_id);
-      database.prepare("UPDATE validation_jobs SET state = 'failed', updated_at = ?, last_error = ? WHERE score_id = ?")
-        .run(new Date().toISOString(), error, job.score_id);
-      invalid++;
+      const failed = database.prepare(`UPDATE validation_jobs SET state = 'failed', updated_at = ?, last_error = ?
+        WHERE score_id = ? AND state = 'running' AND compute_version = ?`)
+        .run(new Date().toISOString(), error, job.score_id, REPLAY_COMPUTE_VERSION);
+      if (failed.changes === 1) {
+        database.prepare(`UPDATE scores SET validation_state = 'invalid', validation_error = ?
+          WHERE id = ? AND validation_state = 'queued'`).run(error, job.score_id);
+        invalid++;
+      }
     }
   }
   return { valid, invalid };

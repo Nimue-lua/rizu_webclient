@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 const SCHEMA_VERSION = 3;
+const STALE_JOB_SECONDS = 10 * 60;
 
 function columns(database: DatabaseSync, table: string): Set<string> {
   return new Set((database.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[]).map(({ name }) => name));
@@ -14,6 +15,11 @@ function addColumn(database: DatabaseSync, table: string, known: Set<string>, de
 export function openReplayDatabase(database_path: string): DatabaseSync {
   const database = new DatabaseSync(database_path);
   database.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 10000;");
+  const schema_version = (database.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
+  if (schema_version > SCHEMA_VERSION) {
+    database.close();
+    throw new Error(`Replay database schema ${schema_version} is newer than supported schema ${SCHEMA_VERSION}`);
+  }
   database.exec("BEGIN IMMEDIATE");
   try {
     database.exec(`
@@ -93,11 +99,12 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
       INSERT OR IGNORE INTO server_state (key, value) SELECT 'total_scores', CAST(COUNT(*) AS TEXT) FROM scores;
       INSERT OR IGNORE INTO score_days (day, score_count)
         SELECT DATE(submitted_at), COUNT(*) FROM scores GROUP BY DATE(submitted_at);
-      UPDATE validation_jobs SET state = 'queued' WHERE state = 'running';
       PRAGMA user_version = ${SCHEMA_VERSION};
     `);
     const job_columns = columns(database, "validation_jobs");
     addColumn(database, "validation_jobs", job_columns, "compute_version INTEGER NOT NULL DEFAULT 1");
+    database.prepare(`UPDATE validation_jobs SET state = 'queued' WHERE state = 'running'
+      AND updated_at < ?`).run(new Date(Date.now() - STALE_JOB_SECONDS * 1000).toISOString());
     database.exec("COMMIT");
   } catch (reason) {
     database.exec("ROLLBACK");

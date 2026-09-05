@@ -139,6 +139,23 @@ command -v git >/dev/null
 command -v npm >/dev/null
 command -v curl >/dev/null
 
+database=/var/lib/rizu-replay/scores.sqlite3
+backup_path="/var/lib/rizu-replay/scores-before-deploy-$(date -u +%Y%m%dT%H%M%SZ).sqlite3"
+if [[ -f "$database" ]]; then
+  "$node_root/bin/node" --input-type=module - "$database" "$backup_path" <<'NODE'
+import { backup, DatabaseSync } from "node:sqlite";
+const [, , databasePath, backupPath] = process.argv;
+const source = new DatabaseSync(databasePath);
+await backup(source, backupPath);
+source.close();
+const copy = new DatabaseSync(backupPath, { readOnly: true });
+const check = copy.prepare("PRAGMA quick_check").get();
+copy.close();
+if (check.quick_check !== "ok") throw new Error(`Database backup failed integrity check: ${check.quick_check}`);
+console.log(`Database backup: ${backupPath}`);
+NODE
+fi
+
 if [[ ! -d "$server_root/.git" ]]; then
   git clone --branch "$branch" --single-branch "$repository_url" "$server_root"
 else

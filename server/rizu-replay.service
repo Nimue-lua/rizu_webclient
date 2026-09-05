@@ -12,7 +12,7 @@ Environment=RIZU_CATALOG_URL=https://s3.kuudere.fun/catalog.sqlite
 Environment=RIZU_CHART_CACHE=/var/lib/rizu-replay/chart-cache
 Environment=RIZU_WEB_ROOT=/srv/rizu-replay/repo/dist
 WorkingDirectory=/srv/rizu-replay/repo
-ExecStart=/srv/rizu-replay/repo/node_modules/.bin/tsx /srv/rizu-replay/repo/server/replay-server/index.ts
+ExecStart=/opt/node-v24.20.0/bin/node /srv/rizu-replay/repo/node_modules/tsx/dist/cli.mjs /srv/rizu-replay/repo/server/replay-server/index.ts
 Restart=on-failure
 NoNewPrivileges=yes
 PrivateTmp=yes
