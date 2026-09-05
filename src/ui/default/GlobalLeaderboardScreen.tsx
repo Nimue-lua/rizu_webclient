@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Trophy } from "lucide-react";
-import { listSkillLeaderboards, type SkillLeaderboards, type SkillName } from "../../replay/ReplayServer";
+import { listSkillLeaderboards, type LeaderboardDefinition, type SkillLeaderboards, type SkillName } from "../../replay/ReplayServer";
 
 interface GlobalLeaderboardScreenProps {
   onExit: () => void;
@@ -11,12 +11,16 @@ const empty_leaderboards: SkillLeaderboards = { speed: [], dexterity: [], stamin
 
 export function GlobalLeaderboardScreen({ onExit }: GlobalLeaderboardScreenProps) {
   const [leaderboards, setLeaderboards] = useState<SkillLeaderboards>(empty_leaderboards);
+  const [available, setAvailable] = useState<readonly LeaderboardDefinition[]>([]);
+  const [selected, setSelected] = useState("all");
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
 
   useEffect(() => {
     const abort_controller = new AbortController();
-    void listSkillLeaderboards(abort_controller.signal).then((rankings) => {
-      setLeaderboards(rankings);
+    setState("loading");
+    void listSkillLeaderboards(abort_controller.signal, undefined, selected).then((rankings) => {
+      setLeaderboards(rankings.leaderboards);
+      setAvailable(rankings.available);
       setState("loaded");
     }).catch((error: unknown) => {
       if (abort_controller.signal.aborted) return;
@@ -24,7 +28,7 @@ export function GlobalLeaderboardScreen({ onExit }: GlobalLeaderboardScreenProps
       setState("error");
     });
     return () => abort_controller.abort();
-  }, []);
+  }, [selected]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onExit(); };
@@ -36,6 +40,9 @@ export function GlobalLeaderboardScreen({ onExit }: GlobalLeaderboardScreenProps
     <section className="global-leaderboard-screen" aria-labelledby="global-leaderboard-title">
       <header className="global-leaderboard-heading">
         <div><Trophy aria-hidden="true" /><div><h1 id="global-leaderboard-title">Global Leaderboards</h1><p>Average of each player&apos;s best 20 chart scores</p></div></div>
+        <label>Ruleset <select value={selected} onChange={(event) => setSelected(event.target.value)}>
+          {available.length ? available.map((item) => <option value={item.slug} key={item.slug}>{item.name}</option>) : <option value="all">All modes</option>}
+        </select></label>
         <button type="button" onClick={onExit}><ArrowLeft aria-hidden="true" />Back to song select</button>
       </header>
       {state === "loaded" ? <div className="global-skill-leaderboards">

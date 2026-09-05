@@ -47,7 +47,7 @@ export function storedPlay(chart_id: string, completed: CompletedGameplay, playe
     played_at: played_at.toISOString(),
     accuracy: completed.score.accuracy ?? null,
     music_rate: completed.replay_base.rate,
-    score: completed.score.score ?? null,
+    score: completed.score.score ?? 0,
     grade: completed.score.grade ?? null,
     combo: completed.score.combo ?? null,
     max_combo: completed.score.max_combo ?? null,

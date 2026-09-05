@@ -1,85 +1,29 @@
 #!/usr/bin/env node
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { access, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { authenticatedUser, createSession, credentials, passwordHash, passwordMatches, tokenHash } from "./auth.ts";
+import { catalogChart } from "./catalog.ts";
+import { dashboardHtml } from "./dashboard.ts";
+import { openReplayDatabase } from "./database.ts";
+import { cacheScoreRanking, listLeaderboards, playerSummary, rebuildCaches, skillLeaderboards, skillRating, SKILLS } from "./rankings.ts";
+import { processValidationJobs } from "./replay-validation.ts";
+import type { CatalogChartRow, JsonObject, LoginRow, ReplayServerOptions, ScoreRow } from "./types.ts";
+
+export { openReplayDatabase, skillRating };
 
 const MAX_BODY_SIZE = 5 * 1024 * 1024;
 const MAX_COMMENT_LENGTH = 160;
 const MAX_RESULTS = 50;
-const SKILL_PLAY_COUNT = 20;
-const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const PRESENCE_LIFETIME_SECONDS = 90;
 const DEFAULT_CATALOG_URL = "https://s3.kuudere.fun/catalog.sqlite";
 const DEFAULT_CATALOG_PATH = "server/replay-server/catalog.sqlite";
 const DEFAULT_WEB_ROOT = fileURLToPath(new URL("../../dist", import.meta.url));
 
-type JsonObject = Record<string, unknown>;
-
-interface UserRow {
-  id: number;
-  name: string;
-}
-
-interface LoginRow extends UserRow {
-  password_hash: string;
-}
-
-interface ScoreRow {
-  id: number;
-  user_id: number | null;
-  user_name: string | null;
-  played_at: string;
-  submitted_at: string;
-  metadata_json: string;
-  comment: string | null;
-}
-
-interface CatalogChartRow {
-  background_preview_path: string | null;
-  difficulty: number;
-  speed: number | null;
-  dexterity: number | null;
-  stamina: number | null;
-  technical: number | null;
-  mode: number;
-  keys: number | null;
-  name: string;
-  title: string;
-  artist: string;
-}
-
-const SKILLS = ["speed", "dexterity", "stamina", "technical"] as const;
-type Skill = typeof SKILLS[number];
-
-interface RankedSkillPlay {
-  user_id: number;
-  nickname: string;
-  chart_id: string;
-  rating: number;
-}
-
-interface PlayerSkillSummary {
-  nickname: string;
-  ratings: Record<Skill, number>;
-  play_counts: Record<Skill, number>;
-  accuracy: number | null;
-}
-
 interface ReplayRow {
   replay: Uint8Array;
-}
-
-interface ReplayServerOptions {
-  database_path?: string;
-  database?: DatabaseSync;
-  catalog_path?: string;
-  catalog?: DatabaseSync;
-  app_html?: string;
-  app_directory?: string;
-  asset_base_url?: string;
 }
 
 interface HttpError extends Error {
@@ -161,22 +105,6 @@ async function staticFile(app_directory: string, pathname: string): Promise<{ bo
   }
 }
 
-function tokenHash(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-function passwordHash(password: string, salt = randomBytes(16)): string {
-  return `${salt.toString("hex")}:${scryptSync(password, salt, 32).toString("hex")}`;
-}
-
-function passwordMatches(password: string, stored: string): boolean {
-  const [salt_hex, expected_hex] = stored.split(":");
-  if (!salt_hex || !expected_hex) return false;
-  const expected = Buffer.from(expected_hex, "hex");
-  const actual = scryptSync(password, Buffer.from(salt_hex, "hex"), expected.length);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
-}
-
 function boundedLimit(value: string | null | undefined, fallback = MAX_RESULTS): number {
   if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
@@ -203,141 +131,6 @@ async function readJson(request: IncomingMessage): Promise<JsonObject> {
   }
 }
 
-function credentials(payload: JsonObject): { name: string; password: string } {
-  const name = typeof payload.name === "string" ? payload.name.trim() : "";
-  const password = typeof payload.password === "string" ? payload.password : "";
-  if (name.length < 2 || name.length > 24) {
-    throw httpError("Name must contain between 2 and 24 characters", 400);
-  }
-  if (password.length < 6 || password.length > 200) {
-    throw httpError("Password must contain between 6 and 200 characters", 400);
-  }
-  return { name, password };
-}
-
-export function skillRating(difficulty: unknown, accuracy: unknown): number {
-  const safe_difficulty = typeof difficulty === "number" && Number.isFinite(difficulty)
-    ? Math.max(0, difficulty)
-    : 0;
-  const safe_accuracy = typeof accuracy === "number" && Number.isFinite(accuracy)
-    ? Math.min(1, Math.max(0, accuracy))
-    : 0;
-  if (safe_accuracy <= 0.8) return 0;
-  if (safe_accuracy === 0.9) return safe_difficulty * 0.5;
-  if (safe_accuracy === 0.95) return safe_difficulty;
-  if (safe_accuracy <= 0.9) return safe_difficulty * (safe_accuracy - 0.8) * 5;
-  if (safe_accuracy <= 0.95) return safe_difficulty * (0.5 + (safe_accuracy - 0.9) * 10);
-  if (safe_accuracy < 1) return safe_difficulty + (safe_accuracy - 0.95) * 40;
-  return safe_difficulty + 2;
-}
-
-function catalogChart(catalog: DatabaseSync, chart_md5: string, chart_index: number): CatalogChartRow | undefined {
-  return catalog.prepare(`
-    SELECT charts.difficulty, charts.speed, charts.dexterity, charts.stamina, charts.technical,
-      charts.mode, charts.keys, charts.name, charts.background_preview_path, songs.title, songs.artist
-    FROM charts JOIN songs ON songs.id = charts.song_id
-    WHERE charts.chart_md5 = ? AND charts.chart_index = ?
-  `).get(chart_md5.toLowerCase(), chart_index) as unknown as CatalogChartRow | undefined;
-}
-
-function playerSkillSummaries(database: DatabaseSync, catalog: DatabaseSync): Map<number, PlayerSkillSummary> {
-  const rows = database.prepare(`${SCORE_SELECT}
-    WHERE scores.user_id IS NOT NULL AND scores.accuracy IS NOT NULL
-  `).all() as unknown as ScoreRow[];
-  const plays: Record<Skill, RankedSkillPlay[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
-  const overall_plays = new Map<string, { user_id: number; nickname: string; accuracy: number; rating: number }>();
-
-  for (const row of rows) {
-    const metadata = JSON.parse(row.metadata_json) as JsonObject;
-    if (typeof metadata.chart_md5 !== "string" || typeof metadata.chart_index !== "number" ||
-      typeof metadata.accuracy !== "number" || !Number.isFinite(metadata.accuracy)) continue;
-    const chart = catalogChart(catalog, metadata.chart_md5, metadata.chart_index);
-    if (!chart) continue;
-    const chart_id = `${metadata.chart_md5.toLowerCase()}:${metadata.chart_index}`;
-    const skill_ratings = SKILLS.map((skill) => skillRating(chart[skill], metadata.accuracy));
-    const overall_play = {
-      user_id: row.user_id as number,
-      nickname: row.user_name ?? "Unknown player",
-      accuracy: metadata.accuracy,
-      rating: Math.hypot(...skill_ratings),
-    };
-    const overall_key = `${overall_play.user_id}:${chart_id}`;
-    if (overall_play.rating > (overall_plays.get(overall_key)?.rating ?? -1)) overall_plays.set(overall_key, overall_play);
-    for (const skill of SKILLS) {
-      const difficulty = chart[skill];
-      if (difficulty === null || !Number.isFinite(difficulty)) continue;
-      plays[skill].push({
-        user_id: row.user_id as number,
-        nickname: row.user_name ?? "Unknown player",
-        chart_id,
-        rating: skillRating(difficulty, metadata.accuracy),
-      });
-    }
-  }
-
-  const summaries = new Map<number, PlayerSkillSummary>();
-  for (const skill of SKILLS) {
-    const best_plays = new Map<string, RankedSkillPlay>();
-    for (const play of plays[skill]) {
-      const key = `${play.user_id}:${play.chart_id}`;
-      if (play.rating > (best_plays.get(key)?.rating ?? -1)) best_plays.set(key, play);
-    }
-    const players = new Map<number, { nickname: string; ratings: number[] }>();
-    for (const play of best_plays.values()) {
-      const player = players.get(play.user_id) ?? { nickname: play.nickname, ratings: [] };
-      player.ratings.push(play.rating);
-      players.set(play.user_id, player);
-    }
-    for (const [user_id, player] of players) {
-      player.ratings.sort((left, right) => right - left);
-      const top_ratings = player.ratings.slice(0, SKILL_PLAY_COUNT);
-      const summary = summaries.get(user_id) ?? {
-        nickname: player.nickname,
-        ratings: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
-        play_counts: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
-        accuracy: null,
-      };
-      summary.ratings[skill] = Math.round(top_ratings.reduce((sum, value) => sum + value, 0) / SKILL_PLAY_COUNT * 100) / 100;
-      summary.play_counts[skill] = top_ratings.length;
-      summaries.set(user_id, summary);
-    }
-  }
-  const player_accuracies = new Map<number, { nickname: string; plays: { accuracy: number; rating: number }[] }>();
-  for (const play of overall_plays.values()) {
-    const player = player_accuracies.get(play.user_id) ?? { nickname: play.nickname, plays: [] };
-    player.plays.push(play);
-    player_accuracies.set(play.user_id, player);
-  }
-  for (const [user_id, player] of player_accuracies) {
-    const top_plays = player.plays.sort((left, right) => right.rating - left.rating).slice(0, 50);
-    const summary = summaries.get(user_id) ?? {
-      nickname: player.nickname,
-      ratings: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
-      play_counts: { speed: 0, dexterity: 0, stamina: 0, technical: 0 },
-      accuracy: null,
-    };
-    summary.accuracy = top_plays.reduce((sum, play) => sum + play.accuracy, 0) / top_plays.length;
-    summaries.set(user_id, summary);
-  }
-  return summaries;
-}
-
-function skillLeaderboards(database: DatabaseSync, catalog: DatabaseSync): Record<Skill, JsonObject[]> {
-  const summaries = playerSkillSummaries(database, catalog);
-  const leaderboards: Record<Skill, JsonObject[]> = { speed: [], dexterity: [], stamina: [], technical: [] };
-  for (const skill of SKILLS) {
-    leaderboards[skill] = [...summaries.entries()].map(([user_id, player]) => ({
-      user_id,
-      nickname: player.nickname,
-      rating: player.ratings[skill],
-      play_count: player.play_counts[skill],
-    })).filter((player) => player.rating > 0)
-      .sort((left, right) => right.rating - left.rating || left.nickname.localeCompare(right.nickname))
-      .slice(0, MAX_RESULTS)
-      .map((player, index) => ({ ...player, rank: index + 1 }));
-  }
-  return leaderboards;
-}
 
 function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
   const metadata = JSON.parse(row.metadata_json) as JsonObject;
@@ -401,79 +194,13 @@ export async function prepareCatalog(catalog_url: string, catalog_path: string):
   }
 }
 
-export function openReplayDatabase(database_path: string): DatabaseSync {
-  const database = new DatabaseSync(database_path);
-  database.exec(`
-    PRAGMA foreign_keys = ON;
-    PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL COLLATE NOCASE UNIQUE,
-      password_hash TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
-      token_hash TEXT PRIMARY KEY,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      expires_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS scores (
-      id INTEGER PRIMARY KEY,
-      chart_md5 TEXT NOT NULL CHECK(length(chart_md5) = 32),
-      chart_index INTEGER NOT NULL CHECK(chart_index >= 1),
-      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      mode TEXT NOT NULL,
-      accuracy REAL,
-      score REAL,
-      played_at TEXT NOT NULL,
-      submitted_at TEXT NOT NULL,
-      metadata_json TEXT NOT NULL,
-      replay BLOB NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS presence (
-      client_id TEXT PRIMARY KEY,
-      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      last_seen INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS scores_chart_ranking_idx
-      ON scores(chart_md5, chart_index, accuracy DESC, score DESC, id ASC);
-    CREATE INDEX IF NOT EXISTS scores_recent_idx ON scores(id DESC);
-    CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
-    CREATE INDEX IF NOT EXISTS presence_last_seen_idx ON presence(last_seen);
-  `);
-  const score_columns = database.prepare("PRAGMA table_info(scores)").all() as unknown as { name: string }[];
-  if (!score_columns.some((column) => column.name === "comment")) {
-    database.exec("ALTER TABLE scores ADD COLUMN comment TEXT");
-  }
-  return database;
-}
-
-function authenticatedUser(database: DatabaseSync, request: IncomingMessage): UserRow | null {
-  const match = request.headers.authorization?.match(/^Bearer (\S+)$/);
-  if (!match) return null;
-  return database.prepare(`
-    SELECT users.id, users.name
-    FROM sessions JOIN users ON users.id = sessions.user_id
-    WHERE sessions.token_hash = ? AND sessions.expires_at > ?
-  `).get(tokenHash(match[1]), Math.floor(Date.now() / 1000)) as unknown as UserRow | undefined ?? null;
-}
-
-function createSession(database: DatabaseSync, user_id: number): string {
-  const token = randomBytes(32).toString("base64url");
-  database.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(Math.floor(Date.now() / 1000));
-  database.prepare("INSERT INTO sessions VALUES (?, ?, ?)").run(
-    tokenHash(token), user_id, Math.floor(Date.now() / 1000) + SESSION_LIFETIME_SECONDS,
-  );
-  return token;
-}
-
 const SCORE_SELECT = `
   SELECT scores.*, users.name AS user_name
   FROM scores LEFT JOIN users ON users.id = scores.user_id
 `;
 
 export function createReplayServer({ database_path = "scores.sqlite", database: supplied_database,
-  catalog_path, catalog: supplied_catalog, app_html, app_directory, asset_base_url }: ReplayServerOptions = {}) {
+  catalog_path, catalog: supplied_catalog, app_html, app_directory, asset_base_url, replay_validator }: ReplayServerOptions = {}) {
   const database = supplied_database ?? openReplayDatabase(database_path);
   const catalog = supplied_catalog ?? (catalog_path ? new DatabaseSync(catalog_path, { readOnly: true }) : undefined);
   if (!catalog) {
@@ -482,6 +209,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
   }
   const owns_database = !supplied_database;
   const owns_catalog = !supplied_catalog;
+  rebuildCaches(database, catalog);
 
   const server = createServer(async (request, response) => {
     try {
@@ -495,6 +223,12 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
       }
 
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (request.method === "GET" && (url.pathname === "/server" || url.pathname === "/server/")) {
+        const body = dashboardHtml(database);
+        response.writeHead(200, { "Cache-Control": "no-store", "Content-Length": Buffer.byteLength(body),
+          "Content-Type": "text/html; charset=utf-8" }).end(body);
+        return;
+      }
       const chart_page_match = request.method === "GET" && url.pathname.match(/^\/chart\/([a-f\d]{32})\/(\d+)\/?$/i);
       if (chart_page_match) {
         const chart = catalogChart(catalog, chart_page_match[1], Number(chart_page_match[2]));
@@ -529,7 +263,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         let result;
         try {
           result = database.prepare("INSERT INTO users (name, password_hash, created_at) VALUES (?, ?, ?)")
-            .run(name, passwordHash(password), new Date().toISOString());
+            .run(name, await passwordHash(password), new Date().toISOString());
         } catch (reason) {
           if (String(reason).includes("UNIQUE constraint failed")) {
             json(response, 409, { error: "Name is already registered" });
@@ -546,7 +280,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const { name, password } = credentials(await readJson(request));
         const user = database.prepare("SELECT id, name, password_hash FROM users WHERE name = ? COLLATE NOCASE")
           .get(name) as unknown as LoginRow | undefined;
-        if (!user || !passwordMatches(password, user.password_hash)) {
+        if (!user || !await passwordMatches(password, user.password_hash)) {
           json(response, 401, { error: "Invalid name or password" });
           return;
         }
@@ -591,21 +325,20 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         `).all(now - PRESENCE_LIFETIME_SECONDS) as unknown as {
           client_id: string; user_id: number | null; name: string | null;
         }[];
-        const skill_summaries = playerSkillSummaries(database, catalog);
         const seen_users = new Set<number>();
         let anonymous_index = 0;
         const players = active_rows.flatMap((row) => {
           if (row.user_id !== null && seen_users.has(row.user_id)) return [];
           if (row.user_id !== null) seen_users.add(row.user_id);
-          const ratings = row.user_id === null ? undefined : skill_summaries.get(row.user_id)?.ratings;
+          const ratings = row.user_id === null ? undefined : playerSummary(database, row.user_id);
           return [{
             id: row.user_id === null ? `anonymous:${anonymous_index++}` : `user:${row.user_id}`,
             name: row.name ?? "Anonymous",
-            speed: ratings?.speed ?? 0,
-            stamina: ratings?.stamina ?? 0,
-            dexterity: ratings?.dexterity ?? 0,
-            technical: ratings?.technical ?? 0,
-            accuracy: row.user_id === null ? null : skill_summaries.get(row.user_id)?.accuracy ?? null,
+            speed: Number(ratings?.speed ?? 0),
+            stamina: Number(ratings?.stamina ?? 0),
+            dexterity: Number(ratings?.dexterity ?? 0),
+            technical: Number(ratings?.technical ?? 0),
+            accuracy: row.user_id === null ? null : Number(ratings?.accuracy ?? 0) || null,
           }];
         });
         json(response, 200, { count: count.count, players });
@@ -626,6 +359,13 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           json(response, 404, { error: "Chart is not in the catalog" });
           return;
         }
+        const accuracy = typeof payload.accuracy === "number" && Number.isFinite(payload.accuracy) && payload.accuracy >= 0 && payload.accuracy <= 1
+          ? payload.accuracy : null;
+        const score = typeof payload.score === "number" && Number.isFinite(payload.score) && payload.score >= 0 ? payload.score : null;
+        if (accuracy === null || score === null || replay.length === 0) {
+          json(response, 400, { error: "Score and accuracy must be finite non-negative numbers and replay must not be empty" });
+          return;
+        }
         const expected_mode = chart.mode === 0 ? "osu" : chart.mode === 3 ? "mania" : null;
         if (payload.mode !== expected_mode) {
           json(response, 400, { error: "Score mode does not match the catalog chart" });
@@ -634,20 +374,42 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const user = authenticatedUser(database, request);
         const played_at = typeof payload.played_at === "string" ? payload.played_at : new Date().toISOString();
         const submitted_at = new Date().toISOString();
+        const music_rate = typeof payload.music_rate === "number" && Number.isFinite(payload.music_rate) && payload.music_rate > 0
+          ? payload.music_rate : 1;
+        const duration_seconds = chart.duration_seconds / music_rate;
         const metadata = { ...payload };
         delete metadata.replay;
         delete metadata.nickname;
         delete metadata.difficulty;
         delete metadata.pp;
         delete metadata.comment;
-        const result = database.prepare(`
-          INSERT INTO scores (chart_md5, chart_index, user_id, mode, accuracy, score, played_at,
-            submitted_at, metadata_json, replay) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(payload.chart_md5.toLowerCase(), payload.chart_index, user?.id ?? null, payload.mode,
-          typeof payload.accuracy === "number" ? payload.accuracy : null,
-          typeof payload.score === "number" ? payload.score : null,
-          played_at, submitted_at, JSON.stringify(metadata), replay);
-        json(response, 201, { id: Number(result.lastInsertRowid), submitted_at });
+        database.exec("BEGIN IMMEDIATE");
+        let score_id: number;
+        try {
+          const result = database.prepare(`
+            INSERT INTO scores (chart_md5, chart_index, user_id, mode, accuracy, score, played_at,
+              submitted_at, metadata_json, replay, duration_seconds, validation_state)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(payload.chart_md5.toLowerCase(), payload.chart_index, user?.id ?? null, payload.mode,
+            accuracy, score, played_at, submitted_at, JSON.stringify(metadata), replay, duration_seconds,
+            replay_validator ? "queued" : "unverified");
+          score_id = Number(result.lastInsertRowid);
+          database.prepare("UPDATE server_state SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'total_scores'").run();
+          database.prepare(`INSERT INTO score_days (day, score_count) VALUES (DATE(?), 1)
+            ON CONFLICT(day) DO UPDATE SET score_count = score_count + 1`).run(submitted_at);
+          if (user && !replay_validator) {
+            database.prepare(`UPDATE users SET score_count = score_count + 1, total_score = total_score + ?,
+              play_time_seconds = play_time_seconds + ? WHERE id = ?`).run(score, duration_seconds, user.id);
+            cacheScoreRanking(database, score_id, user.id, payload.chart_md5.toLowerCase(), payload.chart_index, payload.mode, accuracy, chart);
+          }
+          if (replay_validator) database.prepare("INSERT INTO validation_jobs (score_id, updated_at) VALUES (?, ?)").run(score_id, submitted_at);
+          database.exec("COMMIT");
+        } catch (reason) {
+          database.exec("ROLLBACK");
+          throw reason;
+        }
+        if (replay_validator) void processValidationJobs(database, catalog, replay_validator, 1);
+        json(response, 201, { id: score_id, submitted_at, validation_state: replay_validator ? "queued" : "unverified" });
         return;
       }
 
@@ -686,7 +448,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           return;
         }
         const ranked_rows = database.prepare(`${SCORE_SELECT}
-          WHERE scores.chart_md5 = ? AND scores.chart_index = ?
+          WHERE scores.chart_md5 = ? AND scores.chart_index = ? AND scores.validation_state != 'invalid'
           ORDER BY scores.accuracy DESC, scores.score DESC, scores.id ASC
         `).all(chart_md5.toLowerCase(), chart_index) as unknown as ScoreRow[];
         const ranked_users = new Set<number>();
@@ -701,7 +463,10 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
       }
 
       if (request.method === "GET" && url.pathname === "/api/rankings") {
-        json(response, 200, { leaderboards: skillLeaderboards(database, catalog) });
+        const leaderboard = url.searchParams.get("leaderboard") ?? "all";
+        const rankings = skillLeaderboards(database, leaderboard);
+        if (!rankings) json(response, 404, { error: "Leaderboard not found" });
+        else json(response, 200, { leaderboard, available: listLeaderboards(database), leaderboards: rankings });
         return;
       }
 
@@ -713,11 +478,8 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
       }
 
       if (request.method === "GET" && url.pathname === "/api/scores/stats") {
-        const counts = database.prepare(`
-          SELECT COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE DATE(submitted_at) = DATE('now')) AS today
-          FROM scores
-        `).get() as { total: number; today: number };
+        const counts = database.prepare(`SELECT CAST((SELECT value FROM server_state WHERE key = 'total_scores') AS INTEGER) AS total,
+          COALESCE((SELECT score_count FROM score_days WHERE day = DATE('now')), 0) AS today`).get();
         json(response, 200, counts);
         return;
       }

@@ -96,8 +96,8 @@ test("loads score statistics", async () => {
 });
 
 test("loads independently ranked skill leaderboards", async () => {
-  const leaderboards = await listSkillLeaderboards(undefined, async (input, init) => {
-    assert.equal(String(input), "/api/rankings");
+  const { leaderboards } = await listSkillLeaderboards(undefined, async (input, init) => {
+    assert.equal(String(input), "/api/rankings?leaderboard=all");
     assert.equal(init?.cache, "no-store");
     return Response.json({ leaderboards: {
       speed: [{ rank: 1, nickname: "Fast", rating: 8 }],

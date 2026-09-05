@@ -49,3 +49,13 @@ test("rejects stored plays whose replay modes disagree", () => {
   const play = { ...storedPlay("chart:42", completed), mode: "mania" as const };
   assert.throws(() => completedGameplayFromStoredPlay(play), /modes do not match/);
 });
+
+test("stores zero when gameplay has no score source", () => {
+  const completed: CompletedGameplay = {
+    score: { accuracy: 0.95, grade: "A" },
+    replay_base: createOsuReplayBase(),
+    replay: { version: 1, mode: "osu", time_unit: "1/8192 second", input_events: [], judgment_events: [] },
+  };
+
+  assert.equal(storedPlay("chart:42", completed).score, 0);
+});

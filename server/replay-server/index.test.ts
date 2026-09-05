@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { openReplayDatabase, createReplayServer, skillRating } from "./index.ts";
+import { processValidationJobs } from "./replay-validation.ts";
 
 interface ApiResult {
   [key: string]: any;
@@ -26,12 +27,12 @@ beforeEach(async () => {
   catalog.exec(`
     CREATE TABLE songs (id TEXT PRIMARY KEY, title TEXT, artist TEXT);
     CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, speed REAL, dexterity REAL,
-      stamina REAL, technical REAL, mode INTEGER, keys INTEGER, name TEXT, background_preview_path TEXT, song_id TEXT);
+      stamina REAL, technical REAL, duration_seconds REAL, mode INTEGER, keys INTEGER, name TEXT, background_preview_path TEXT, song_id TEXT);
     INSERT INTO songs VALUES ('song-1', 'First Song', 'First Artist');
     INSERT INTO songs VALUES ('song-2', 'Second Song', 'Second Artist');
-    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 8, 2, 4, 1, 3, 4, 'Hard', 'backgrounds/v2/first.avif', 'song-1');
-    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 9, 5, 7, 3, 7, 'Challenge', NULL, 'song-2');
-    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 0, NULL, 'Insane', NULL, 'song-1');
+    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 8, 2, 4, 1, 120, 3, 4, 'Hard', 'backgrounds/v2/first.avif', 'song-1');
+    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 9, 5, 7, 180, 3, 7, 'Challenge', NULL, 'song-2');
+    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 90, 0, NULL, 'Insane', NULL, 'song-1');
   `);
   server = createReplayServer({ database, catalog, app_html: "<!doctype html><html><head><title>Rizu</title></head><body></body></html>",
     app_directory, asset_base_url: "https://assets.example/" });
@@ -266,6 +267,7 @@ test("counts all scores and scores submitted today", async () => {
   await submit({ accuracy: 0.8 });
   await submit({ accuracy: 0.9 });
   database.prepare("UPDATE scores SET submitted_at = '2020-01-01T00:00:00.000Z' WHERE id = 1").run();
+  database.prepare("UPDATE score_days SET score_count = 1 WHERE day = DATE('now')").run();
 
   const { result } = await request("/scores/stats");
   assert.deepEqual(result, { total: 2, today: 1 });
@@ -316,4 +318,54 @@ test("rejects scores for unknown charts and mismatched modes", async () => {
 
   const count = database.prepare("SELECT count(*) AS count FROM scores").get() as { count: number };
   assert.equal(count.count, 0);
+});
+
+test("stores hashed passwords and cached score aggregates", async () => {
+  const { result: registration } = await auth("/register", "AggregatePlayer");
+  await submit({ token: registration.token, accuracy: 0.95, score: 123456 });
+  const user = database.prepare(`SELECT password_hash, score_count, total_score, play_time_seconds FROM users WHERE id = ?`)
+    .get(registration.user.id) as { password_hash: string; score_count: number; total_score: number; play_time_seconds: number };
+  assert.match(user.password_hash, /^scrypt:[a-f\d]{32}:[a-f\d]{64}$/);
+  assert.equal(user.score_count, 1);
+  assert.equal(user.total_score, 123456);
+  assert.equal(user.play_time_seconds, 120);
+});
+
+test("serves separate cached key-mode leaderboards", async () => {
+  const { result: four_key } = await auth("/register", "FourKey");
+  const { result: seven_key } = await auth("/register", "SevenKey");
+  await submit({ token: four_key.token, accuracy: 1 });
+  await submit({ token: seven_key.token, accuracy: 1, chart_md5: "22222222222222222222222222222222" });
+  const four = await request("/rankings?leaderboard=mania-4k");
+  const seven = await request("/rankings?leaderboard=mania-7k");
+  assert.deepEqual(four.result.leaderboards.speed.map((row: ApiResult) => row.nickname), ["FourKey"]);
+  assert.deepEqual(seven.result.leaderboards.speed.map((row: ApiResult) => row.nickname), ["SevenKey"]);
+  assert.ok(four.result.available.some((row: ApiResult) => row.slug === "osu"));
+});
+
+test("serves a public dashboard without credential values", async () => {
+  await auth("/register", "DashboardPlayer", "hidden-password");
+  const response = await fetch(`${base_url.replace(/\/api$/, "")}/server`);
+  const body = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(body, /DashboardPlayer/);
+  assert.doesNotMatch(body, /hidden-password|password_hash|token_hash/);
+});
+
+test("uses validated replay results as the authoritative aggregates", async () => {
+  const { result: registration } = await auth("/register", "ValidatedPlayer");
+  const submitted_at = new Date().toISOString();
+  const result = database.prepare(`INSERT INTO scores (chart_md5, chart_index, user_id, mode, accuracy, score, played_at,
+    submitted_at, metadata_json, replay, duration_seconds, validation_state) VALUES (?, 1, ?, 'mania', .99, 999999,
+    ?, ?, ?, X'0102', 120, 'queued')`).run("11111111111111111111111111111111", registration.user.id,
+      submitted_at, submitted_at, JSON.stringify({ replay_base: { mode: "mania" } }));
+  const score_id = Number(result.lastInsertRowid);
+  database.prepare("INSERT INTO validation_jobs (score_id, updated_at) VALUES (?, ?)").run(score_id, submitted_at);
+
+  assert.deepEqual(await processValidationJobs(database, catalog, async () => ({ score: 500000, accuracy: 0.95,
+    grade: "A", judges: { perfect: 100 } })), { valid: 1, invalid: 0 });
+  const score = database.prepare("SELECT score, accuracy, validation_state FROM scores WHERE id = ?").get(score_id);
+  const user = database.prepare("SELECT score_count, total_score, play_time_seconds FROM users WHERE id = ?").get(registration.user.id);
+  assert.deepEqual({ ...score }, { score: 500000, accuracy: 0.95, validation_state: "valid" });
+  assert.deepEqual({ ...user }, { score_count: 1, total_score: 500000, play_time_seconds: 120 });
 });

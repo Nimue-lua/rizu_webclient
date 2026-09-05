@@ -403,6 +403,8 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .global-leaderboard-heading h1 { margin: 0; font-size: 30px; }
 .global-leaderboard-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .global-leaderboard-heading button { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; font-size: 14px; font-weight: 600; }
+.global-leaderboard-heading label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.global-leaderboard-heading select { height: 36px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 5px; padding: 0 10px; }
 .global-skill-leaderboards { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 12px; min-height: 0; padding: 24px; overflow-x: auto; }
 .global-skill-board { --skill-color: var(--accent); min-width: 230px; overflow-y: auto; background: var(--panel); border: 1px solid var(--outline); border-top: 4px solid var(--skill-color); border-radius: 7px; scrollbar-color: var(--outline) transparent; }
 .global-skill-board.dexterity { --skill-color: var(--magenta); }
