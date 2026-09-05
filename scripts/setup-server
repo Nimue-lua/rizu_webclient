@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly SERVER_ROOT="${SERVER_ROOT:-/srv/rizu-replay/repo}"
+
+if [[ "$ROOT_DIR" != "$SERVER_ROOT" || ! -d /run/systemd/system ]]; then
+  printf 'This command must run from %s on the Rizu VPS.\n' "$SERVER_ROOT" >&2
+  exit 1
+fi
+if (( EUID != 0 )); then
+  printf 'This one-time setup must run as root.\n' >&2
+  exit 1
+fi
+
+install -m 0644 "$ROOT_DIR/server/rizu-replay.service" /etc/systemd/system/rizu-replay.service
+systemctl daemon-reload
+systemctl enable rizu-replay.service
+
+printf 'Rizu system service installed. Run ./scripts/deploy to build and start it.\n'

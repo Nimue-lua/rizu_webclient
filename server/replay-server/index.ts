@@ -9,7 +9,7 @@ import { catalogChart } from "./catalog.ts";
 import { dashboardHtml } from "./dashboard.ts";
 import { openReplayDatabase } from "./database.ts";
 import { listLeaderboards, playerSummary, rebuildCaches, skillLeaderboards, skillRating, SKILLS } from "./rankings.ts";
-import { processValidationJobs, queueUnverifiedScores, requeueOutdatedValidationJobs } from "./replay-validation.ts";
+import { processValidationJobs, requeueOutdatedValidationJobs } from "./replay-validation.ts";
 import { ChartStore } from "./chart-store.ts";
 import { createReplayValidator, REPLAY_COMPUTE_VERSION } from "./replay-verifier.ts";
 import type { CatalogChartRow, JsonObject, LoginRow, ReplayServerOptions, ScoreRow } from "./types.ts";
@@ -564,12 +564,6 @@ async function main(): Promise<void> {
   const catalog = new DatabaseSync(catalog_path, { readOnly: true });
   const asset_base_url = new URL(".", catalog_url).href;
   const replay_validator = createReplayValidator(new ChartStore(catalog, { cache_directory: chart_cache, asset_base_url }));
-  if (process.env.RIZU_VALIDATE_EXISTING === "1") {
-    const migration_database = openReplayDatabase(database_path);
-    const queued = queueUnverifiedScores(migration_database);
-    migration_database.close();
-    console.log(`Queued ${queued} existing replays for validation`);
-  }
   createReplayServer({ database_path, catalog, app_html, app_directory, asset_base_url, replay_validator }).listen(port, host, () => {
     console.log(`Rizu API listening on http://${host}:${port}`);
   });

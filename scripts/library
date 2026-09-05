@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+export LC_ALL=C
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly LIBRARY_DIR="${LIBRARY_DIR:-/media/SSD/s3_test}"
+readonly LIBRARY_REMOTE="${LIBRARY_REMOTE:-catalog:rizu.catalog}"
+readonly LIBRARY_URL="${LIBRARY_URL:-https://s3.kuudere.fun}"
+readonly CHARTS_DIR="$LIBRARY_DIR/charts"
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/library <command>
+
+Commands:
+  cache           Generate immutable chart, audio, preview, and background files
+  catalog         Create or replace catalog.sqlite and catalog.sqlite.gz
+  upload-assets   Upload immutable files to Selectel
+  upload-catalog  Upload the catalog to Selectel
+EOF
+}
+
+require_commands() {
+  local name
+  for name in "$@"; do
+    command -v "$name" >/dev/null || { printf 'Required command not found: %s\n' "$name" >&2; exit 1; }
+  done
+}
+
+require_charts() {
+  [[ -d "$CHARTS_DIR" ]] || { printf 'Chart directory not found: %s\n' "$CHARTS_DIR" >&2; exit 1; }
+}
+
+case "${1:-}" in
+  cache)
+    require_commands node ffmpeg
+    require_charts
+    node "$ROOT_DIR/server/cache-charts.mjs" --charts "$CHARTS_DIR" \
+      --chart-assets "$LIBRARY_DIR/chart-files/v1" --audio "$LIBRARY_DIR/audio/v1" \
+      --audio-previews "$LIBRARY_DIR/audio-previews/v1" --background-previews "$LIBRARY_DIR/backgrounds/v2" \
+      --skip-database
+    ;;
+  catalog)
+    require_commands node
+    require_charts
+    node "$ROOT_DIR/server/cache-charts.mjs" --charts "$CHARTS_DIR" \
+      --client-database "$LIBRARY_DIR/catalog.sqlite" --chart-assets "$LIBRARY_DIR/chart-files/v1" \
+      --audio "$LIBRARY_DIR/audio/v1" --audio-previews "$LIBRARY_DIR/audio-previews/v1" \
+      --background-previews "$LIBRARY_DIR/backgrounds/v2" --skip-previews
+    ;;
+  upload-assets)
+    require_commands rclone
+    declare -A content_types=(
+      [chart-files/v1]='text/plain; charset=utf-8'
+      [audio/v1]='audio/webm'
+      [audio-previews/v1]='audio/webm'
+      [backgrounds/v2]='image/avif'
+    )
+    for directory in chart-files/v1 audio/v1 audio-previews/v1 backgrounds/v2; do
+      [[ -d "$LIBRARY_DIR/$directory" ]] || {
+        printf 'Generated asset directory not found: %s (run ./scripts/library cache)\n' "$LIBRARY_DIR/$directory" >&2
+        exit 1
+      }
+      rclone copy "$LIBRARY_DIR/$directory" "$LIBRARY_REMOTE/$directory" --metadata \
+        --metadata-set 'cache-control=public, max-age=31536000, immutable' \
+        --metadata-set "content-type=${content_types[$directory]}" --progress
+    done
+    printf 'Immutable assets uploaded: %s\n' "$LIBRARY_URL"
+    ;;
+  upload-catalog)
+    require_commands rclone curl
+    catalog="$LIBRARY_DIR/catalog.sqlite.gz"
+    [[ -f "$catalog" ]] || { printf 'Catalog not found: %s (run ./scripts/library catalog)\n' "$catalog" >&2; exit 1; }
+    rclone copyto "$catalog" "$LIBRARY_REMOTE/catalog.sqlite" --metadata \
+      --metadata-set 'cache-control=no-cache' --metadata-set 'content-type=application/vnd.sqlite3' \
+      --metadata-set 'content-encoding=gzip' --ignore-times --progress
+    curl -fsS --compressed "$LIBRARY_URL/catalog.sqlite" >/dev/null
+    printf 'Catalog uploaded: %s/catalog.sqlite\n' "$LIBRARY_URL"
+    ;;
+  -h|--help|help) usage ;;
+  '') usage >&2; exit 2 ;;
+  *) printf 'Unknown command: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+esac

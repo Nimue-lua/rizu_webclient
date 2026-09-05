@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+export LC_ALL=C
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly SERVER_ROOT="${SERVER_ROOT:-/srv/rizu-replay/repo}"
+readonly NODE_ROOT="${NODE_ROOT:-/opt/node-v24.20.0}"
+readonly DATABASE="${RIZU_DATABASE:-/var/lib/rizu-replay/scores.sqlite3}"
+export PATH="$NODE_ROOT/bin:$PATH"
+
+if [[ "$ROOT_DIR" != "$SERVER_ROOT" || ! -d /run/systemd/system ]]; then
+  printf 'This command must run on the Rizu VPS. SSH into it first.\n' >&2
+  exit 1
+fi
+if (( EUID != 0 )); then
+  printf 'Deployment must run as root because it restarts the system service.\n' >&2
+  exit 1
+fi
+for name in npm systemctl curl; do
+  command -v "$name" >/dev/null || { printf 'Required command not found: %s\n' "$name" >&2; exit 1; }
+done
+if ! systemctl cat rizu-replay.service >/dev/null 2>&1; then
+  printf 'Rizu is not installed as a system service. Run ./scripts/setup-server once as root.\n' >&2
+  exit 1
+fi
+
+rm -rf -- "$ROOT_DIR/.dist.new"
+npm --prefix "$ROOT_DIR" ci
+npm --prefix "$ROOT_DIR" run build -- --outDir .dist.new
+
+if [[ -f "$DATABASE" ]]; then
+  backup_path="$(dirname -- "$DATABASE")/scores-before-deploy-$(date -u +%Y%m%dT%H%M%SZ).sqlite3"
+  "$NODE_ROOT/bin/node" "$ROOT_DIR/scripts/backup-database.mjs" "$DATABASE" "$backup_path"
+fi
+
+systemctl stop rizu-replay
+rm -rf -- "$ROOT_DIR/dist.old"
+if [[ -d "$ROOT_DIR/dist" ]]; then mv -- "$ROOT_DIR/dist" "$ROOT_DIR/dist.old"; fi
+mv -- "$ROOT_DIR/.dist.new" "$ROOT_DIR/dist"
+if ! systemctl start rizu-replay || ! curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-connrefused \
+  http://127.0.0.1:8765/api/health; then
+  systemctl stop rizu-replay || true
+  rm -rf -- "$ROOT_DIR/dist"
+  if [[ -d "$ROOT_DIR/dist.old" ]]; then mv -- "$ROOT_DIR/dist.old" "$ROOT_DIR/dist"; fi
+  systemctl start rizu-replay
+  printf 'Deployment failed; restored the previous build.\n' >&2
+  exit 1
+fi
+rm -rf -- "$ROOT_DIR/dist.old"
+printf '\nRizu deployed from %s.\n' "$ROOT_DIR"

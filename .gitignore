@@ -9,4 +9,8 @@ server/replay-server/catalog.sqlite*
 scores.sqlite
 scores.sqlite-shm
 scores.sqlite-wal
+scores.sqlite3
+scores.sqlite3-shm
+scores.sqlite3-wal
 public/dmca_incoming
+chart-cache/

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly SERVER_ROOT="${SERVER_ROOT:-/srv/rizu-replay/repo}"
+readonly NODE_ROOT="${NODE_ROOT:-/opt/node-v24.20.0}"
+readonly DATABASE="${RIZU_DATABASE:-/var/lib/rizu-replay/scores.sqlite3}"
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/server <command>
+
+Commands:
+  status                    Show service status
+  logs                      Follow service logs
+  restart                   Restart and health-check the service
+  scores                    Show validation counts
+  scores-recalculate --all  Recalculate every score and rebuild derived rankings
+EOF
+}
+
+if [[ "$ROOT_DIR" != "$SERVER_ROOT" || ! -d /run/systemd/system ]]; then
+  printf 'This command must run on the Rizu VPS. SSH into it first.\n' >&2
+  exit 1
+fi
+
+run_maintenance() {
+  RIZU_DATABASE="$DATABASE" "$NODE_ROOT/bin/node" "$ROOT_DIR/node_modules/tsx/dist/cli.mjs" \
+    "$ROOT_DIR/server/replay-server/maintenance.ts" "$@"
+}
+
+case "${1:-}" in
+  status) systemctl status rizu-replay --no-pager ;;
+  logs) journalctl -u rizu-replay -f ;;
+  restart)
+    systemctl restart rizu-replay
+    curl --fail --silent --show-error --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8765/api/health
+    ;;
+  scores) run_maintenance scores ;;
+  scores-recalculate)
+    [[ "${2:-}" == "--all" && $# -eq 2 ]] || {
+      printf 'This operation requires: ./scripts/server scores-recalculate --all\n' >&2
+      exit 2
+    }
+    systemctl stop rizu-replay
+    trap 'systemctl start rizu-replay' EXIT
+    if [[ -f "$DATABASE" ]]; then
+      backup_path="$(dirname -- "$DATABASE")/scores-before-recalculation-$(date -u +%Y%m%dT%H%M%SZ).sqlite3"
+      "$NODE_ROOT/bin/node" "$ROOT_DIR/scripts/backup-database.mjs" "$DATABASE" "$backup_path"
+    fi
+    run_maintenance scores-recalculate --all
+    ;;
+  -h|--help|help) usage ;;
+  '') usage >&2; exit 2 ;;
+  *) printf 'Unknown command: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+esac

@@ -105,6 +105,32 @@ export function queueUnverifiedScores(database: DatabaseSync): number {
   }
 }
 
+export function queueAllScoresForRecalculation(database: DatabaseSync): number {
+  const now = new Date().toISOString();
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const result = database.prepare(`INSERT INTO validation_jobs
+      (score_id, state, attempts, updated_at, last_error, compute_version)
+      SELECT id, 'queued', 0, ?, NULL, ? FROM scores WHERE true
+      ON CONFLICT(score_id) DO UPDATE SET state = 'queued', attempts = 0, updated_at = excluded.updated_at,
+        last_error = NULL, compute_version = excluded.compute_version`).run(now, REPLAY_COMPUTE_VERSION);
+    database.prepare(`UPDATE scores SET validation_state = 'queued', validation_error = NULL,
+      score = NULL, accuracy = NULL, duration_seconds = 0`).run();
+    database.exec(`
+      DELETE FROM leaderboard_skill_plays;
+      DELETE FROM leaderboard_chart_plays;
+      DELETE FROM leaderboard_users;
+      UPDATE users SET score_count = 0, total_score = 0, play_time_seconds = 0;
+      INSERT OR REPLACE INTO server_state (key, value) VALUES ('cache_version', '1');
+    `);
+    database.exec("COMMIT");
+    return Number(result.changes);
+  } catch (reason) {
+    database.exec("ROLLBACK");
+    throw reason;
+  }
+}
+
 export function requeueOutdatedValidationJobs(database: DatabaseSync): number {
   const result = database.prepare(`UPDATE validation_jobs SET state = 'queued', attempts = 0, updated_at = ?,
     last_error = NULL, compute_version = ? WHERE state = 'failed' AND compute_version < ?`)
