@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const STALE_JOB_SECONDS = 10 * 60;
 
 function columns(database: DatabaseSync, table: string): Set<string> {
@@ -22,6 +22,11 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
   }
   database.exec("BEGIN IMMEDIATE");
   try {
+    if (schema_version > 0 && schema_version < 4) database.exec(`
+      DROP TABLE IF EXISTS leaderboard_skill_plays;
+      DROP TABLE IF EXISTS leaderboard_chart_plays;
+      DROP TABLE IF EXISTS leaderboard_users;
+    `);
     database.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY, name TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -56,28 +61,12 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
         id INTEGER PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
         mode TEXT, keys INTEGER, sort_order INTEGER NOT NULL DEFAULT 0
       );
-      CREATE TABLE IF NOT EXISTS leaderboard_skill_plays (
-        leaderboard_id INTEGER NOT NULL REFERENCES leaderboards(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        chart_md5 TEXT NOT NULL, chart_index INTEGER NOT NULL, skill TEXT NOT NULL,
-        rating REAL NOT NULL, score_id INTEGER NOT NULL REFERENCES scores(id) ON DELETE CASCADE,
-        PRIMARY KEY (leaderboard_id, user_id, chart_md5, chart_index, skill)
-      );
-      CREATE TABLE IF NOT EXISTS leaderboard_chart_plays (
-        leaderboard_id INTEGER NOT NULL REFERENCES leaderboards(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        chart_md5 TEXT NOT NULL, chart_index INTEGER NOT NULL, rating REAL NOT NULL,
-        accuracy REAL NOT NULL, score_id INTEGER NOT NULL REFERENCES scores(id) ON DELETE CASCADE,
-        PRIMARY KEY (leaderboard_id, user_id, chart_md5, chart_index)
-      );
       CREATE TABLE IF NOT EXISTS leaderboard_users (
         leaderboard_id INTEGER NOT NULL REFERENCES leaderboards(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        speed REAL NOT NULL DEFAULT 0, speed_count INTEGER NOT NULL DEFAULT 0,
-        dexterity REAL NOT NULL DEFAULT 0, dexterity_count INTEGER NOT NULL DEFAULT 0,
-        stamina REAL NOT NULL DEFAULT 0, stamina_count INTEGER NOT NULL DEFAULT 0,
-        technical REAL NOT NULL DEFAULT 0, technical_count INTEGER NOT NULL DEFAULT 0,
-        accuracy REAL, updated_at TEXT NOT NULL,
+        total_score REAL NOT NULL DEFAULT 0, accuracy_sum REAL NOT NULL DEFAULT 0,
+        play_time_seconds REAL NOT NULL DEFAULT 0, score_count INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
         PRIMARY KEY (leaderboard_id, user_id)
       );
       CREATE TABLE IF NOT EXISTS validation_jobs (
@@ -91,7 +80,7 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
       CREATE INDEX IF NOT EXISTS scores_recent_idx ON scores(id DESC);
       CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
       CREATE INDEX IF NOT EXISTS presence_last_seen_idx ON presence(last_seen);
-      CREATE INDEX IF NOT EXISTS leaderboard_users_skill_idx ON leaderboard_users(leaderboard_id, speed DESC);
+      CREATE INDEX IF NOT EXISTS leaderboard_users_score_idx ON leaderboard_users(leaderboard_id, total_score DESC);
       INSERT OR IGNORE INTO leaderboards (slug, name, mode, keys, sort_order) VALUES
         ('all', 'All modes', NULL, NULL, 0), ('osu', 'osu!standard', 'osu', NULL, 10),
         ('mania-4k', '4K', 'mania', 4, 20), ('mania-7k', '7K', 'mania', 7, 30),

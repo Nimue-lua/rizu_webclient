@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { StoredPlay } from "../src/replay/ReplayStore";
-import { listOnlineScores, listRecentPlays, listSkillLeaderboards, loadScoreStats, reportPresence, submitPlay, updateScoreComment } from "../src/replay/ReplayServer";
+import { listOnlineScores, listRecentPlays, listScoreLeaderboard, loadScoreStats, reportPresence, submitPlay, updateScoreComment } from "../src/replay/ReplayServer";
 
 test("submits score metadata and compressed replay bytes", async () => {
   const play: StoredPlay = {
@@ -99,20 +99,16 @@ test("loads score statistics", async () => {
   assert.deepEqual(stats, { total: 120, today: 7 });
 });
 
-test("loads independently ranked skill leaderboards", async () => {
-  const { leaderboards } = await listSkillLeaderboards(undefined, async (input, init) => {
+test("loads the total score leaderboard", async () => {
+  const { rankings } = await listScoreLeaderboard(undefined, async (input, init) => {
     assert.equal(String(input), "/api/rankings?leaderboard=all");
     assert.equal(init?.cache, "no-store");
-    return Response.json({ leaderboards: {
-      speed: [{ rank: 1, nickname: "Fast", rating: 8 }],
-      technical: [{ rank: 1, nickname: "Tech", rating: 7 }],
-    } });
+    return Response.json({ rankings: [{ rank: 1, nickname: "Top", total_score: 123456, accuracy: 0.98,
+      play_time_seconds: 3600, score_count: 2 }] });
   });
 
-  assert.equal(leaderboards.speed[0]?.nickname, "Fast");
-  assert.equal(leaderboards.technical[0]?.nickname, "Tech");
-  assert.deepEqual(leaderboards.dexterity, []);
-  assert.deepEqual(leaderboards.stamina, []);
+  assert.equal(rankings[0]?.nickname, "Top");
+  assert.equal(rankings[0]?.total_score, 123456);
 });
 
 test("reports presence and reads the online count", async () => {
@@ -121,13 +117,15 @@ test("reports presence and reads the online count", async () => {
     assert.equal(String(input), "/api/presence");
     submitted_init = init;
     return Response.json({ count: 1, players: [{
-      id: "user:1", name: "Nimue", speed: 4, stamina: 3, dexterity: 2, technical: 1, accuracy: 0.98,
+      id: "user:1", name: "Nimue", total_score: 123456, accuracy: 0.98, play_time_seconds: 3600,
+      score_count: 2, rank: 1,
     }] });
   });
 
   assert.equal(submitted_init?.method, "POST");
   assert.match(JSON.parse(String(submitted_init?.body)).client_id, /^[a-f\d-]{36}$/);
   assert.deepEqual(status, { count: 1, players: [{
-    id: "user:1", name: "Nimue", speed: 4, stamina: 3, dexterity: 2, technical: 1, accuracy: 0.98,
+    id: "user:1", name: "Nimue", total_score: 123456, accuracy: 0.98, play_time_seconds: 3600,
+    score_count: 2, rank: 1,
   }] });
 });

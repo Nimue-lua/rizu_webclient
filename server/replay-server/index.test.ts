@@ -6,7 +6,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import { openReplayDatabase, createReplayServer, skillRating } from "./index.ts";
+import { openReplayDatabase, createReplayServer } from "./index.ts";
 import { processValidationJobs } from "./replay-validation.ts";
 import { REPLAY_COMPUTE_VERSION } from "./replay-verifier.ts";
 
@@ -160,7 +160,7 @@ test("counts active clients and deduplicates logged-in users", async () => {
   const anonymous = await heartbeat("anonymous-client-1");
   assert.equal(anonymous.result.count, 1);
   assert.deepEqual(anonymous.result.players[0], {
-    id: "anonymous:0", name: "Anonymous", speed: 0, stamina: 0, dexterity: 0, technical: 0, accuracy: null,
+    id: "anonymous:0", name: "Anonymous", total_score: 0, accuracy: null, play_time_seconds: 0, score_count: 0, rank: null,
   });
   assert.equal((await heartbeat("anonymous-client-2")).result.count, 2);
   assert.equal((await heartbeat("registered-client-1", registration.token)).result.count, 3);
@@ -169,11 +169,11 @@ test("counts active clients and deduplicates logged-in users", async () => {
   assert.deepEqual(deduplicated.result.players.find((player: ApiResult) => player.name === "OnlinePlayer"), {
     id: `user:${registration.user.id}`,
     name: "OnlinePlayer",
-    speed: 0.5,
-    stamina: 0.3,
-    dexterity: 0.2,
-    technical: 0.15,
+    total_score: 0,
     accuracy: 1,
+    play_time_seconds: 120,
+    score_count: 1,
+    rank: 1,
   });
 
   database.prepare("UPDATE presence SET last_seen = 0 WHERE client_id = ?").run("anonymous-client-1");
@@ -187,18 +187,6 @@ test("rejects invalid presence client IDs", async () => {
     body: JSON.stringify({ client_id: "short" }),
   });
   assert.equal(response.status, 400);
-});
-
-test("interpolates score skill rating through the accuracy curve", () => {
-  const closeTo = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-12);
-  closeTo(skillRating(8, 1), 10);
-  closeTo(skillRating(8, 0.975), 9);
-  closeTo(skillRating(8, 0.95), 8);
-  closeTo(skillRating(8, 0.925), 6);
-  closeTo(skillRating(8, 0.9), 4);
-  closeTo(skillRating(8, 0.85), 2);
-  closeTo(skillRating(8, 0.8), 0);
-  closeTo(skillRating(8, 0.7), 0);
 });
 
 test("shows only a registered user's best chart score and every anonymous score", async () => {
@@ -282,26 +270,20 @@ test("counts all scores and scores submitted today", async () => {
   assert.deepEqual(result, { total: 2, today: 1 });
 });
 
-test("builds each skill leaderboard from its own top 20 chart scores", async () => {
-  const { result: first } = await auth("/register", "SpeedPlayer");
-  const { result: second } = await auth("/register", "DexPlayer");
-  await submit({ token: first.token, accuracy: 1 });
-  await submit({ token: first.token, accuracy: 0.5, chart_md5: "22222222222222222222222222222222" });
-  await submit({ token: first.token, accuracy: 0.9 });
-  await submit({ token: second.token, accuracy: 1, chart_md5: "22222222222222222222222222222222" });
+test("ranks players by total score and reports aggregate accuracy and play time", async () => {
+  const { result: first } = await auth("/register", "FirstPlayer");
+  const { result: second } = await auth("/register", "SecondPlayer");
+  await submit({ token: first.token, accuracy: 1, score: 400 });
+  await submit({ token: first.token, accuracy: 0.5, score: 300, chart_md5: "22222222222222222222222222222222" });
+  await submit({ token: second.token, accuracy: 0.9, score: 800 });
   await submit({ accuracy: 1 });
 
   const { result } = await request("/rankings");
-  assert.deepEqual(result.leaderboards.speed.map((player: ApiResult) => [player.rank, player.nickname, player.rating, player.play_count]), [
-    [1, "SpeedPlayer", 0.5, 2],
-    [2, "DexPlayer", 0.25, 1],
+  assert.deepEqual(result.rankings.map((player: ApiResult) => [player.rank, player.nickname, player.total_score,
+    player.accuracy, player.play_time_seconds, player.score_count]), [
+    [1, "SecondPlayer", 800, 0.9, 120, 1],
+    [2, "FirstPlayer", 700, 0.75, 300, 2],
   ]);
-  assert.deepEqual(result.leaderboards.dexterity.map((player: ApiResult) => [player.rank, player.nickname, player.rating, player.play_count]), [
-    [1, "DexPlayer", 0.55, 1],
-    [2, "SpeedPlayer", 0.2, 2],
-  ]);
-  assert.equal(result.leaderboards.stamina[0].nickname, "DexPlayer");
-  assert.equal(result.leaderboards.technical[0].nickname, "DexPlayer");
 });
 
 test("rejects scores for unknown charts and mismatched modes", async () => {
@@ -375,8 +357,8 @@ test("serves separate cached key-mode leaderboards", async () => {
   await submit({ token: seven_key.token, accuracy: 1, chart_md5: "22222222222222222222222222222222" });
   const four = await request("/rankings?leaderboard=mania-4k");
   const seven = await request("/rankings?leaderboard=mania-7k");
-  assert.deepEqual(four.result.leaderboards.speed.map((row: ApiResult) => row.nickname), ["FourKey"]);
-  assert.deepEqual(seven.result.leaderboards.speed.map((row: ApiResult) => row.nickname), ["SevenKey"]);
+  assert.deepEqual(four.result.rankings.map((row: ApiResult) => row.nickname), ["FourKey"]);
+  assert.deepEqual(seven.result.rankings.map((row: ApiResult) => row.nickname), ["SevenKey"]);
   assert.ok(four.result.available.some((row: ApiResult) => row.slug === "osu"));
 });
 

@@ -57,7 +57,7 @@ export async function processValidationJobs(database: DatabaseSync, catalog: Dat
           database.prepare(`UPDATE users SET score_count = score_count + 1, total_score = total_score + ?,
             play_time_seconds = play_time_seconds + ? WHERE id = ?`)
             .run(result.score, duration_seconds, job.user_id);
-          cacheScoreRanking(database, job.score_id, job.user_id, job.chart_md5, job.chart_index, job.mode, result.accuracy, chart);
+          cacheScoreRanking(database, job.user_id, job.mode, chart.keys, result.score, result.accuracy, duration_seconds);
         }
         database.exec("COMMIT");
       } catch (reason) {
@@ -117,11 +117,9 @@ export function queueAllScoresForRecalculation(database: DatabaseSync): number {
     database.prepare(`UPDATE scores SET validation_state = 'queued', validation_error = NULL,
       score = NULL, accuracy = NULL, duration_seconds = 0`).run();
     database.exec(`
-      DELETE FROM leaderboard_skill_plays;
-      DELETE FROM leaderboard_chart_plays;
       DELETE FROM leaderboard_users;
       UPDATE users SET score_count = 0, total_score = 0, play_time_seconds = 0;
-      INSERT OR REPLACE INTO server_state (key, value) VALUES ('cache_version', '1');
+      INSERT OR REPLACE INTO server_state (key, value) VALUES ('cache_version', '2');
     `);
     database.exec("COMMIT");
     return Number(result.changes);

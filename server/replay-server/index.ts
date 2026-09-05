@@ -8,13 +8,13 @@ import { authenticatedUser, createSession, credentials, passwordHash, passwordMa
 import { catalogChart } from "./catalog.ts";
 import { dashboardHtml } from "./dashboard.ts";
 import { openReplayDatabase } from "./database.ts";
-import { listLeaderboards, playerSummary, rebuildCaches, skillLeaderboards, skillRating, SKILLS } from "./rankings.ts";
+import { listLeaderboards, playerSummary, rebuildCaches, scoreLeaderboard } from "./rankings.ts";
 import { processValidationJobs, requeueOutdatedValidationJobs } from "./replay-validation.ts";
 import { ChartStore } from "./chart-store.ts";
 import { createReplayValidator, REPLAY_COMPUTE_VERSION } from "./replay-verifier.ts";
 import type { CatalogChartRow, JsonObject, LoginRow, ReplayServerOptions, ScoreRow } from "./types.ts";
 
-export { openReplayDatabase, skillRating };
+export { openReplayDatabase };
 
 const MAX_BODY_SIZE = 5 * 1024 * 1024;
 const MAX_COMMENT_LENGTH = 160;
@@ -139,7 +139,8 @@ function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
   const chart = typeof metadata.chart_md5 === "string" && typeof metadata.chart_index === "number"
     ? catalogChart(catalog, metadata.chart_md5, metadata.chart_index)
     : undefined;
-  const max_skill_difficulty = Math.max(0, ...SKILLS.map((skill) => chart?.[skill] ?? 0));
+  const max_skill_difficulty = Math.max(0, chart?.speed ?? 0, chart?.dexterity ?? 0,
+    chart?.stamina ?? 0, chart?.technical ?? 0);
   return {
     ...metadata,
     id: row.id,
@@ -355,10 +356,10 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           return [{
             id: row.user_id === null ? `anonymous:${anonymous_index++}` : `user:${row.user_id}`,
             name: row.name ?? "Anonymous",
-            speed: Number(ratings?.speed ?? 0),
-            stamina: Number(ratings?.stamina ?? 0),
-            dexterity: Number(ratings?.dexterity ?? 0),
-            technical: Number(ratings?.technical ?? 0),
+            total_score: Number(ratings?.total_score ?? 0),
+            play_time_seconds: Number(ratings?.play_time_seconds ?? 0),
+            score_count: Number(ratings?.score_count ?? 0),
+            rank: row.user_id === null ? null : Number(ratings?.rank ?? 0) || null,
             accuracy: row.user_id === null ? null : Number(ratings?.accuracy ?? 0) || null,
           }];
         });
@@ -476,9 +477,9 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
 
       if (request.method === "GET" && url.pathname === "/api/rankings") {
         const leaderboard = url.searchParams.get("leaderboard") ?? "all";
-        const rankings = skillLeaderboards(database, leaderboard);
+        const rankings = scoreLeaderboard(database, leaderboard);
         if (!rankings) json(response, 404, { error: "Leaderboard not found" });
-        else json(response, 200, { leaderboard, available: listLeaderboards(database), leaderboards: rankings });
+        else json(response, 200, { leaderboard, available: listLeaderboards(database), rankings });
         return;
       }
 

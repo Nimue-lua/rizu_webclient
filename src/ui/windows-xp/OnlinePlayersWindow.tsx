@@ -1,5 +1,5 @@
-import { Sigma } from "lucide-react";
 import type { OnlinePlayer } from "../../replay/ReplayServer";
+import { formatScore } from "../formatScore";
 
 export function OnlinePlayersWindow({ count, players }: {
   count: number | null;
@@ -19,7 +19,7 @@ export function OnlinePlayersWindow({ count, players }: {
 
       {players.length > 0 ? (
         <div className="windows-xp-online-grid">
-          {players.map((player, index) => (
+          {players.map((player) => (
             <article className="windows-xp-online-player" key={player.id}>
               <div className="windows-xp-online-avatar" aria-hidden="true">
                 {player.name.charAt(0).toUpperCase() || "?"}
@@ -29,12 +29,10 @@ export function OnlinePlayersWindow({ count, players }: {
                 <span className="windows-xp-online-no-stats">No stats</span>
               ) : (
                 <div className="windows-xp-online-stats">
-                  <span title="Combined skill rating">
-                    <b>{Math.hypot(player.speed, player.stamina, player.dexterity, player.technical).toFixed(2)}</b>
-                    <Sigma aria-hidden="true" />
-                  </span>
+                  <span title={`Total score: ${Math.round(player.total_score).toLocaleString()}`}><b>{formatScore(player.total_score)}</b></span>
                   <b className="windows-xp-online-accuracy">{(player.accuracy * 100).toFixed(2)}%</b>
-                  <b className="windows-xp-online-rank">{index + 1}#</b>
+                  <b title="Total play time">{Math.floor(player.play_time_seconds / 3600)}h</b>
+                  {player.rank !== null && <b className="windows-xp-online-rank">#{player.rank}</b>}
                 </div>
               )}
             </article>

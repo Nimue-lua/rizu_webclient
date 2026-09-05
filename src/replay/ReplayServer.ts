@@ -41,24 +41,22 @@ export interface PresenceStatus {
 export interface OnlinePlayer {
   readonly id: string;
   readonly name: string;
-  readonly speed: number;
-  readonly stamina: number;
-  readonly dexterity: number;
-  readonly technical: number;
+  readonly total_score: number;
   readonly accuracy: number | null;
+  readonly play_time_seconds: number;
+  readonly score_count: number;
+  readonly rank: number | null;
 }
 
-export type SkillName = "speed" | "dexterity" | "stamina" | "technical";
-
-export interface SkillRanking {
+export interface ScoreRanking {
   readonly rank: number;
   readonly user_id: number;
   readonly nickname: string;
-  readonly rating: number;
-  readonly play_count: number;
+  readonly total_score: number;
+  readonly accuracy: number;
+  readonly play_time_seconds: number;
+  readonly score_count: number;
 }
-
-export type SkillLeaderboards = Record<SkillName, readonly SkillRanking[]>;
 
 export interface LeaderboardDefinition {
   readonly slug: string;
@@ -67,8 +65,8 @@ export interface LeaderboardDefinition {
   readonly keys: number | null;
 }
 
-export interface SkillLeaderboardResponse {
-  readonly leaderboards: SkillLeaderboards;
+export interface ScoreLeaderboardResponse {
+  readonly rankings: readonly ScoreRanking[];
   readonly available: readonly LeaderboardDefinition[];
 }
 
@@ -178,18 +176,15 @@ export async function listRecentPlays(signal?: AbortSignal, request: typeof fetc
   return Array.isArray(result.scores) ? result.scores as OnlineScore[] : [];
 }
 
-export async function listSkillLeaderboards(signal?: AbortSignal, request: typeof fetch = onlineClient.request,
-  leaderboard = "all"): Promise<SkillLeaderboardResponse> {
+export async function listScoreLeaderboard(signal?: AbortSignal, request: typeof fetch = onlineClient.request,
+  leaderboard = "all"): Promise<ScoreLeaderboardResponse> {
   const response = await request(`/api/rankings?leaderboard=${encodeURIComponent(leaderboard)}`, { signal, cache: "no-store" });
   if (!response.ok) throw new Error(`Replay server returned ${response.status}`);
-  const result = await response.json() as { leaderboards?: Partial<Record<SkillName, unknown>> };
-  const available = (result as { available?: unknown }).available;
-  return { leaderboards: {
-    speed: Array.isArray(result.leaderboards?.speed) ? result.leaderboards.speed as SkillRanking[] : [],
-    dexterity: Array.isArray(result.leaderboards?.dexterity) ? result.leaderboards.dexterity as SkillRanking[] : [],
-    stamina: Array.isArray(result.leaderboards?.stamina) ? result.leaderboards.stamina as SkillRanking[] : [],
-    technical: Array.isArray(result.leaderboards?.technical) ? result.leaderboards.technical as SkillRanking[] : [],
-  }, available: Array.isArray(available) ? available as LeaderboardDefinition[] : [] };
+  const result = await response.json() as { rankings?: unknown; available?: unknown };
+  return {
+    rankings: Array.isArray(result.rankings) ? result.rankings as ScoreRanking[] : [],
+    available: Array.isArray(result.available) ? result.available as LeaderboardDefinition[] : [],
+  };
 }
 
 export async function loadScoreStats(signal?: AbortSignal, request: typeof fetch = onlineClient.request): Promise<ScoreStats> {

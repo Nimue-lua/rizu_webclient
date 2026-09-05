@@ -115,10 +115,9 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .welcome-online-player { display: grid; grid-template-columns: 54px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 13px; padding: 13px; overflow: hidden; background: linear-gradient(135deg, var(--panel), color-mix(in srgb, var(--surface) 78%, var(--panel))); border-radius: 8px; }
 .welcome-online-avatar { grid-row: 1 / 3; display: grid; width: 54px; height: 54px; color: var(--muted); background: var(--background); border-radius: 7px; font: 700 27px/1 "Zen Maru Gothic", sans-serif; place-items: center; }
 .welcome-online-player > strong { align-self: start; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.welcome-online-sigma { display: flex; align-items: center; align-self: end; gap: 5px; color: var(--accent); font-variant-numeric: tabular-nums; }
-.welcome-online-sigma strong { font-size: 18px; }
-.welcome-online-sigma svg { width: 13px; height: 13px; color: var(--muted); stroke-width: 3; }
-.welcome-online-sigma span { margin-left: 7px; color: var(--text); font-size: 18px; font-weight: 700; }
+.welcome-online-stats { display: flex; align-items: center; align-self: end; gap: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.welcome-online-stats strong { font-size: 16px; }
+.welcome-online-stats span { color: var(--text); font-size: 16px; font-weight: 700; }
 .welcome-online-no-stats { align-self: end; color: var(--muted); font-size: 13px; font-weight: 500; }
 .welcome-online-empty { display: grid; min-height: 82px; margin: 0; color: var(--muted); background: var(--panel); border-radius: 8px; font-size: 13px; place-items: center; }
 .welcome-recent h1 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 18px; }
@@ -405,19 +404,16 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .global-leaderboard-heading button { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; font-size: 14px; font-weight: 600; }
 .global-leaderboard-heading label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .global-leaderboard-heading select { height: 36px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 5px; padding: 0 10px; }
-.global-skill-leaderboards { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 12px; min-height: 0; padding: 24px; overflow-x: auto; }
-.global-skill-board { --skill-color: var(--accent); min-width: 230px; overflow-y: auto; background: var(--panel); border: 1px solid var(--outline); border-top: 4px solid var(--skill-color); border-radius: 7px; scrollbar-color: var(--outline) transparent; }
-.global-skill-board.dexterity { --skill-color: var(--magenta); }
-.global-skill-board.stamina { --skill-color: var(--success); }
-.global-skill-board.technical { --skill-color: var(--blue); }
-.global-skill-board h2 { position: sticky; top: 0; margin: 0; padding: 17px 18px; background: var(--surface); color: var(--skill-color); font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
-.global-skill-board ol { margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
-.global-skill-board li { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 54px; padding: 8px 14px; border-bottom: 1px solid var(--divider); }
-.global-skill-board li:hover { background: var(--hover); }
-.global-skill-board li b { color: var(--skill-color); }
-.global-skill-board li span { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.global-skill-board li strong { color: var(--skill-color); font-size: 17px; }
-.global-skill-board > p { padding: 36px 18px; color: var(--muted); text-align: center; }
+.global-score-leaderboard { min-height: 0; padding: 24px; overflow: auto; }
+.global-score-leaderboard > p { color: var(--muted); text-align: center; }
+.global-score-table { max-width: 1100px; margin: 0 auto; overflow: hidden; background: var(--panel); border: 1px solid var(--outline); border-top: 4px solid var(--accent); border-radius: 7px; font-variant-numeric: tabular-nums; }
+.global-score-table-header, .global-score-table li { display: grid; grid-template-columns: 72px minmax(160px, 1fr) minmax(140px, auto) minmax(100px, auto) minmax(100px, auto); align-items: center; gap: 18px; padding: 0 20px; }
+.global-score-table-header { min-height: 48px; color: var(--muted); background: var(--surface); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.global-score-table ol { margin: 0; padding: 0; list-style: none; }
+.global-score-table li { min-height: 58px; border-top: 1px solid var(--divider); }
+.global-score-table li:hover { background: var(--hover); }
+.global-score-table li b, .global-score-table li span:first-of-type { color: var(--accent); }
+.global-score-table li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .global-leaderboard-status { display: grid; color: var(--muted); font-size: 18px; place-items: center; align-content: center; gap: 18px; }
 .global-leaderboard-status svg { width: 42px; height: 42px; color: var(--accent); }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Play, Sigma, Trophy } from "lucide-react";
 import { listRecentPlays, loadScoreStats, type OnlinePlayer, type OnlineScore, type ScoreStats } from "../../replay/ReplayServer";
+import { formatScore } from "../formatScore";
 
 interface WelcomeScreenProps {
   online_count: number | null;
@@ -28,6 +29,12 @@ function timeAgo(timestamp: string, now: number): string {
 function constantScroll(play: OnlineScore): boolean {
   return typeof play.replay_base === "object" && play.replay_base !== null &&
     "const" in play.replay_base && play.replay_base.const === true;
+}
+
+function playTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor(seconds % 3600 / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 export function WelcomeScreen({ online_count, online_players, onPlay }: WelcomeScreenProps) {
@@ -96,10 +103,10 @@ export function WelcomeScreen({ online_count, online_players, onPlay }: WelcomeS
                 <div className="welcome-online-avatar" aria-hidden="true">?</div>
                 <strong title={player.name}>{player.name}</strong>
                 {player.accuracy === null ? <span className="welcome-online-no-stats">No stats</span> :
-                  <div className="welcome-online-sigma">
-                    <strong>{Math.hypot(player.speed, player.stamina, player.dexterity, player.technical).toFixed(2)}</strong>
-                    <Sigma aria-hidden="true" />
+                  <div className="welcome-online-stats">
+                    <strong title={`Total score: ${Math.round(player.total_score).toLocaleString()}`}>{formatScore(player.total_score)}</strong>
                     <span>{(player.accuracy * 100).toFixed(2)}%</span>
+                    <span>{playTime(player.play_time_seconds)}</span>
                   </div>}
               </article>)}
             </div> : <p className="welcome-online-empty">{online_count === null ? "Could not load online players" : "No players online"}</p>}
