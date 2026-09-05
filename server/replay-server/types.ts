@@ -28,6 +28,7 @@ export interface ScoreRow {
 }
 
 export interface CatalogChartRow {
+  chart_path: string;
   background_preview_path: string | null;
   difficulty: number;
   speed: number | null;
@@ -63,8 +64,9 @@ export interface ReplayValidationInput {
 }
 
 export interface ReplayValidationResult {
-  score: number | null;
+  score: number;
   accuracy: number;
+  music_rate: number;
   grade?: string | null;
   combo?: number | null;
   max_combo?: number | null;

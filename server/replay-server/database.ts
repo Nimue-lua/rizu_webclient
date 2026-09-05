@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function columns(database: DatabaseSync, table: string): Set<string> {
   return new Set((database.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[]).map(({ name }) => name));
@@ -77,7 +77,7 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
       CREATE TABLE IF NOT EXISTS validation_jobs (
         score_id INTEGER PRIMARY KEY REFERENCES scores(id) ON DELETE CASCADE,
         state TEXT NOT NULL DEFAULT 'queued', attempts INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT NOT NULL, last_error TEXT
+        updated_at TEXT NOT NULL, last_error TEXT, compute_version INTEGER NOT NULL DEFAULT 1
       );
       CREATE TABLE IF NOT EXISTS server_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS score_days (day TEXT PRIMARY KEY, score_count INTEGER NOT NULL);
@@ -93,8 +93,11 @@ export function openReplayDatabase(database_path: string): DatabaseSync {
       INSERT OR IGNORE INTO server_state (key, value) SELECT 'total_scores', CAST(COUNT(*) AS TEXT) FROM scores;
       INSERT OR IGNORE INTO score_days (day, score_count)
         SELECT DATE(submitted_at), COUNT(*) FROM scores GROUP BY DATE(submitted_at);
+      UPDATE validation_jobs SET state = 'queued' WHERE state = 'running';
       PRAGMA user_version = ${SCHEMA_VERSION};
     `);
+    const job_columns = columns(database, "validation_jobs");
+    addColumn(database, "validation_jobs", job_columns, "compute_version INTEGER NOT NULL DEFAULT 1");
     database.exec("COMMIT");
   } catch (reason) {
     database.exec("ROLLBACK");

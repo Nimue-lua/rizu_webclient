@@ -118,7 +118,7 @@ export function rebuildCaches(database: DatabaseSync, catalog: DatabaseSync): vo
   const current = database.prepare("SELECT value FROM server_state WHERE key = 'cache_version'").get() as { value: string } | undefined;
   if (current?.value === "1") return;
   const scores = database.prepare(`SELECT id, user_id, chart_md5, chart_index, mode, accuracy, score, metadata_json
-    FROM scores WHERE user_id IS NOT NULL ORDER BY id`).all() as unknown as {
+    FROM scores WHERE user_id IS NOT NULL AND validation_state IN ('valid', 'unverified') ORDER BY id`).all() as unknown as {
       id: number; user_id: number; chart_md5: string; chart_index: number; mode: string;
       accuracy: number | null; score: number | null; metadata_json: string;
     }[];
@@ -151,7 +151,7 @@ export function rebuildCaches(database: DatabaseSync, catalog: DatabaseSync): vo
 }
 
 function catalogChartForRebuild(catalog: DatabaseSync, chart_md5: string, chart_index: number): CatalogChartRow | undefined {
-  return catalog.prepare(`SELECT charts.difficulty, charts.speed, charts.dexterity, charts.stamina, charts.technical,
+  return catalog.prepare(`SELECT charts.chart_path, charts.difficulty, charts.speed, charts.dexterity, charts.stamina, charts.technical,
     charts.duration_seconds, charts.mode, charts.keys, charts.name, charts.background_preview_path, songs.title, songs.artist
     FROM charts JOIN songs ON songs.id = charts.song_id WHERE charts.chart_md5 = ? AND charts.chart_index = ?`)
     .get(chart_md5, chart_index) as unknown as CatalogChartRow | undefined;

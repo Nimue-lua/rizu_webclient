@@ -8,6 +8,7 @@ import path from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { openReplayDatabase, createReplayServer, skillRating } from "./index.ts";
 import { processValidationJobs } from "./replay-validation.ts";
+import { REPLAY_COMPUTE_VERSION } from "./replay-verifier.ts";
 
 interface ApiResult {
   [key: string]: any;
@@ -26,16 +27,19 @@ beforeEach(async () => {
   catalog = new DatabaseSync(":memory:");
   catalog.exec(`
     CREATE TABLE songs (id TEXT PRIMARY KEY, title TEXT, artist TEXT);
-    CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, difficulty REAL, speed REAL, dexterity REAL,
+    CREATE TABLE charts (chart_md5 TEXT, chart_index INTEGER, chart_path TEXT, difficulty REAL, speed REAL, dexterity REAL,
       stamina REAL, technical REAL, duration_seconds REAL, mode INTEGER, keys INTEGER, name TEXT, background_preview_path TEXT, song_id TEXT);
     INSERT INTO songs VALUES ('song-1', 'First Song', 'First Artist');
     INSERT INTO songs VALUES ('song-2', 'Second Song', 'Second Artist');
-    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 5, 8, 2, 4, 1, 120, 3, 4, 'Hard', 'backgrounds/v2/first.avif', 'song-1');
-    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 10, 3, 9, 5, 7, 180, 3, 7, 'Challenge', NULL, 'song-2');
-    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 7, 2, 3, 4, 8, 90, 0, NULL, 'Insane', NULL, 'song-1');
+    INSERT INTO charts VALUES ('11111111111111111111111111111111', 1, 'chart-files/v1/11111111111111111111111111111111.osu', 5, 8, 2, 4, 1, 120, 3, 4, 'Hard', 'backgrounds/v2/first.avif', 'song-1');
+    INSERT INTO charts VALUES ('22222222222222222222222222222222', 1, 'chart-files/v1/22222222222222222222222222222222.osu', 10, 3, 9, 5, 7, 180, 3, 7, 'Challenge', NULL, 'song-2');
+    INSERT INTO charts VALUES ('33333333333333333333333333333333', 1, 'chart-files/v1/33333333333333333333333333333333.osu', 7, 2, 3, 4, 8, 90, 0, NULL, 'Insane', NULL, 'song-1');
   `);
   server = createReplayServer({ database, catalog, app_html: "<!doctype html><html><head><title>Rizu</title></head><body></body></html>",
-    app_directory, asset_base_url: "https://assets.example/" });
+    app_directory, asset_base_url: "https://assets.example/", replay_validator: async ({ replay_base }) => {
+      const values = replay_base as { test_accuracy: number; test_score: number };
+      return { score: values.test_score, accuracy: values.test_accuracy, music_rate: 1 };
+    } });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base_url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 });
@@ -117,10 +121,15 @@ async function submit({ token, accuracy, score = 0,
   const result = await request("/scores", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ chart_md5, chart_index, mode, accuracy, score,
-      played_at: new Date().toISOString(), replay: "AAEC" }),
+    body: JSON.stringify({ chart_md5, chart_index, mode, played_at: new Date().toISOString(),
+      replay_base: { mode, rate: 1, test_accuracy: accuracy, test_score: score }, replay: "AAEC" }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.result));
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const row = database.prepare("SELECT validation_state FROM scores WHERE id = ?").get(result.result.id) as { validation_state: string };
+    if (row.validation_state !== "queued") break;
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
   return result;
 }
 
@@ -301,7 +310,7 @@ test("rejects scores for unknown charts and mismatched modes", async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chart_md5: "99999999999999999999999999999999", chart_index: 1,
-      mode: "mania", accuracy: 1, replay: "AAEC",
+      mode: "mania", replay_base: { mode: "mania", rate: 1 }, replay: "AAEC",
     }),
   });
   assert.equal(unknown.response.status, 404);
@@ -311,7 +320,7 @@ test("rejects scores for unknown charts and mismatched modes", async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chart_md5: "33333333333333333333333333333333", chart_index: 1,
-      mode: "mania", accuracy: 1, replay: "AAEC",
+      mode: "mania", replay_base: { mode: "mania", rate: 1 }, replay: "AAEC",
     }),
   });
   assert.equal(wrong_mode.response.status, 400);
@@ -329,6 +338,34 @@ test("stores hashed passwords and cached score aggregates", async () => {
   assert.equal(user.score_count, 1);
   assert.equal(user.total_score, 123456);
   assert.equal(user.play_time_seconds, 120);
+});
+
+test("discards client-provided result fields from score metadata", async () => {
+  const response = await request("/scores", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chart_md5: "11111111111111111111111111111111", chart_index: 1, mode: "mania",
+      played_at: new Date().toISOString(), replay_base: { mode: "mania", rate: 1,
+        test_accuracy: 0.75, test_score: 123 }, replay: "AAEC",
+      score: 999999999, accuracy: 1, grade: "X", judges: { perfect: 999 }, music_rate: 4,
+    }),
+  });
+  assert.equal(response.response.status, 201);
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const state = database.prepare("SELECT validation_state FROM scores WHERE id = ?").get(response.result.id) as { validation_state: string };
+    if (state.validation_state !== "queued") break;
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  const row = database.prepare("SELECT score, accuracy, metadata_json FROM scores WHERE id = ?").get(response.result.id) as {
+    score: number; accuracy: number; metadata_json: string;
+  };
+  const metadata = JSON.parse(row.metadata_json);
+  assert.equal(row.score, 123);
+  assert.equal(row.accuracy, 0.75);
+  assert.equal(metadata.grade, undefined);
+  assert.equal(metadata.judges, undefined);
+  assert.equal(metadata.music_rate, 1);
 });
 
 test("serves separate cached key-mode leaderboards", async () => {
@@ -360,9 +397,10 @@ test("uses validated replay results as the authoritative aggregates", async () =
     ?, ?, ?, X'0102', 120, 'queued')`).run("11111111111111111111111111111111", registration.user.id,
       submitted_at, submitted_at, JSON.stringify({ replay_base: { mode: "mania" } }));
   const score_id = Number(result.lastInsertRowid);
-  database.prepare("INSERT INTO validation_jobs (score_id, updated_at) VALUES (?, ?)").run(score_id, submitted_at);
+  database.prepare("INSERT INTO validation_jobs (score_id, updated_at, compute_version) VALUES (?, ?, ?)")
+    .run(score_id, submitted_at, REPLAY_COMPUTE_VERSION);
 
-  assert.deepEqual(await processValidationJobs(database, catalog, async () => ({ score: 500000, accuracy: 0.95,
+  assert.deepEqual(await processValidationJobs(database, catalog, async () => ({ score: 500000, accuracy: 0.95, music_rate: 1,
     grade: "A", judges: { perfect: 100 } })), { valid: 1, invalid: 0 });
   const score = database.prepare("SELECT score, accuracy, validation_state FROM scores WHERE id = ?").get(score_id);
   const user = database.prepare("SELECT score_count, total_score, play_time_seconds FROM users WHERE id = ?").get(registration.user.id);

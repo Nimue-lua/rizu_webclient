@@ -35,8 +35,12 @@ test("submits score metadata and compressed replay bytes", async () => {
   assert.equal(payload.nickname, undefined);
   assert.equal(payload.chart_md5, "0123456789abcdef0123456789abcdef");
   assert.equal(payload.chart_index, 2);
-  assert.equal(payload.score, 123456);
-  assert.deepEqual(payload.judges, { perfect: 40, miss: 2 });
+  assert.equal(payload.score, undefined);
+  assert.equal(payload.accuracy, undefined);
+  assert.equal(payload.grade, undefined);
+  assert.equal(payload.judges, undefined);
+  assert.equal(payload.music_rate, undefined);
+  assert.deepEqual(payload.replay_base, { mode: "mania", rate: 1.25 });
   assert.equal(payload.replay, "AAEC/w==");
 });
 

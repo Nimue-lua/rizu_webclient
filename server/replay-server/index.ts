@@ -8,8 +8,10 @@ import { authenticatedUser, createSession, credentials, passwordHash, passwordMa
 import { catalogChart } from "./catalog.ts";
 import { dashboardHtml } from "./dashboard.ts";
 import { openReplayDatabase } from "./database.ts";
-import { cacheScoreRanking, listLeaderboards, playerSummary, rebuildCaches, skillLeaderboards, skillRating, SKILLS } from "./rankings.ts";
-import { processValidationJobs } from "./replay-validation.ts";
+import { listLeaderboards, playerSummary, rebuildCaches, skillLeaderboards, skillRating, SKILLS } from "./rankings.ts";
+import { processValidationJobs, queueUnverifiedScores, requeueOutdatedValidationJobs } from "./replay-validation.ts";
+import { ChartStore } from "./chart-store.ts";
+import { createReplayValidator, REPLAY_COMPUTE_VERSION } from "./replay-verifier.ts";
 import type { CatalogChartRow, JsonObject, LoginRow, ReplayServerOptions, ScoreRow } from "./types.ts";
 
 export { openReplayDatabase, skillRating };
@@ -141,6 +143,9 @@ function scoreFromRow(row: ScoreRow, catalog: DatabaseSync): JsonObject {
   return {
     ...metadata,
     id: row.id,
+    score: row.score,
+    accuracy: row.accuracy,
+    validation_state: row.validation_state,
     comment: row.comment,
     nickname: row.user_name ?? "Anonymous",
     played_at: row.played_at,
@@ -210,6 +215,22 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
   const owns_database = !supplied_database;
   const owns_catalog = !supplied_catalog;
   rebuildCaches(database, catalog);
+  if (replay_validator) requeueOutdatedValidationJobs(database);
+  let validation_running = false;
+  const runValidation = async () => {
+    if (!replay_validator || validation_running) return;
+    validation_running = true;
+    try {
+      await processValidationJobs(database, catalog, replay_validator, 25);
+    } catch (reason) {
+      console.error("Replay validation worker failed", reason);
+    } finally {
+      validation_running = false;
+    }
+  };
+  const validation_timer = replay_validator ? setInterval(() => void runValidation(), 1_000) : undefined;
+  validation_timer?.unref();
+  void runValidation();
 
   const server = createServer(async (request, response) => {
     try {
@@ -349,8 +370,9 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const payload = await readJson(request);
         if (typeof payload.chart_md5 !== "string" || !/^[a-f\d]{32}$/i.test(payload.chart_md5) ||
           !Number.isInteger(payload.chart_index) || typeof payload.chart_index !== "number" || payload.chart_index < 1 ||
-          (payload.mode !== "mania" && payload.mode !== "osu") || typeof payload.replay !== "string") {
-          json(response, 400, { error: "Score requires chart_md5, chart_index, mode, and Base64 replay" });
+          (payload.mode !== "mania" && payload.mode !== "osu") || typeof payload.replay !== "string" ||
+          typeof payload.replay_base !== "object" || payload.replay_base === null || Array.isArray(payload.replay_base)) {
+          json(response, 400, { error: "Score requires chart_md5, chart_index, mode, replay_base, and Base64 replay" });
           return;
         }
         const replay = Buffer.from(payload.replay, "base64");
@@ -359,11 +381,8 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           json(response, 404, { error: "Chart is not in the catalog" });
           return;
         }
-        const accuracy = typeof payload.accuracy === "number" && Number.isFinite(payload.accuracy) && payload.accuracy >= 0 && payload.accuracy <= 1
-          ? payload.accuracy : null;
-        const score = typeof payload.score === "number" && Number.isFinite(payload.score) && payload.score >= 0 ? payload.score : null;
-        if (accuracy === null || score === null || replay.length === 0) {
-          json(response, 400, { error: "Score and accuracy must be finite non-negative numbers and replay must not be empty" });
+        if (replay.length === 0) {
+          json(response, 400, { error: "Replay must not be empty" });
           return;
         }
         const expected_mode = chart.mode === 0 ? "osu" : chart.mode === 3 ? "mania" : null;
@@ -374,15 +393,12 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
         const user = authenticatedUser(database, request);
         const played_at = typeof payload.played_at === "string" ? payload.played_at : new Date().toISOString();
         const submitted_at = new Date().toISOString();
-        const music_rate = typeof payload.music_rate === "number" && Number.isFinite(payload.music_rate) && payload.music_rate > 0
-          ? payload.music_rate : 1;
+        const replay_base = payload.replay_base as JsonObject;
+        const music_rate = typeof replay_base.rate === "number" && Number.isFinite(replay_base.rate) && replay_base.rate > 0
+          ? replay_base.rate : 1;
         const duration_seconds = chart.duration_seconds / music_rate;
-        const metadata = { ...payload };
-        delete metadata.replay;
-        delete metadata.nickname;
-        delete metadata.difficulty;
-        delete metadata.pp;
-        delete metadata.comment;
+        const metadata = { chart_md5: payload.chart_md5.toLowerCase(), chart_index: payload.chart_index,
+          mode: payload.mode, played_at, replay_base };
         database.exec("BEGIN IMMEDIATE");
         let score_id: number;
         try {
@@ -391,24 +407,20 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
               submitted_at, metadata_json, replay, duration_seconds, validation_state)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(payload.chart_md5.toLowerCase(), payload.chart_index, user?.id ?? null, payload.mode,
-            accuracy, score, played_at, submitted_at, JSON.stringify(metadata), replay, duration_seconds,
+            null, null, played_at, submitted_at, JSON.stringify(metadata), replay, replay_validator ? 0 : duration_seconds,
             replay_validator ? "queued" : "unverified");
           score_id = Number(result.lastInsertRowid);
           database.prepare("UPDATE server_state SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'total_scores'").run();
           database.prepare(`INSERT INTO score_days (day, score_count) VALUES (DATE(?), 1)
             ON CONFLICT(day) DO UPDATE SET score_count = score_count + 1`).run(submitted_at);
-          if (user && !replay_validator) {
-            database.prepare(`UPDATE users SET score_count = score_count + 1, total_score = total_score + ?,
-              play_time_seconds = play_time_seconds + ? WHERE id = ?`).run(score, duration_seconds, user.id);
-            cacheScoreRanking(database, score_id, user.id, payload.chart_md5.toLowerCase(), payload.chart_index, payload.mode, accuracy, chart);
-          }
-          if (replay_validator) database.prepare("INSERT INTO validation_jobs (score_id, updated_at) VALUES (?, ?)").run(score_id, submitted_at);
+          if (replay_validator) database.prepare("INSERT INTO validation_jobs (score_id, updated_at, compute_version) VALUES (?, ?, ?)")
+            .run(score_id, submitted_at, REPLAY_COMPUTE_VERSION);
           database.exec("COMMIT");
         } catch (reason) {
           database.exec("ROLLBACK");
           throw reason;
         }
-        if (replay_validator) void processValidationJobs(database, catalog, replay_validator, 1);
+        void runValidation();
         json(response, 201, { id: score_id, submitted_at, validation_state: replay_validator ? "queued" : "unverified" });
         return;
       }
@@ -448,7 +460,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
           return;
         }
         const ranked_rows = database.prepare(`${SCORE_SELECT}
-          WHERE scores.chart_md5 = ? AND scores.chart_index = ? AND scores.validation_state != 'invalid'
+          WHERE scores.chart_md5 = ? AND scores.chart_index = ? AND scores.validation_state IN ('valid', 'unverified')
           ORDER BY scores.accuracy DESC, scores.score DESC, scores.id ASC
         `).all(chart_md5.toLowerCase(), chart_index) as unknown as ScoreRow[];
         const ranked_users = new Set<number>();
@@ -531,6 +543,7 @@ export function createReplayServer({ database_path = "scores.sqlite", database: 
     }
   });
   server.on("close", () => {
+    if (validation_timer) clearInterval(validation_timer);
     if (owns_database) database.close();
     if (owns_catalog) catalog.close();
   });
@@ -545,9 +558,19 @@ async function main(): Promise<void> {
   const catalog_url = process.env.RIZU_CATALOG_URL ?? DEFAULT_CATALOG_URL;
   const catalog_path = process.env.RIZU_CATALOG ?? DEFAULT_CATALOG_PATH;
   const app_directory = path.resolve(process.env.RIZU_WEB_ROOT ?? DEFAULT_WEB_ROOT);
+  const chart_cache = process.env.RIZU_CHART_CACHE ?? path.join(path.dirname(database_path), "chart-cache");
   await prepareCatalog(catalog_url, catalog_path);
   const app_html = await readFile(path.join(app_directory, "index.html"), "utf8");
-  createReplayServer({ database_path, catalog_path, app_html, app_directory, asset_base_url: new URL(".", catalog_url).href }).listen(port, host, () => {
+  const catalog = new DatabaseSync(catalog_path, { readOnly: true });
+  const asset_base_url = new URL(".", catalog_url).href;
+  const replay_validator = createReplayValidator(new ChartStore(catalog, { cache_directory: chart_cache, asset_base_url }));
+  if (process.env.RIZU_VALIDATE_EXISTING === "1") {
+    const migration_database = openReplayDatabase(database_path);
+    const queued = queueUnverifiedScores(migration_database);
+    migration_database.close();
+    console.log(`Queued ${queued} existing replays for validation`);
+  }
+  createReplayServer({ database_path, catalog, app_html, app_directory, asset_base_url, replay_validator }).listen(port, host, () => {
     console.log(`Rizu API listening on http://${host}:${port}`);
   });
 }
