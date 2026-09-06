@@ -29,6 +29,7 @@ export interface GameplayController {
   readonly playback: CompletedGameplay | null;
   readonly autoplay: boolean;
   readonly note_skin_editor: boolean;
+  readonly restart_revision: number;
   readonly background_url: string | null;
   readonly background_state: GameplayBackgroundState;
   readonly loading_progress: ReadonlyMap<string, GameplayLoadProgress>;
@@ -42,6 +43,7 @@ export interface GameplayController {
   cancel(): void;
   finish(completed: CompletedGameplay, reached_chart_end: boolean): GameplayFinishOutcome;
   replay(): void;
+  restart(): void;
   discard(): void;
   set_background_state(state: GameplayBackgroundState): void;
 }

@@ -32,6 +32,9 @@ interface GameplayScreenProps {
   playback?: CompletedGameplay;
   note_skin_editor?: boolean;
   initial_lead_in?: number;
+  allow_restart?: boolean;
+  restart_revision: number;
+  onRestart: () => void;
   onFinish: (completed: CompletedGameplay, reached_chart_end: boolean) => void;
   onBackgroundStateChange?: (state: GameplayBackgroundState) => void;
 }
@@ -145,9 +148,11 @@ function NoteSkinEditorPanel({ assets }: { assets: GameplayData }) {
 }
 
 export function GameplayScreen({ assets, configuration, input_bindings,
-  autoplay = false, playback, note_skin_editor = false, initial_lead_in = 0, onFinish,
+  autoplay = false, playback, note_skin_editor = false, initial_lead_in = 0, allow_restart = true,
+  restart_revision, onRestart, onFinish,
   onBackgroundStateChange }: GameplayScreenProps) {
   const finish = useEffectEvent(onFinish);
+  const requestRestart = useEffectEvent(() => onRestart());
   const backgroundStateChange = useEffectEvent((state: GameplayBackgroundState) => onBackgroundStateChange?.(state));
   const canvas_ref = useRef<HTMLCanvasElement>(null);
   const performance_canvas_ref = useRef<HTMLCanvasElement>(null);
@@ -156,7 +161,6 @@ export function GameplayScreen({ assets, configuration, input_bindings,
   const mania_input_ref = useRef<ManiaPointerInput | null>(null);
   const osu_input_ref = useRef<OsuPointerInput | null>(null);
   const restart_timeout_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [restart_revision, setRestartRevision] = useState(0);
   const [restart_holding, setRestartHolding] = useState(false);
   const [performance_graph_visible, setPerformanceGraphVisible] = useState(false);
 
@@ -167,29 +171,31 @@ export function GameplayScreen({ assets, configuration, input_bindings,
   };
 
   const beginRestartHold = () => {
+    if (!allow_restart) return;
     if (restart_timeout_ref.current !== null) return;
     setRestartHolding(true);
     restart_timeout_ref.current = setTimeout(() => {
       restart_timeout_ref.current = null;
       setRestartHolding(false);
-      setRestartRevision((revision) => revision + 1);
+      requestRestart();
     }, RESTART_HOLD_MS);
   };
 
   useEffect(() => {
+    if (!allow_restart) cancelRestartHold();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === "F3") {
         event.preventDefault();
         setPerformanceGraphVisible((visible) => !visible);
         return;
       }
-      if (event.code !== "Backquote") return;
+      if (event.code !== "Backquote" || !allow_restart) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (!event.repeat) beginRestartHold();
     };
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== "Backquote") return;
+      if (event.code !== "Backquote" || !allow_restart) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       cancelRestartHold();
@@ -204,7 +210,7 @@ export function GameplayScreen({ assets, configuration, input_bindings,
       window.removeEventListener("blur", handleBlur);
       if (restart_timeout_ref.current !== null) clearTimeout(restart_timeout_ref.current);
     };
-  }, []);
+  }, [allow_restart]);
 
   useEffect(() => {
     const canvas = canvas_ref.current;

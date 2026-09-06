@@ -129,6 +129,7 @@ export class GameController {
     const gameplay = {
       status: "idle" as const, location: null, audio_context: null, assets: null, configuration: settings.configuration,
       input_bindings: [] as readonly (string | null)[], playback: null, autoplay: false, note_skin_editor: false,
+      restart_revision: 0,
       background_url: null, background_state: "visible" as GameplayBackgroundState,
       loading_progress: new Map<string, GameplayLoadProgress>(), loading_error: null,
       begin: (request: GameplayLaunch) => this.beginGameplay(request), prepare: () => this.prepareGameplay(),
@@ -140,7 +141,7 @@ export class GameController {
       select_note_skin: (skin_id: string) => this.selectGameplayNoteSkin(skin_id),
       start: () => this.startGameplay(), cancel: () => this.cancelGameplay(),
       finish: (completed: CompletedGameplay, reached_chart_end: boolean) => this.finishGameplay(completed, reached_chart_end),
-      replay: () => this.replayGameplay(), discard: () => this.discardGameplay(),
+      replay: () => this.replayGameplay(), restart: () => this.restartGameplay(), discard: () => this.discardGameplay(),
       set_background_state: (background_state: GameplayBackgroundState) =>
         this.update({ gameplay: { ...this.state.gameplay, background_state } }),
     };
@@ -221,7 +222,8 @@ export class GameController {
       gameplay: { ...this.state.gameplay, status: "setup", location, audio_context: new AudioContext(), assets: null,
         input_bindings: launch.request.input_bindings, playback,
         autoplay: launch.kind === "autoplay" || launch.kind === "note-skin-editor",
-        note_skin_editor: launch.kind === "note-skin-editor", loading_progress: new Map(), loading_error: null },
+        note_skin_editor: launch.kind === "note-skin-editor", restart_revision: 0,
+        loading_progress: new Map(), loading_error: null },
       results: { ...this.state.results, completed: playback },
       online: { ...this.state.online, score: null },
     });
@@ -321,7 +323,7 @@ export class GameController {
     this.services.local_library.resume();
     this.update({
       gameplay: { ...this.state.gameplay, status: "idle", location: null, audio_context: null, assets: null,
-        playback: null, autoplay: false, note_skin_editor: false },
+        playback: null, autoplay: false, note_skin_editor: false, restart_revision: 0 },
       results: { ...this.state.results, completed: null },
       online: { ...this.state.online, score: null },
     });
@@ -405,7 +407,7 @@ export class GameController {
       dan: { ...this.state.dan, status: "playing", stage_index },
       gameplay: { ...this.state.gameplay, status: "ready", location, audio_context: assets.audio_context, assets,
         input_bindings: request.input_bindings, playback: null, autoplay: false, note_skin_editor: false,
-        loading_progress: new Map(), loading_error: null },
+        restart_revision: 0, loading_progress: new Map(), loading_error: null },
       results: { ...this.state.results, completed: null },
       online: { ...this.state.online, score: null },
     });
@@ -451,7 +453,7 @@ export class GameController {
     if (this.state.dan) this.update({
       dan: { ...this.state.dan, status: "idle", course: null, stage_index: 0, completed_stages: [], result: null },
       gameplay: { ...this.state.gameplay, status: "idle", location: null, audio_context: null, assets: null,
-        playback: null, autoplay: false, note_skin_editor: false },
+        playback: null, autoplay: false, note_skin_editor: false, restart_revision: 0 },
       results: { ...this.state.results, completed: null },
     });
   }
@@ -460,6 +462,12 @@ export class GameController {
     const completed = this.state.results.completed;
     if (!completed || !this.state.gameplay.assets) throw new Error("There is no completed gameplay to replay");
     this.update({ gameplay: { ...this.state.gameplay, status: "running", playback: completed } });
+  }
+
+  private restartGameplay(): void {
+    if (this.state.dan.status !== "idle") throw new Error("Restarting the chart is not allowed during a dan course");
+    if (this.state.gameplay.status !== "running") throw new Error("Gameplay is not running");
+    this.update({ gameplay: { ...this.state.gameplay, restart_revision: this.state.gameplay.restart_revision + 1 } });
   }
 
   private updateBackground(location: GameplayLocation): void {

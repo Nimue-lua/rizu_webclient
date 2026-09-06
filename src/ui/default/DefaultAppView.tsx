@@ -95,6 +95,8 @@ export function DefaultAppView({ game }: { game: GameController }) {
         <GameplayScreen assets={gameplay.assets} configuration={gameplay.configuration}
           input_bindings={gameplay.input_bindings} autoplay={gameplay.autoplay} playback={gameplay.playback ?? undefined}
           note_skin_editor={gameplay.note_skin_editor} initial_lead_in={1.15}
+          allow_restart={controller.dan.status === "idle"} restart_revision={gameplay.restart_revision}
+          onRestart={gameplay.restart}
           onBackgroundStateChange={gameplay.set_background_state} onFinish={(completed, reached_chart_end) => {
             const outcome = gameplay.finish(completed, reached_chart_end);
             if (outcome === "result" || outcome === "replay") navigate("result", "gameplay-result");

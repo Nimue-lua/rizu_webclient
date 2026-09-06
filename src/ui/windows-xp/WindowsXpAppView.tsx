@@ -19,7 +19,7 @@ import { WindowsXpGameplayLoading } from "./WindowsXpGameplayLoading";
 import { WindowsXpWindowContainer } from "./WindowsXpWindowContainer";
 
 export function WindowsXpAppView({ game }: { game: GameController }) {
-  const { gameplay, library, modifiers, online, preview_player, results } = useRizuAppController(game);
+  const { gameplay, library, modifiers, online, preview_player, results, dan } = useRizuAppController(game);
   const [background_url, setBackgroundUrl] = useState<string | null>(null);
   const [filter_open_request, setFilterOpenRequest] = useState(0);
   const [modifiers_open_request, setModifiersOpenRequest] = useState(0);
@@ -74,7 +74,8 @@ export function WindowsXpAppView({ game }: { game: GameController }) {
           src={gameplay.background_url} alt="" />}
         <GameplayScreen assets={gameplay.assets} configuration={gameplay.configuration}
           input_bindings={gameplay.input_bindings} autoplay={gameplay.autoplay}
-          playback={gameplay.playback ?? undefined} initial_lead_in={1.15}
+          playback={gameplay.playback ?? undefined} initial_lead_in={1.15} allow_restart={dan.status === "idle"}
+          restart_revision={gameplay.restart_revision} onRestart={gameplay.restart}
           onBackgroundStateChange={gameplay.set_background_state} onFinish={(completed, reached_chart_end) => {
             gameplay.finish(completed, reached_chart_end);
           }} />
