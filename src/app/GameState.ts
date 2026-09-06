@@ -5,6 +5,7 @@ import type { LibraryController } from "../library/LibraryController";
 import type { NoteSkinController } from "../noteskin/NoteSkinController";
 import type { OnlineController } from "../online/OnlineController";
 import type { ResultsController } from "../replay/ResultsController";
+import type { DanController } from "../dan/DanCourse";
 
 export interface GameState {
   readonly library: LibraryController;
@@ -13,5 +14,6 @@ export interface GameState {
   readonly note_skins: NoteSkinController;
   readonly online: OnlineController;
   readonly results: ResultsController;
+  readonly dan: DanController;
   readonly preview_player: SongPreviewPlayer;
 }

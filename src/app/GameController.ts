@@ -10,6 +10,8 @@ import { deleteNoteSkinOverrides } from "../noteskin/NoteSkinOverrides";
 import { compatibleNoteSkins, loadNoteSkinSelections, noteSkinMode, note_skin_options, saveNoteSkinSelections, selectedNoteSkin,
   type NoteSkinOption, type NoteSkinSelections } from "../noteskin/NoteSkinSelection";
 import type { CompletedGameplay } from "../replay/RecordedReplay";
+import { danAccuracy, type ResolvedDanCourse } from "../dan/DanCourse";
+import type { GameplayData } from "../library/GameplayLoader";
 import { deleteScoreDatabase, savePlay, storedPlay } from "../replay/ReplayStore";
 import { currentUser, reportPresence, submitPlay, subscribeAccountChanges } from "../replay/ReplayServer";
 import type { AppServices } from "./controller/AppServices";
@@ -53,6 +55,7 @@ export class GameController {
   private loaded = false;
   private unsubscribe_account: (() => void) | null = null;
   private presence_timer: number | null = null;
+  private dan_assets: (GameplayData | null)[] = [];
 
   constructor(private readonly services: AppServices) {
     this.state = this.createState();
@@ -100,6 +103,7 @@ export class GameController {
     this.catalog_load?.abort();
     this.gameplay_load?.abort();
     this.audio_load?.abort();
+    this.discardDan();
     this.unsubscribe_account?.();
     this.unsubscribe_account = null;
     if (this.presence_timer !== null) window.clearInterval(this.presence_timer);
@@ -161,8 +165,14 @@ export class GameController {
         this.update({ note_skins: { ...this.state.note_skins, options, selections: next } });
       },
     };
+    const dan = {
+      status: "idle" as const, course: null, stage_index: 0, completed_stages: [], result: null,
+      begin: (course: ResolvedDanCourse) => this.beginDan(course),
+      continue: () => this.continueDan(),
+      discard: () => this.discardDan(),
+    };
     return {
-      library, gameplay, modifiers: settings.modifiers, note_skins,
+      library, gameplay, modifiers: settings.modifiers, note_skins, dan,
       online: { user: null, count: null, players: [], score: null },
       results: { completed: null, score_revision: 0, delete_scores: async () => {
         await deleteScoreDatabase();
@@ -199,6 +209,7 @@ export class GameController {
   }
 
   private beginGameplay(launch: GameplayLaunch): void {
+    if (this.state.dan.status !== "idle") this.discardDan();
     this.cancelGameplay();
     this.services.local_library.pause();
     this.prepared_audio = null;
@@ -327,6 +338,7 @@ export class GameController {
       this.update({ gameplay: { ...gameplay, status: "completed" } });
       return "discarded";
     }
+    if (this.state.dan.status === "playing") return this.finishDanStage(completed);
     const attempt = ++this.score_attempt;
     this.update({
       gameplay: { ...gameplay, status: "completed" }, results: { ...this.state.results, completed },
@@ -342,6 +354,106 @@ export class GameController {
         score: { id: null, state: "error" } } });
     });
     return "result";
+  }
+
+  private async beginDan(course: ResolvedDanCourse): Promise<void> {
+    this.discardDan();
+    this.cancelGameplay();
+    this.services.local_library.pause();
+    this.update({ dan: { ...this.state.dan, status: "preparing", course, stage_index: 0,
+      completed_stages: [], result: null } });
+    const abort = new AbortController();
+    this.gameplay_load = abort;
+    const prepared: GameplayData[] = [];
+    try {
+      for (const request of course.stages) {
+        const location = gameplayLocation(request.chart, request.song, this.state.note_skins.selections,
+          this.state.note_skins.options);
+        const audio_context = new AudioContext();
+        try {
+          prepared.push(await this.services.gameplay_loader.load(location, audio_context, abort.signal));
+        } catch (reason) {
+          void audio_context.close();
+          throw reason;
+        }
+      }
+      if (abort.signal.aborted) throw new DOMException("Dan preparation was cancelled", "AbortError");
+      this.dan_assets = prepared;
+      this.activateDanStage(0);
+    } catch (reason) {
+      for (const assets of prepared) {
+        void assets.audio_context.close();
+        destroyNoteSkin(assets.note_skin);
+      }
+      if (!abort.signal.aborted) {
+        this.update({ dan: { ...this.state.dan, status: "idle", course: null },
+          gameplay: { ...this.state.gameplay, loading_error: reason instanceof Error ? reason.message : "Failed to prepare dan course" } });
+      }
+      this.services.local_library.resume();
+      throw reason;
+    }
+  }
+
+  private activateDanStage(stage_index: number): void {
+    const course = this.state.dan.course;
+    const request = course?.stages[stage_index];
+    const assets = this.dan_assets[stage_index];
+    if (!course || !request || !assets) throw new Error("Dan stage is not prepared");
+    const location = gameplayLocation(request.chart, request.song, this.state.note_skins.selections,
+      this.state.note_skins.options);
+    this.update({
+      dan: { ...this.state.dan, status: "playing", stage_index },
+      gameplay: { ...this.state.gameplay, status: "ready", location, audio_context: assets.audio_context, assets,
+        input_bindings: request.input_bindings, playback: null, autoplay: false, note_skin_editor: false,
+        loading_progress: new Map(), loading_error: null },
+      results: { ...this.state.results, completed: null },
+      online: { ...this.state.online, score: null },
+    });
+    this.updateBackground(location);
+  }
+
+  private finishDanStage(completed: CompletedGameplay): GameplayFinishOutcome {
+    const completed_stages = [...this.state.dan.completed_stages, completed];
+    const final = completed_stages.length === this.state.dan.course?.stages.length;
+    const accuracy = danAccuracy(completed_stages.map((stage) => stage.score), this.state.dan.course?.mode);
+    this.update({
+      gameplay: { ...this.state.gameplay, status: "completed" },
+      results: { ...this.state.results, completed },
+      dan: final && this.state.dan.course
+        ? { ...this.state.dan, status: "completed", completed_stages,
+          result: { course: this.state.dan.course, stages: completed_stages, accuracy,
+            cleared: accuracy >= this.state.dan.course.goal_accuracy } }
+        : { ...this.state.dan, status: "break", completed_stages },
+    });
+    return final ? "dan-result" : "dan-break";
+  }
+
+  private continueDan(): void {
+    if (this.state.dan.status !== "break") throw new Error("Dan course is not at a break");
+    this.releaseDanStage(this.state.dan.stage_index);
+    this.activateDanStage(this.state.dan.stage_index + 1);
+  }
+
+  private releaseDanStage(index: number): void {
+    const assets = this.dan_assets[index];
+    if (!assets) return;
+    void assets.audio_context.close();
+    destroyNoteSkin(assets.note_skin);
+    this.dan_assets[index] = null;
+  }
+
+  private discardDan(): void {
+    if (this.state.dan?.status === "idle") return;
+    this.gameplay_load?.abort();
+    for (let index = 0; index < this.dan_assets.length; index += 1) this.releaseDanStage(index);
+    this.dan_assets = [];
+    this.services.local_library.resume();
+    if (this.state.dan) this.update({
+      dan: { ...this.state.dan, status: "idle", course: null, stage_index: 0, completed_stages: [], result: null },
+      gameplay: { ...this.state.gameplay, status: "idle", location: null, audio_context: null, assets: null,
+        playback: null, autoplay: false, note_skin_editor: false },
+      results: { ...this.state.results, completed: null },
+    });
   }
 
   private replayGameplay(): void {

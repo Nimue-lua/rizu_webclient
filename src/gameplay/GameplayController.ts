@@ -17,7 +17,7 @@ export type GameplayLaunch =
   | { kind: "note-skin-editor"; request: PlayRequest };
 
 export type GameplayPreparationStatus = "idle" | "setup" | "preparing" | "ready" | "running" | "completed";
-export type GameplayFinishOutcome = "result" | "discarded" | "replay";
+export type GameplayFinishOutcome = "result" | "discarded" | "replay" | "dan-break" | "dan-result";
 
 export interface GameplayController {
   readonly status: GameplayPreparationStatus;

@@ -7,6 +7,7 @@ interface WelcomeScreenProps {
   online_count: number | null;
   online_players: readonly OnlinePlayer[];
   onPlay: () => void;
+  onDan: () => void;
 }
 
 const relative_time = new Intl.RelativeTimeFormat("en", { numeric: "always" });
@@ -37,7 +38,7 @@ function playTime(seconds: number): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
-export function WelcomeScreen({ online_count, online_players, onPlay }: WelcomeScreenProps) {
+export function WelcomeScreen({ online_count, online_players, onPlay, onDan }: WelcomeScreenProps) {
   const [active_tab, setActiveTab] = useState<"home" | "readme" | "privacy">("home");
   const [plays, setPlays] = useState<readonly OnlineScore[]>([]);
   const [plays_state, setPlaysState] = useState<"loading" | "loaded" | "error">("loading");
@@ -91,6 +92,7 @@ export function WelcomeScreen({ online_count, online_players, onPlay }: WelcomeS
               <span>Play</span>
               <Play aria-hidden="true" fill="currentColor" />
             </button>
+            <button className="welcome-dan" type="button" onClick={onDan}><Trophy aria-hidden="true" /> Dan courses</button>
             <dl className="welcome-score-stats" aria-label="Submitted score statistics">
               <div><dt>Scores set</dt><dd>{score_stats?.total.toLocaleString() ?? "-"}</dd></div>
               <div><dt>Set today</dt><dd>{score_stats?.today.toLocaleString() ?? "-"}</dd></div>

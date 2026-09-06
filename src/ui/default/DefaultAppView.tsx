@@ -11,6 +11,10 @@ import { ResultScreen } from "./ResultScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SongSelectScreen } from "./SongSelectScreen";
 import { WelcomeScreen } from "./WelcomeScreen";
+import { DanSelectScreen } from "./DanSelectScreen";
+import { DanBreakScreen } from "./DanBreakScreen";
+import { dan_courses } from "../../dan/DanCourses";
+import { resolveDanCourse } from "../../dan/resolveDanCourse";
 
 function ScreenContainer({ children }: PropsWithChildren) {
   return <div className="screen-container">{children}</div>;
@@ -28,7 +32,7 @@ function ChartScreenContainer({ children, background_url, background_class }: Pr
   );
 }
 
-type Screen = "welcome" | "catalog-loading" | "song-select" | "loading" | "gameplay" | "result";
+type Screen = "welcome" | "catalog-loading" | "song-select" | "dan-select" | "dan-loading" | "loading" | "gameplay" | "result" | "dan-break";
 
 export function DefaultAppView({ game }: { game: GameController }) {
   const controller = useRizuAppController(game);
@@ -36,6 +40,9 @@ export function DefaultAppView({ game }: { game: GameController }) {
   const linked_chart = useRef(parseChartLink(window.location.pathname, window.location.hash));
   const [screen, setScreen] = useState<Screen>(() => linked_chart.current ? "catalog-loading" : "welcome");
   const [settings_open, setSettingsOpen] = useState(false);
+  const [catalog_destination, setCatalogDestination] = useState<"song-select" | "dan-select">("song-select");
+  const [selected_dan, setSelectedDan] = useState<string | null>(null);
+  const [dan_mode, setDanMode] = useState<"osu" | "mania">("osu");
   const transition = useAppViewTransition();
   const navigate = (next: Screen, kind: AppTransition = "screen", update?: () => void) =>
     transition(kind, () => { update?.(); setScreen(next); });
@@ -48,13 +55,13 @@ export function DefaultAppView({ game }: { game: GameController }) {
       const identity = linked_chart.current;
       if (identity) library.chart_selector.selectChartIdentity(identity.chart_md5, identity.chart_index);
       linked_chart.current = null;
-      navigate("song-select");
+      navigate(catalog_destination);
     }).catch(() => undefined);
     return () => { active = false; library.cancel_loading(); };
-  }, [screen, library.load, library.cancel_loading, library.chart_selector]);
+  }, [screen, library.load, library.cancel_loading, library.chart_selector, catalog_destination]);
 
   useEffect(() => {
-    if (gameplay.status === "ready" && screen === "loading") {
+    if (gameplay.status === "ready" && (screen === "loading" || screen === "dan-loading")) {
       navigate("gameplay", "loading-gameplay", gameplay.start);
     }
   }, [gameplay.status, screen]);
@@ -62,7 +69,8 @@ export function DefaultAppView({ game }: { game: GameController }) {
   switch (screen) {
     case "welcome":
       return <ScreenContainer key="welcome"><WelcomeScreen online_count={online.count} online_players={online.players}
-        onPlay={() => navigate("catalog-loading")} /></ScreenContainer>;
+        onPlay={() => { setCatalogDestination("song-select"); navigate("catalog-loading"); }}
+        onDan={() => { setCatalogDestination("dan-select"); navigate("catalog-loading"); }} /></ScreenContainer>;
     case "catalog-loading":
       return <ScreenContainer key="catalog-loading"><CatalogLoadingScreen progress={library.loading_progress}
         error={library.loading_error} /></ScreenContainer>;
@@ -73,6 +81,13 @@ export function DefaultAppView({ game }: { game: GameController }) {
           background_url={gameplay.background_url}
           progress={gameplay.loading_progress} error={gameplay.loading_error} />
       </ChartScreenContainer>;
+    case "dan-loading":
+      return <ScreenContainer><main className="dan-preparing-screen"><div><span>Preparing course</span>
+        <h1>{controller.dan.course?.name ?? "Dan Course"}</h1>
+        <p>Downloading and parsing all four stages...</p>
+        {gameplay.loading_error && <p className="dan-loading-error">{gameplay.loading_error}</p>}
+        <button type="button" onClick={() => navigate("dan-select", "screen", controller.dan.discard)}>Cancel</button>
+      </div></main></ScreenContainer>;
     case "gameplay":
       if (!gameplay.assets) throw new Error("Gameplay assets are not loaded");
       return <ChartScreenContainer background_url={gameplay.background_url}
@@ -83,9 +98,28 @@ export function DefaultAppView({ game }: { game: GameController }) {
           onBackgroundStateChange={gameplay.set_background_state} onFinish={(completed, reached_chart_end) => {
             const outcome = gameplay.finish(completed, reached_chart_end);
             if (outcome === "result" || outcome === "replay") navigate("result", "gameplay-result");
+            else if (outcome === "dan-break" || outcome === "dan-result") navigate("dan-break", "gameplay-result");
+            else if (controller.dan.status !== "idle") navigate("dan-select", "screen", controller.dan.discard);
             else navigate("song-select", "screen", gameplay.discard);
           }} />
       </ChartScreenContainer>;
+    case "dan-break":
+      return <ScreenContainer><DanBreakScreen dan={controller.dan}
+        onContinue={controller.dan.status === "break" ? () => {
+          controller.dan.continue();
+          navigate("gameplay", "loading-gameplay", gameplay.start);
+        } : undefined}
+        onExit={() => navigate("dan-select", "screen", controller.dan.discard)} /></ScreenContainer>;
+    case "dan-select": {
+      const resolved = dan_courses.filter((course) => course.mode === dan_mode)
+        .map((course) => resolveDanCourse(course, library.chart_selector.getSnapshot())).filter((course) => course !== null);
+      return <ScreenContainer><DanSelectScreen courses={resolved} selected={selected_dan} mode={dan_mode}
+        onMode={(mode) => { setDanMode(mode); setSelectedDan(null); }} onSelect={setSelectedDan}
+        nickname={online.user?.name ?? "Anonymous"} online_count={online.count} onSettings={() => setSettingsOpen(true)}
+        onExit={() => navigate("welcome")} onStart={(course) => {
+          navigate("dan-loading", "song-loading", () => void controller.dan.begin(course).catch(() => undefined));
+        }} />{settings_open && <SettingsScreen onDeleteScores={results.delete_scores} onExit={() => setSettingsOpen(false)} />}</ScreenContainer>;
+    }
     case "result": {
       const location = gameplay.location;
       return <ChartScreenContainer background_url={gameplay.background_url} background_class="result-chart-background">
