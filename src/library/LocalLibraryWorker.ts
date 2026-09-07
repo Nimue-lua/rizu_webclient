@@ -75,7 +75,7 @@ async function persistCatalog(): Promise<void> {
 
 function createSchema(): void {
   database.run(`
-    PRAGMA user_version = 1;
+    PRAGMA user_version = 2;
     CREATE TABLE sources (id TEXT PRIMARY KEY, name TEXT NOT NULL);
     CREATE TABLE locations (id INTEGER PRIMARY KEY, source_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL, path TEXT NOT NULL);
     CREATE TABLE chartfile_sets (id INTEGER PRIMARY KEY, location_id INTEGER NOT NULL, dir TEXT, name TEXT NOT NULL, modified_at INTEGER NOT NULL, UNIQUE(location_id, dir, name));
@@ -85,6 +85,7 @@ function createSchema(): void {
       title TEXT, title_unicode TEXT, artist TEXT, artist_unicode TEXT, name TEXT, creator TEXT, level REAL,
       source TEXT, tags TEXT, audio_path TEXT, audio_offset REAL, background_path TEXT, preview_time REAL,
       osu_beatmap_id INTEGER, osu_beatmapset_id INTEGER, tempo REAL, tempo_avg REAL, tempo_max REAL, tempo_min REAL,
+      circle_size REAL, approach_rate REAL, overall_difficulty REAL,
       UNIQUE(hash, \`index\`)
     );
     CREATE TABLE chartdiffs (
@@ -93,6 +94,19 @@ function createSchema(): void {
       UNIQUE(hash, \`index\`)
     );
   `);
+}
+
+function migrateSchema(): boolean {
+  const version = Number(database.exec("PRAGMA user_version")[0]?.values[0]?.[0] ?? 0);
+  if (version >= 2) return false;
+  database.run(`
+    ALTER TABLE chartmetas ADD COLUMN circle_size REAL;
+    ALTER TABLE chartmetas ADD COLUMN approach_rate REAL;
+    ALTER TABLE chartmetas ADD COLUMN overall_difficulty REAL;
+    UPDATE chartfiles SET modified_at = -1;
+    PRAGMA user_version = 2;
+  `);
+  return true;
 }
 
 function property(source: string, name: string): string {
@@ -168,13 +182,16 @@ function upsertChart(source: LocalLibrarySource, location_id: number, chart_file
   database.run("DELETE FROM chartdiffs WHERE hash = ?", [hash]);
   database.run(`INSERT INTO chartmetas (hash, \`index\`, inputmode, format, title, title_unicode, artist, artist_unicode,
     name, creator, level, source, tags, audio_path, audio_offset, background_path, preview_time, osu_beatmap_id,
-    osu_beatmapset_id, tempo, tempo_avg, tempo_max, tempo_min) VALUES (?, 1, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    osu_beatmapset_id, tempo, tempo_avg, tempo_max, tempo_min, circle_size, approach_rate, overall_difficulty)
+    VALUES (?, 1, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
     hash, inputmode, property(source_text, "Title"), property(source_text, "TitleUnicode"), property(source_text, "Artist"),
     property(source_text, "ArtistUnicode"), property(source_text, "Version"), property(source_text, "Creator"), difficulty,
     property(source_text, "Source"), property(source_text, "Tags"), audio_path,
     background_name ? resolvePath(chart_file.path, background_name) : null, Number(property(source_text, "PreviewTime") || 0) / 1000,
     Number(property(source_text, "BeatmapID")) || null, Number(property(source_text, "BeatmapSetID")) || null,
     parsed.primary_tempo, parsed.primary_tempo, parsed.primary_tempo, parsed.primary_tempo,
+    parsed.mode === "osu" ? parsed.circle_size : null, parsed.mode === "osu" ? parsed.approach_rate : null,
+    parsed.mode === "osu" ? parsed.overall_difficulty ?? 5 : null,
   ]);
   database.run(`INSERT INTO chartdiffs (hash, \`index\`, mode, inputmode, duration, notes_count, judges_count, difficulty)
     VALUES (?, 1, ?, ?, ?, ?, ?, ?)`, [hash, mode, inputmode, Math.max(0, last_time - first_time), note_count, judges_count, difficulty]);
@@ -211,6 +228,7 @@ function librarySnapshot(): LibraryView {
     chartmetas.hash, chartmetas.\`index\`, chartmetas.inputmode, chartmetas.title, chartmetas.title_unicode,
     chartmetas.artist, chartmetas.artist_unicode, chartmetas.name, chartmetas.creator, chartmetas.level, chartmetas.audio_path,
     chartmetas.background_path, chartmetas.preview_time, chartmetas.tempo_avg, chartmetas.tempo_max, chartmetas.tempo_min,
+    chartmetas.circle_size, chartmetas.approach_rate, chartmetas.overall_difficulty,
     chartdiffs.mode, chartdiffs.duration, chartdiffs.notes_count, chartdiffs.judges_count
     FROM chartfiles JOIN chartfile_sets ON chartfile_sets.id = chartfiles.set_id
     JOIN locations ON locations.id = chartfile_sets.location_id JOIN chartmetas ON chartmetas.hash = chartfiles.hash
@@ -248,7 +266,9 @@ function librarySnapshot(): LibraryView {
       background_url: null,
       bpm_avg: Number(row.tempo_avg), bpm_max: Number(row.tempo_max), bpm_min: Number(row.tempo_min),
       creator: String(row.creator || "Unknown creator"), difficulty: Number(row.level), duration_seconds: Number(row.duration),
-      circle_size: null, approach_rate: null, overall_difficulty: null,
+      circle_size: row.circle_size === null ? null : Number(row.circle_size),
+      approach_rate: row.approach_rate === null ? null : Number(row.approach_rate),
+      overall_difficulty: row.overall_difficulty === null ? null : Number(row.overall_difficulty),
       speed: null, dexterity: null, stamina: null, technical: null,
       format: "osu", keys: /^\d+key$/.test(inputmode) ? Number.parseInt(inputmode) : null,
       location_id: Number(row.location_id), long_note_ratio: Number(row.notes_count) > 0
@@ -279,10 +299,9 @@ async function initialize(): Promise<void> {
   const sql = await initSqlJs({ locateFile: () => sql_wasm_url });
   const bytes = await storedCatalog();
   database = bytes ? new sql.Database(bytes) : new sql.Database();
-  if (!bytes) {
-    createSchema();
-    await persistCatalog();
-  }
+  if (!bytes) createSchema();
+  const migrated = bytes ? migrateSchema() : false;
+  if (!bytes || migrated) await persistCatalog();
 }
 
 const ready = initialize();

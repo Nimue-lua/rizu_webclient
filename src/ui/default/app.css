@@ -510,19 +510,22 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .settings-account-control { justify-content: space-between; padding: 16px; background: var(--surface); border: 1px solid var(--outline); border-radius: 4px; }
 .settings-account-error { margin: 0; color: var(--danger); }
 
-.chart-summary { display: grid; grid-template-columns: minmax(285px, auto) minmax(260px, 1fr); min-width: 0; overflow: hidden; padding: 6px; background: var(--panel); border: 1px solid var(--outline); border-radius: 6px; }
-.chart-difficulty { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; padding: 7px 14px 7px 11px; background: linear-gradient(105deg, color-mix(in srgb, var(--difficulty-color) 8%, transparent), transparent 80%); border-left: 3px solid var(--difficulty-color); }
-.chart-rating { display: flex; align-items: center; }
-.chart-rating b { color: var(--difficulty-color); font-size: 36px; font-weight: 600; line-height: .9; }
-.chart-rating em { margin-left: 6px; color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; }
-.chart-rating em svg { display: block; width: 14px; height: 14px; }
-.chart-mode { color: var(--text); font-size: 18px; font-weight: 400; white-space: nowrap; }
-.chart-patterns { display: grid; gap: 4px; min-width: 0; padding: 0 8px; color: var(--accent); border-left: 1px solid var(--divider); font-size: 11px; font-weight: 700; }
-.chart-metadata { display: grid; grid-template: repeat(2, 1fr) / repeat(3, minmax(62px, 1fr)); grid-auto-flow: column; align-items: center; min-width: 0; padding: 5px 0 5px 12px; border-left: 1px solid var(--divider); }
-.chart-metadata > span { display: grid; grid-template-columns: 25px minmax(0, 1fr); align-items: center; min-width: 0; color: var(--muted); font-size: clamp(11px, .8vw, 15px); }
-.chart-metadata svg { width: 16px; height: 16px; }
-.chart-metadata b { overflow: hidden; color: var(--text); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.chart-metadata b.accent { color: var(--accent); }
+.chart-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; overflow: hidden; padding: 10px 16px; background: var(--panel); border-radius: 6px; }
+.chart-challenge { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.chart-challenge > span { display: flex; align-items: baseline; gap: 7px; min-height: 34px; padding: 7px 12px; background: var(--surface); border-radius: 5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chart-challenge > span small { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.chart-challenge > span b { color: var(--text); font-size: 16px; font-weight: 650; }
+.chart-rating { align-items: center !important; background: color-mix(in srgb, var(--difficulty-color) 10%, var(--surface)) !important; }
+.chart-rating b { color: var(--difficulty-color) !important; font-size: 22px !important; font-weight: 650; line-height: 1; }
+.chart-rating svg { width: 13px; height: 13px; color: var(--difficulty-color); fill: currentColor; }
+.chart-patterns { display: grid; gap: 4px; min-width: 0; padding: 0 8px; color: var(--accent); font-size: 11px; font-weight: 700; }
+.chart-metadata { display: grid; grid-template-columns: repeat(3, minmax(90px, 1fr)); align-self: stretch; min-width: min(52%, 520px); color: var(--muted); }
+.chart-metadata > span { display: grid; grid-template: auto auto / 27px minmax(0, 1fr); align-content: center; min-width: 0; padding: 3px clamp(10px, 1.4vw, 22px); white-space: nowrap; }
+.chart-metadata > span + span { border-left: 1px solid var(--divider); }
+.chart-metadata svg { grid-row: 1 / 3; align-self: center; width: 18px; height: 18px; }
+.chart-metadata small { align-self: end; font-size: 9px; font-weight: 800; letter-spacing: .1em; line-height: 1.1; }
+.chart-metadata b { align-self: start; overflow: hidden; color: var(--text); font-size: clamp(16px, 1.15vw, 20px); font-weight: 650; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.chart-metadata b em { color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: .05em; }
 
 .chart-browser { display: grid; grid-template-rows: 78px minmax(0, 1fr); min-height: 0; overflow: hidden; padding: 6px; background: var(--panel); border: 1px solid var(--outline); border-radius: 7px; }
 .chart-browser.chart-level-browser { grid-template-rows: minmax(0, 1fr); }

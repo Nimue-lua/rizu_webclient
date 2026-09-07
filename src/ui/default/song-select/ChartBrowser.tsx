@@ -4,6 +4,10 @@ import type { ChartfileSetView, Chartview } from "../../../library/views";
 import type { ChartSelectionEntry, ChartSortMode } from "../../../select/ChartSelector";
 import { ChartModeBadge, chartSummaryMode, difficultyColor, formatDuration, SongSelectIcon } from "./SongSelectUi";
 
+function formatDifficultySetting(value: number | null): string {
+  return value === null ? "-" : value.toFixed(1).replace(/\.0$/, "");
+}
+
 interface ChartBrowserProps {
   chart_level_sort: boolean;
   difficulty_strip_ref: RefObject<HTMLDivElement | null>;
@@ -98,17 +102,23 @@ export function ChartBrowser({ chart_level_sort, difficulty_strip_ref, error, in
   onChartSelect, onEntryPlay, onEntrySelect, onKeyDown, onMoveDifficulty, onScrollPositionChange, isEntrySelected }: ChartBrowserProps) {
   return (
     <div className="song-select-column right-column">
-      <section className="chart-summary" aria-label="Selected chart information">
-        <div className="chart-difficulty" style={{ "--difficulty-color": difficultyColor(selected_chart?.difficulty ?? 0) } as CSSProperties}>
-          <span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><em><Star aria-label="stars" /></em></span>
-          <span className="chart-mode">{selected_chart ? chartSummaryMode(selected_chart) : "NO CHART"}</span>
+      <section className="chart-summary" aria-label="Selected chart information"
+        style={{ "--difficulty-color": difficultyColor(selected_chart?.difficulty ?? 0) } as CSSProperties}>
+        <div className="chart-challenge">
+          <span className="chart-rating"><b>{selected_chart?.difficulty.toFixed(1) ?? "0.0"}</b><Star aria-label="stars" /></span>
+          {selected_chart?.mode === 0 ? <>
+            <span title="Approach rate"><small>AR</small><b>{formatDifficultySetting(selected_chart.approach_rate)}</b></span>
+            <span title="Overall difficulty"><small>OD</small><b>{formatDifficultySetting(selected_chart.overall_difficulty)}</b></span>
+            <span title="Circle size"><small>CS</small><b>{formatDifficultySetting(selected_chart.circle_size)}</b></span>
+          </> : selected_chart && <>
+            <span><b>{chartSummaryMode(selected_chart)}</b></span>
+            <span><small>LN</small><b>{Math.round(selected_chart.long_note_ratio * 100)}%</b></span>
+          </>}
         </div>
         <div className="chart-metadata">
-          <span><SongSelectIcon name="clock" /><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span>
-          <span><SongSelectIcon name="music" /><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span>
-          <span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><SongSelectIcon name="metronome" /><b>{Math.round(selected_chart?.bpm_avg ?? 0)} BPM</b></span>
-          <span><strong>LN</strong><b className="accent">{Math.round((selected_chart?.long_note_ratio ?? 0) * 100)}%</b></span>
-          <span><SongSelectIcon name="file" /><b>{selected_chart?.format.toUpperCase() ?? "-"}</b></span>
+          <span><SongSelectIcon name="clock" /><small>LENGTH</small><b>{formatDuration(selected_chart?.duration_seconds ?? 0)}</b></span>
+          <span><SongSelectIcon name="music" /><small>{selected_chart?.mode === 0 ? "OBJECTS" : "NOTES"}</small><b>{selected_chart?.note_count.toLocaleString() ?? "0"}</b></span>
+          <span title={selected_chart ? `${Math.round(selected_chart.bpm_min)}-${Math.round(selected_chart.bpm_max)} BPM` : undefined}><SongSelectIcon name="metronome" /><small>TEMPO</small><b>{Math.round(selected_chart?.bpm_avg ?? 0)} <em>BPM</em></b></span>
         </div>
       </section>
       <section className={`chart-browser${chart_level_sort ? " chart-level-browser" : ""}`} aria-label="Chart browser">
