@@ -1,13 +1,12 @@
 import { loadSqliteCatalog, type Library, type LibraryProgressCallback } from "./Library";
 import type { LibraryView } from "./views";
 import { catalogUrl, DEFAULT_REMOTE_PROVIDER } from "./ProviderUrl";
-import { downloadArrayBuffer, type DownloadProgressCallback } from "../download/Download";
+import { describeCatalogError, fetchCatalogWithRetry } from "./CatalogFetch";
 
 const DATABASE_NAME = "rizu-remote-libraries";
 const DATABASE_VERSION = 1;
 const PROVIDER_STORE = "providers";
 const CATALOG_STORE = "catalogs";
-const FETCH_TIMEOUT_MS = 5_000;
 
 export interface RemoteProvider {
   readonly id: string;
@@ -64,10 +63,17 @@ async function persistProvider(provider: RemoteProvider, catalog: Uint8Array): P
   }
 }
 
-async function fetchCatalog(url: string, signal?: AbortSignal, onProgress?: DownloadProgressCallback): Promise<Uint8Array> {
-  const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-  const combined_signal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  return new Uint8Array(await downloadArrayBuffer(url, { cache: "no-store", signal: combined_signal }, onProgress));
+async function storedCatalog(id: string): Promise<Uint8Array | null> {
+  const database = await openDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = database.transaction(CATALOG_STORE).objectStore(CATALOG_STORE).get(id);
+      request.onsuccess = () => resolve((request.result as Uint8Array | undefined) ?? null);
+      request.onerror = () => reject(request.error ?? new Error("Could not load cached catalog"));
+    });
+  } finally {
+    database.close();
+  }
 }
 
 function providerName(url: string): string {
@@ -104,14 +110,16 @@ export class RemoteLibraryStore implements Library {
     this.providers = [...this.providers, { ...provider, status: "checking", error: null }];
     this.emit();
     try {
-      const bytes = await fetchCatalog(catalog_url);
+      const bytes = await fetchCatalogWithRetry(catalog_url);
       await loadSqliteCatalog(bytes, catalog_url, id);
       await persistProvider(provider, bytes);
       this.update(id, { status: "available", error: null });
     } catch (reason) {
       this.providers = this.providers.filter((candidate) => candidate.id !== id);
       this.emit();
-      throw reason;
+      // add() has no caller abort signal, so any abort here is our own fetch
+      // timeout after all retries: report it in user-friendly terms.
+      throw new Error(describeCatalogError(reason), { cause: reason });
     }
   }
 
@@ -121,7 +129,7 @@ export class RemoteLibraryStore implements Library {
     const results = await Promise.all(this.providers.map(async (provider) => {
       this.update(provider.id, { status: "checking", error: null });
       try {
-        const bytes = await fetchCatalog(provider.catalog_url, signal, (progress) => {
+        const bytes = await fetchCatalogWithRetry(provider.catalog_url, signal, (progress) => {
           onProgress?.({ ...progress, id: provider.id, label: `${provider.name} catalog` });
         });
         const library = await loadSqliteCatalog(bytes, provider.catalog_url, provider.id);
@@ -129,7 +137,24 @@ export class RemoteLibraryStore implements Library {
         this.update(provider.id, { status: "available", error: null });
         return library;
       } catch (reason) {
-        const message = reason instanceof Error ? reason.message : "Provider is unavailable";
+        if (!signal.aborted) {
+          // Fall back to the last successfully downloaded catalog so a slow or
+          // offline connection still shows songs instead of failing outright.
+          try {
+            const cached = await storedCatalog(provider.id);
+            if (cached) {
+              const library = await loadSqliteCatalog(cached, provider.catalog_url, provider.id);
+              const message = describeCatalogError(reason);
+              this.update(provider.id, { status: "available", error: `Using cached catalog: ${message}` });
+              return library;
+            }
+          } catch {
+            // Cached catalog is missing or unreadable; report the network error below.
+          }
+        }
+        const message = signal.aborted
+          ? (reason instanceof Error ? reason.message : "Provider is unavailable")
+          : describeCatalogError(reason);
         failures.push(`${provider.name}: ${message}`);
         this.update(provider.id, { status: "unavailable", error: message });
         return null;
