@@ -19,10 +19,10 @@ export function GamemodeFiltersModal({ selected_mode, onModeChange, onExit }: Ga
   }, [onExit]);
 
   return (
-    <div className="filters-modal-layer" role="presentation" onMouseDown={(event) => {
+    <div className="modal-layer filters-modal-layer" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onExit();
     }}>
-      <section className="filters-modal" role="dialog" aria-modal="true" aria-labelledby="filters-title">
+      <section className="modal-surface filters-modal" role="dialog" aria-modal="true" aria-labelledby="filters-title">
         <h1 id="filters-title">Filters</h1>
         <fieldset className="gamemode-filter-list">
           <legend>Gamemode</legend>

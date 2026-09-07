@@ -6,6 +6,7 @@ import {
   Play,
   Trash2,
   UserRound,
+  X,
   Volume2,
 } from "lucide-react";
 import type { ManiaHitRegistration } from "../../gameplay/mania/ManiaRulesEngine";
@@ -141,10 +142,10 @@ export function SettingsScreen({
   };
 
   return (
-    <div className="settings-modal-layer" role="presentation" onMouseDown={(event) => {
+    <div className="modal-layer settings-modal-layer" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onExit();
     }}>
-      <main className="settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
+      <main className="modal-surface settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
         <aside className="settings-sidebar">
           <nav aria-label="Settings sections">
             {sections.map((section) => (
@@ -159,6 +160,10 @@ export function SettingsScreen({
               </button>
             ))}
           </nav>
+          <button className="settings-close-button" type="button" onClick={onExit}>
+            <X aria-hidden="true" />
+            <span>Close</span>
+          </button>
         </aside>
 
         <section className="settings-panel" ref={panel_ref} onScroll={syncSelectedSection}>

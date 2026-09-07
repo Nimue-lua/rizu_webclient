@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import { settings } from "../../config/Settings";
 import { ConfigNumberControl } from "./ConfigNumberControl";
 
@@ -41,11 +42,14 @@ export function GameplayModifiersModal({
   }, [onExit]);
 
   return (
-    <div className="gameplay-modifiers-layer" role="presentation" onMouseDown={(event) => {
+    <div className="modal-layer gameplay-modifiers-layer" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onExit();
     }}>
-      <section className="gameplay-modifiers-modal" role="dialog" aria-modal="true" aria-labelledby="gameplay-modifiers-title">
-        <h1 id="gameplay-modifiers-title">Gameplay Modifiers</h1>
+      <section className="modal-surface gameplay-modifiers-modal" role="dialog" aria-modal="true" aria-labelledby="gameplay-modifiers-title">
+        <header>
+          <h1 id="gameplay-modifiers-title">Gameplay Modifiers</h1>
+          <p>Customize gameplay for <strong>{mode === "osu" ? "OSU!" : "MANIA"}</strong>.</p>
+        </header>
         <div className="modifier-checkbox-list">
           {mode === "mania" && <><label className="settings-checkbox-control">
             <input
@@ -93,6 +97,12 @@ export function GameplayModifiersModal({
               label="Approach Rate" value={approach_rate} onChange={onApproachRateChange} />}
           </>}
         </div>
+        <footer>
+          <button className="modal-close-button" type="button" onClick={onExit}>
+            <X aria-hidden="true" />
+            <span>Close</span>
+          </button>
+        </footer>
       </section>
     </div>
   );

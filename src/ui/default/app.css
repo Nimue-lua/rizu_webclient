@@ -581,47 +581,57 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .rate-knob > span { position: absolute; inset: 4px; background: var(--panel); border: 1px solid var(--outline); border-radius: 50%; }
 .rate-knob > span::after { position: absolute; top: 50%; left: 50%; width: 2px; height: 10px; margin: -10px 0 0 -1px; transform: rotate(var(--rate-rotation)); transform-origin: 1px 10px; background: var(--text); content: ""; }
 .rate-knob input { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; touch-action: none; }
-.gameplay-modifiers-layer {
+.modal-layer {
   position: absolute;
   z-index: 30;
   inset: 0;
   display: grid;
   padding: 36px;
   place-items: center;
-  background: var(--overlay);
-  backdrop-filter: blur(6px);
+  background: rgb(255 176 222 / 12%);
 }
+
+.modal-surface {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border-radius: 17px;
+  box-shadow: 0 24px 80px color-mix(in srgb, var(--shadow) 67%, transparent);
+  font-size: 16px;
+  font-weight: 500;
+}
+.modal-surface footer .modal-close-button { display: flex; align-items: center; gap: 12px; min-width: 0; height: 48px; padding: 12px; color: var(--muted); background: transparent; border-radius: 6px; font-size: 16px; font-weight: 500; letter-spacing: 0; text-align: left; }
+.modal-surface footer .modal-close-button:hover { color: var(--text); background: var(--surface-raised); filter: none; }
+.modal-surface footer .modal-close-button svg { flex: 0 0 auto; width: 24px; height: 24px; stroke-width: 2; }
 
 .gameplay-modifiers-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(760px, calc(100% - 72px));
-  min-height: 300px;
-  padding: 54px 58px;
-  background: var(--panel);
-  border-radius: 22px;
-  box-shadow: 0 28px 90px color-mix(in srgb, var(--shadow) 73%, transparent);
+  height: min(880px, calc(100% - 72px));
 }
 
-.gameplay-modifiers-modal h1 { margin: 0 0 54px; font-size: 38px; line-height: 1; }
-.modifier-checkbox-list { display: grid; gap: 24px; }
+.gameplay-modifiers-modal > header { padding: 34px 48px 28px; border-bottom: 1px solid var(--border-subtle); }
+.gameplay-modifiers-modal h1 { margin: 0; font-size: 38px; line-height: 1; }
+.gameplay-modifiers-modal > header p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.modifier-checkbox-list { display: grid; align-content: start; gap: 24px; padding: 28px 48px; overflow-y: auto; scrollbar-color: var(--outline) transparent; }
 .gameplay-modifiers-modal .settings-control { width: 100%; }
+.gameplay-modifiers-modal > footer { display: flex; align-items: center; gap: 20px; padding: 22px 48px; background: var(--surface); }
+.gameplay-modifiers-modal > footer button { min-width: 120px; padding: 12px 22px; background: var(--blue); border-radius: 6px; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
 
-.filters-modal-layer {
-  position: absolute;
-  z-index: 30;
-  inset: 0;
-  display: grid;
-  padding: 36px;
-  place-items: center;
-  background: var(--overlay);
-  backdrop-filter: blur(6px);
+@media (max-width: 640px) {
+  .gameplay-modifiers-modal { width: 100%; height: calc(100% - 32px); }
+  .gameplay-modifiers-modal > header { padding: 30px 26px 22px; }
+  .gameplay-modifiers-modal > header p { display: none; }
+  .modifier-checkbox-list { padding: 24px 26px; }
+  .gameplay-modifiers-modal > footer { padding: 18px 26px; }
+  .gameplay-modifiers-modal > footer span { display: none; }
 }
 
 .filters-modal {
   width: min(520px, calc(100% - 72px));
   padding: 42px;
-  background: var(--panel);
-  border-radius: 12px;
-  box-shadow: 0 28px 90px color-mix(in srgb, var(--shadow) 73%, transparent);
 }
 
 .filters-modal h1 { margin: 0 0 30px; font-size: 32px; }
@@ -630,12 +640,15 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .gamemode-filter-list label { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--elements); border-radius: 5px; cursor: pointer; text-transform: capitalize; }
 .gamemode-filter-list input { width: 20px; height: 20px; accent-color: var(--accent); }
 
-.note-skins-layer { position: absolute; z-index: 30; inset: 0; display: grid; padding: 36px; place-items: center; background: var(--overlay); backdrop-filter: blur(7px); }
-.note-skins-modal { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(760px, calc(100% - 72px)); max-height: min(820px, calc(100% - 72px)); overflow: hidden; background: var(--panel); border: 1px solid var(--border-subtle); border-radius: 22px; box-shadow: 0 28px 90px color-mix(in srgb, var(--shadow) 73%, transparent); }
-.note-skins-modal > header { display: flex; align-items: end; justify-content: space-between; gap: 36px; padding: 42px 48px 30px; border-bottom: 1px solid var(--border-subtle); }
-.note-skins-modal > header span { color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .16em; }
-.note-skins-modal h1 { margin: 8px 0 0; font-size: 38px; line-height: 1; }
-.note-skins-modal > header p { max-width: 280px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; text-align: right; }
+.note-skins-modal { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(760px, calc(100% - 72px)); height: min(880px, calc(100% - 72px)); }
+.note-skins-modal > header { display: flex; align-items: start; flex-direction: column; gap: 20px; padding: 34px 48px 28px; border-bottom: 1px solid var(--border-subtle); }
+.note-skins-modal h1 { margin: 0; font-size: 38px; line-height: 1; }
+.note-skins-modal > header p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.note-skin-target-controls { display: flex; align-items: end; gap: 14px; }
+.note-skin-target-controls .settings-control { width: auto; }
+.note-skin-target-controls .settings-control.settings-select-control,
+.note-skin-target-controls .settings-control.settings-select-control select { width: 90px; }
+.note-skin-target-controls .settings-segmented-control button { min-width: 58px; padding-inline: 12px; }
 .note-skin-list { display: grid; align-content: start; gap: 7px; margin: 0; padding: 20px 28px; overflow-y: auto; border: 0; scrollbar-color: var(--outline) transparent; }
 .note-skin-list label { display: flex; align-items: center; gap: 18px; min-height: 62px; padding: 10px 20px; background: var(--surface); border: 1px solid transparent; border-radius: 8px; cursor: pointer; }
 .note-skin-list label.current { background: linear-gradient(90deg, color-mix(in srgb, var(--blue) 20%, transparent), var(--surface) 70%); border-color: color-mix(in srgb, var(--blue) 40%, transparent); box-shadow: inset 3px 0 var(--blue); }
@@ -661,10 +674,11 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .note-skin-drop-overlay { position: absolute; z-index: 2; inset: 12px; display: grid; color: var(--text); background: color-mix(in srgb, var(--background) 91%, transparent); border: 3px dashed var(--blue); border-radius: 14px; font-size: 22px; font-weight: 800; letter-spacing: .12em; pointer-events: none; place-items: center; }
 
 @media (max-width: 640px) {
-  .note-skins-layer { padding: 16px; }
-  .note-skins-modal { width: 100%; max-height: calc(100% - 32px); }
-  .note-skins-modal > header { align-items: start; padding: 30px 26px 22px; }
+  .modal-layer { padding: 16px; }
+  .note-skins-modal { width: 100%; height: calc(100% - 32px); }
+  .note-skins-modal > header { align-items: start; flex-direction: column; gap: 20px; padding: 30px 26px 22px; }
   .note-skins-modal > header p { display: none; }
+  .note-skin-target-controls { width: 100%; }
   .note-skin-list { padding: 14px; }
   .note-skin-list label { padding-left: 14px; }
   .note-skins-modal > footer { padding: 18px 26px; }
@@ -786,17 +800,12 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 }
 
 .settings-modal-layer {
-  position: absolute;
   z-index: 20;
-  top: 0;
-  left: 0;
-  display: grid;
   width: var(--logical-width);
   height: 1080px;
-  place-items: center;
+  padding: 0;
   transform: scale(var(--ui-scale));
   transform-origin: top left;
-  background: rgb(255 176 222 / 12%);
 }
 
 .settings-modal {
@@ -804,27 +813,22 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
   grid-template-columns: 320px 740px;
   width: 1060px;
   height: 740px;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--panel);
-  border-radius: 17px;
-  box-shadow: 0 24px 80px color-mix(in srgb, var(--shadow) 67%, transparent);
-  font-size: 16px;
-  font-weight: 500;
 }
 
 .settings-sidebar {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
   overflow: hidden;
   background: var(--surface);
 }
 
 .settings-sidebar nav { display: grid; align-content: start; gap: 4px; padding: 40px 20px 20px; }
-.settings-sidebar nav button { display: flex; align-items: center; gap: 12px; width: 280px; height: 48px; padding: 12px; color: var(--text); background: transparent; border-radius: 6px; font-size: 16px; font-weight: 500; text-align: left; }
-.settings-sidebar nav button:hover, .settings-sidebar nav button.selected { background: var(--surface-raised); filter: none; }
+.settings-sidebar nav button, .settings-close-button { display: flex; align-items: center; gap: 12px; width: 280px; height: 48px; padding: 12px; color: var(--text); background: transparent; border-radius: 6px; font-size: 16px; font-weight: 500; text-align: left; }
+.settings-sidebar nav button:hover, .settings-sidebar nav button.selected, .settings-close-button:hover { background: var(--surface-raised); filter: none; }
 .settings-sidebar nav button.selected { box-shadow: inset 4px 0 var(--accent); }
-.settings-sidebar nav svg { flex: 0 0 auto; width: 24px; height: 24px; stroke-width: 2; }
+.settings-sidebar nav svg, .settings-close-button svg { flex: 0 0 auto; width: 24px; height: 24px; stroke-width: 2; }
+.settings-close-button { margin: 0 20px 20px; color: var(--muted); }
 
 .settings-panel {
   width: 740px;
@@ -877,37 +881,46 @@ html[data-view-transition="loading-gameplay"]::view-transition-new(root) { z-ind
 .settings-control input[type="range"]::-moz-range-thumb { width: 32px; height: 23px; background: var(--accent); border: 0; border-radius: 8px; }
 
 .input-bindings-layer {
-  position: absolute;
-  z-index: 30;
-  top: 0;
-  left: 0;
-  display: grid;
   width: var(--logical-width);
   height: 1080px;
   padding: 24px;
-  place-items: center;
-  background: var(--overlay);
-  backdrop-filter: blur(4px);
 }
 
 .input-bindings-modal {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  width: min(1040px, calc(100% - 48px));
-  min-height: 520px;
-  padding: 58px 70px 42px;
-  overflow: hidden;
-  background: var(--panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
-  box-shadow: 0 24px 80px color-mix(in srgb, var(--shadow) 67%, transparent);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(800px, calc(100% - 48px));
+  height: min(880px, calc(100% - 48px));
 }
 
-.input-bindings-modal h1 { margin: 0; font-size: 37px; text-align: center; }
-.input-bindings-modal h1 span { white-space: nowrap; }
-.input-bindings-modal > p { margin: 34px 0 0; color: var(--muted); font-size: 18px; text-align: center; }
-.input-binding-list { display: flex; align-items: center; justify-content: center; gap: 14px; min-width: 0; padding: 44px 0 30px; }
-.input-binding-list > div { display: grid; flex: 1 1 112px; min-width: 0; max-width: 112px; gap: 12px; color: var(--column-color); font-size: 20px; font-weight: 700; text-align: center; }
-.input-binding-list button { height: 112px; padding: 8px; overflow: hidden; color: var(--text); background: color-mix(in srgb, var(--column-color) 12%, var(--panel)); border: 3px solid color-mix(in srgb, var(--column-color) 62%, var(--outline)); border-radius: 8px; font-size: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.input-bindings-modal > header { display: flex; align-items: start; flex-direction: column; gap: 20px; padding: 34px 48px 28px; border-bottom: 1px solid var(--border-subtle); }
+.input-bindings-modal h1 { margin: 0; font-size: 38px; line-height: 1; }
+.input-bindings-modal > header p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.input-binding-target-controls { display: flex; align-items: end; gap: 14px; }
+.input-binding-target-controls .settings-control { width: auto; }
+.input-binding-target-controls .settings-control.settings-select-control,
+.input-binding-target-controls .settings-control.settings-select-control select { width: 90px; }
+.input-binding-target-controls .settings-segmented-control button { min-width: 58px; padding-inline: 12px; }
+.input-binding-list { display: flex; align-items: flex-start; flex-direction: column; gap: 7px; min-width: 0; padding: 20px 48px; overflow-y: auto; scrollbar-color: var(--outline) transparent; }
+.input-binding-list > div { display: flex; flex: 0 0 58px; align-items: center; gap: 8px; width: min(210px, 100%); padding: 7px 8px 7px 12px; color: var(--column-color); background: var(--surface); border-left: 4px solid var(--column-color); border-radius: 8px; font-size: 16px; font-weight: 700; }
+.input-binding-list > div > span { flex: 0 0 64px; }
+.input-binding-list button { width: 93px; min-width: 0; height: 44px; padding: 8px; overflow: hidden; color: var(--text); background: color-mix(in srgb, var(--column-color) 12%, var(--panel)); border: 2px solid color-mix(in srgb, var(--column-color) 62%, var(--outline)); border-radius: 6px; font-size: 16px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .input-binding-list button:hover, .input-binding-list button.listening { border-color: var(--column-color); background: color-mix(in srgb, var(--column-color) 22%, var(--surface)); filter: none; }
 .input-binding-list button.listening { box-shadow: 0 0 0 4px color-mix(in srgb, var(--column-color) 25%, transparent); }
+.input-binding-list.standard { align-items: center; justify-content: center; flex-direction: row; gap: 14px; }
+.input-binding-list.standard > div { flex: 0 1 112px; align-items: stretch; flex-direction: column; gap: 12px; width: 112px; padding: 0; background: transparent; border-left: 0; border-radius: 0; font-size: 20px; text-align: center; }
+.input-binding-list.standard > div > span { flex: none; }
+.input-binding-list.standard button { width: 112px; height: 112px; padding: 8px; border-width: 3px; border-radius: 8px; font-size: 20px; text-align: center; }
+.input-bindings-modal > footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 48px; background: var(--surface); }
+.input-bindings-modal > footer span { color: var(--muted); font-size: 13px; }
+.input-bindings-modal > footer button { min-width: 120px; padding: 12px 22px; background: var(--blue); border-radius: 6px; font-size: 13px; font-weight: 800; letter-spacing: .08em; }
+
+@media (max-width: 640px) {
+  .input-bindings-modal { width: 100%; height: calc(100% - 32px); }
+  .input-bindings-modal > header { align-items: start; flex-direction: column; gap: 20px; padding: 30px 26px 22px; }
+  .input-bindings-modal > header p { display: none; }
+  .input-binding-target-controls { width: 100%; overflow-x: auto; }
+  .input-binding-list { padding: 24px 26px; }
+  .input-bindings-modal > footer { padding: 18px 26px; }
+  .input-bindings-modal > footer span { display: none; }
+}
