@@ -54,6 +54,11 @@ export function GameplayModifiersWindow({ selector, modifiers }: {
       {mode === "osu" && <fieldset>
         <legend>osu!standard</legend>
         <div className="windows-xp-modifier-checkbox">
+          <input id="windows-xp-note-lock" type="checkbox" checked={modifiers.osu_note_lock}
+            onChange={(event) => modifiers.set_osu_note_lock(event.target.checked)} />
+          <label htmlFor="windows-xp-note-lock"><strong>Note Lock</strong></label>
+        </div>
+        <div className="windows-xp-modifier-checkbox">
           <input id="windows-xp-custom-od" type="checkbox" checked={modifiers.osu_overall_difficulty !== null}
             onChange={(event) => modifiers.set_osu_overall_difficulty(event.target.checked
               ? settings.osu_overall_difficulty.default : null)} />

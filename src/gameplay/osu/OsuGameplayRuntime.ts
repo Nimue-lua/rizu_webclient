@@ -133,7 +133,8 @@ export class OsuGameplayRuntime implements GameplaySession, OsuPointerInput {
     const difficulty_multiplier = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
       replay_base.overall_difficulty ?? chart.overall_difficulty ?? 5,
       replay_base.circle_size ?? chart.circle_size, chart.object_count, chart.drain_length_seconds);
-    this.rules_engine = new OsuRulesEngine(chart, timing_configuration.values, difficulty_multiplier, slider_paths);
+    this.rules_engine = new OsuRulesEngine(chart, timing_configuration.values, difficulty_multiplier, slider_paths,
+      replay_base.note_lock);
     this.playback = new WebAudioPlayback({
       audio_context: data.audio_context,
       audio_buffer: data.audio_buffer,

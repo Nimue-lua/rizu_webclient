@@ -46,6 +46,7 @@ interface SongSelectScreenProps {
   music_rate: number;
   constant_scroll: boolean;
   tap_only: boolean;
+  osu_note_lock: boolean;
   osu_overall_difficulty: number | null;
   osu_circle_size: number | null;
   osu_approach_rate: number | null;
@@ -55,6 +56,7 @@ interface SongSelectScreenProps {
   onMusicRateChange: (music_rate: number) => void;
   onConstantScrollChange: (constant_scroll: boolean) => void;
   onTapOnlyChange: (tap_only: boolean) => void;
+  onOsuNoteLockChange: (note_lock: boolean) => void;
   onOsuOverallDifficultyChange: (overall_difficulty: number | null) => void;
   onOsuCircleSizeChange: (circle_size: number | null) => void;
   onOsuApproachRateChange: (approach_rate: number | null) => void;
@@ -90,6 +92,7 @@ export function SongSelectScreen({
   music_rate,
   constant_scroll,
   tap_only,
+  osu_note_lock,
   osu_overall_difficulty,
   osu_circle_size,
   osu_approach_rate,
@@ -99,6 +102,7 @@ export function SongSelectScreen({
   onMusicRateChange,
   onConstantScrollChange,
   onTapOnlyChange,
+  onOsuNoteLockChange,
   onOsuOverallDifficultyChange,
   onOsuCircleSizeChange,
   onOsuApproachRateChange,
@@ -410,9 +414,10 @@ export function SongSelectScreen({
       </>}
       {input_bindings_open && selected_chart && <InputBindingsModal chart={selected_chart} onExit={() => setInputBindingsOpen(false)} />}
       {modifiers_open && selected_chart && <GameplayModifiersModal mode={selected_chart.mode === 0 ? "osu" : "mania"}
-        constant_scroll={constant_scroll} tap_only={tap_only} overall_difficulty={osu_overall_difficulty}
-        circle_size={osu_circle_size} approach_rate={osu_approach_rate} onConstantScrollChange={onConstantScrollChange}
-        onTapOnlyChange={onTapOnlyChange} onOverallDifficultyChange={onOsuOverallDifficultyChange}
+        constant_scroll={constant_scroll} tap_only={tap_only} note_lock={osu_note_lock}
+        overall_difficulty={osu_overall_difficulty} circle_size={osu_circle_size} approach_rate={osu_approach_rate}
+        onConstantScrollChange={onConstantScrollChange} onTapOnlyChange={onTapOnlyChange}
+        onNoteLockChange={onOsuNoteLockChange} onOverallDifficultyChange={onOsuOverallDifficultyChange}
         onCircleSizeChange={onOsuCircleSizeChange} onApproachRateChange={onOsuApproachRateChange}
         onExit={() => setModifiersOpen(false)} />}
       {filters_open && <GamemodeFiltersModal selected_mode={selection.selected_mode} onModeChange={selectMode} onExit={() => setFiltersOpen(false)} />}

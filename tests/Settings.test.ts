@@ -27,6 +27,18 @@ test("persists hit error meter visibility, type, and scale", () => {
   });
 });
 
+test("persists the osu note-lock modifier", () => {
+  let stored: string | null = null;
+  const config = createSettingsConfig({
+    getItem: () => stored,
+    setItem: (_key, value) => { stored = value; },
+    removeItem: () => { stored = null; },
+  });
+  assert.equal(config.get(settings.osu_note_lock), true);
+  config.set(settings.osu_note_lock, false);
+  assert.equal(JSON.parse(stored!).values["gameplay.osu.note_lock"], false);
+});
+
 test("persists independent osu slider snaking options", () => {
   let stored: string | null = null;
   const config = createSettingsConfig({

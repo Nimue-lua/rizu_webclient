@@ -127,6 +127,7 @@ test("creates an osu session without exposing mania column input", () => {
   assert.equal(harness.osu_options[0]?.data, options.data);
   assert.equal(harness.osu_options[0]?.configuration.replay_base.mode, "osu");
   assert.equal(harness.osu_options[0]?.configuration.replay_base.rate, options.configuration.osu.replay_base.rate);
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.note_lock, true);
   assert.equal(harness.osu_options[0]?.configuration.cursor_scale, options.configuration.osu.cursor_scale);
   assert.deepEqual(harness.osu_options[0]?.configuration.hit_error_meter,
     { enabled: true, type: "fullscreen", scale: 1.5 });
@@ -144,6 +145,7 @@ test("applies configured osu difficulty overrides", () => {
   const harness = createDependencies();
   const options = createOptions(createOsuData());
   options.configuration.osu.replay_base = createOsuReplayBase(1.25, 12);
+  options.configuration.osu.replay_base.note_lock = false;
   options.configuration.osu.replay_base.overall_difficulty = 12;
   options.configuration.osu.replay_base.circle_size = 6.5;
   options.configuration.osu.replay_base.approach_rate = 10.5;
@@ -151,6 +153,7 @@ test("applies configured osu difficulty overrides", () => {
   createGameplaySession(options, harness.dependencies);
 
   assert.equal(harness.osu_options[0]?.configuration.replay_base.rate, 1.25);
+  assert.equal(harness.osu_options[0]?.configuration.replay_base.note_lock, false);
   assert.equal(harness.osu_options[0]?.configuration.replay_base.overall_difficulty, 12);
   assert.equal(harness.osu_options[0]?.configuration.replay_base.circle_size, 6.5);
   assert.equal(harness.osu_options[0]?.configuration.replay_base.approach_rate, 10.5);

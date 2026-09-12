@@ -78,6 +78,7 @@ export function createGameplaySession(options: GameplaySessionOptions,
       approach_rate: configured.replay_base.approach_rate,
       circle_size: configured.replay_base.circle_size,
       overall_difficulty: configured.replay_base.overall_difficulty,
+      note_lock: configured.replay_base.note_lock,
     };
   const playback_replay = options.playback?.replay.mode === "osu" ? options.playback.replay
     : options.autoplay ? createOsuAutoplayReplay(applyOsuHitObjectStacking(options.data.chart,

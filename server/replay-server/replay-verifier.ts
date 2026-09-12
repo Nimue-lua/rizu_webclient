@@ -119,6 +119,7 @@ function equalOsuTiming(left: JsonObject, right: Record<string, number>): boolea
 function verifyOsu(parsed_chart: OsuChart, replay_value: JsonObject, base_value: unknown): ReplayValidationResult {
   const base = commonBase(base_value, "osu") as unknown as OsuReplayBaseValues;
   if (typeof base.x_flip !== "boolean" || typeof base.y_flip !== "boolean") throw new Error("Osu replay flips are invalid");
+  if (typeof base.note_lock !== "boolean") throw new Error("Osu replay note lock is invalid");
   for (const [name, value, minimum] of [["approach_rate", base.approach_rate, -10], ["circle_size", base.circle_size, 0],
     ["overall_difficulty", base.overall_difficulty, 0]] as const) {
     if (value !== null && (!Number.isFinite(value) || value < minimum || value > 12)) throw new Error(`Osu ${name} is invalid`);
@@ -135,7 +136,7 @@ function verifyOsu(parsed_chart: OsuChart, replay_value: JsonObject, base_value:
   const difficulty = calculateOsuStandardDifficultyMultiplier(chart.hp_drain_rate,
     base.overall_difficulty ?? chart.overall_difficulty ?? 5, base.circle_size ?? chart.circle_size,
     chart.object_count, chart.drain_length_seconds);
-  const engine = new OsuRulesEngine(chart, timings, difficulty);
+  const engine = new OsuRulesEngine(chart, timings, difficulty, undefined, base.note_lock);
   const replay = replay_value as unknown as OsuRecordedReplay;
   const events = replay.input_events.map((unknown_event) => {
     const event = object(unknown_event, "Osu replay event");

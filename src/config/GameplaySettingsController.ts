@@ -9,12 +9,14 @@ export interface GameplayModifiersController {
   readonly music_rate: number;
   readonly constant_scroll: boolean;
   readonly tap_only: boolean;
+  readonly osu_note_lock: boolean;
   readonly osu_overall_difficulty: number | null;
   readonly osu_circle_size: number | null;
   readonly osu_approach_rate: number | null;
   set_music_rate(value: number): void;
   set_constant_scroll(value: boolean): void;
   set_tap_only(value: boolean): void;
+  set_osu_note_lock(value: boolean): void;
   set_osu_overall_difficulty(value: number | null): void;
   set_osu_circle_size(value: number | null): void;
   set_osu_approach_rate(value: number | null): void;
@@ -72,6 +74,7 @@ export class GameplaySettingsController {
     const osu_replay_base = {
       ...createOsuReplayBase(music_rate, value<boolean>(settings.customize_osu_overall_difficulty)
         ? value<number>(settings.osu_overall_difficulty) : 5),
+      note_lock: value<boolean>(settings.osu_note_lock),
       overall_difficulty: value<boolean>(settings.customize_osu_overall_difficulty)
         ? value<number>(settings.osu_overall_difficulty) : null,
       circle_size: value<boolean>(settings.customize_osu_circle_size) ? value<number>(settings.osu_circle_size) : null,
@@ -95,11 +98,12 @@ export class GameplaySettingsController {
       online_server_address: value<string>(settings.online_server_address),
       modifiers: {
         master_volume: configuration.common.master_volume, music_rate, constant_scroll, tap_only,
-        osu_overall_difficulty: osu_replay_base.overall_difficulty, osu_circle_size: osu_replay_base.circle_size,
+        osu_note_lock: osu_replay_base.note_lock, osu_overall_difficulty: osu_replay_base.overall_difficulty, osu_circle_size: osu_replay_base.circle_size,
         osu_approach_rate: osu_replay_base.approach_rate,
         set_music_rate: (next) => this.config.set(settings.music_rate, Math.round(next * 1000) / 1000),
         set_constant_scroll: (next) => this.config.set(settings.constant_scroll, next),
         set_tap_only: (next) => this.config.set(settings.tap_only, next),
+        set_osu_note_lock: (next) => this.config.set(settings.osu_note_lock, next),
         set_osu_overall_difficulty: (next) => this.setOsuOverride(settings.customize_osu_overall_difficulty,
           settings.osu_overall_difficulty, next),
         set_osu_circle_size: (next) => this.setOsuOverride(settings.customize_osu_circle_size, settings.osu_circle_size, next),

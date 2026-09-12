@@ -140,7 +140,7 @@ export function DefaultAppView({ game }: { game: GameController }) {
         <SongSelectScreen chart_selector={library.chart_selector} preview_player={controller.preview_player}
           nickname={online.user?.name ?? "Anonymous"} online_count={online.count} master_volume={modifiers.master_volume}
           music_rate={modifiers.music_rate} constant_scroll={modifiers.constant_scroll} tap_only={modifiers.tap_only}
-          osu_overall_difficulty={modifiers.osu_overall_difficulty} osu_circle_size={modifiers.osu_circle_size}
+          osu_note_lock={modifiers.osu_note_lock} osu_overall_difficulty={modifiers.osu_overall_difficulty} osu_circle_size={modifiers.osu_circle_size}
           osu_approach_rate={modifiers.osu_approach_rate} note_skin_selections={note_skins.selections}
           available_note_skins={note_skins.options} score_storage_revision={results.score_revision}
           local_library_status={library.local_status} remote_providers={library.remote_providers}
@@ -163,7 +163,8 @@ export function DefaultAppView({ game }: { game: GameController }) {
           }}
           onExit={() => { controller.preview_player.stop(); navigate("welcome"); }} onSettings={() => setSettingsOpen(true)}
           onMusicRateChange={modifiers.set_music_rate} onConstantScrollChange={modifiers.set_constant_scroll}
-          onTapOnlyChange={modifiers.set_tap_only} onOsuOverallDifficultyChange={modifiers.set_osu_overall_difficulty}
+          onTapOnlyChange={modifiers.set_tap_only} onOsuNoteLockChange={modifiers.set_osu_note_lock}
+          onOsuOverallDifficultyChange={modifiers.set_osu_overall_difficulty}
           onOsuCircleSizeChange={modifiers.set_osu_circle_size} onOsuApproachRateChange={modifiers.set_osu_approach_rate}
           onNoteSkinSelectionChange={note_skins.select} onNoteSkinImport={note_skins.import}
           onNoteSkinDelete={note_skins.delete} />

@@ -7,11 +7,13 @@ interface GameplayModifiersModalProps {
   mode: "osu" | "mania";
   constant_scroll: boolean;
   tap_only: boolean;
+  note_lock: boolean;
   overall_difficulty: number | null;
   circle_size: number | null;
   approach_rate: number | null;
   onConstantScrollChange: (constant_scroll: boolean) => void;
   onTapOnlyChange: (tap_only: boolean) => void;
+  onNoteLockChange: (note_lock: boolean) => void;
   onOverallDifficultyChange: (overall_difficulty: number | null) => void;
   onCircleSizeChange: (circle_size: number | null) => void;
   onApproachRateChange: (approach_rate: number | null) => void;
@@ -22,11 +24,13 @@ export function GameplayModifiersModal({
   mode,
   constant_scroll,
   tap_only,
+  note_lock,
   overall_difficulty,
   circle_size,
   approach_rate,
   onConstantScrollChange,
   onTapOnlyChange,
+  onNoteLockChange,
   onOverallDifficultyChange,
   onCircleSizeChange,
   onApproachRateChange,
@@ -72,7 +76,13 @@ export function GameplayModifiersModal({
           </label></>}
           {mode === "osu" && <>
             <label className="settings-checkbox-control">
-              <input autoFocus type="checkbox" checked={overall_difficulty !== null}
+              <input autoFocus type="checkbox" checked={note_lock}
+                onChange={(event) => onNoteLockChange(event.target.checked)} />
+              <span aria-hidden="true" />
+              <strong>Note Lock</strong>
+            </label>
+            <label className="settings-checkbox-control">
+              <input type="checkbox" checked={overall_difficulty !== null}
                 onChange={(event) => onOverallDifficultyChange(event.target.checked ? settings.osu_overall_difficulty.default : null)} />
               <span aria-hidden="true" />
               <strong>Customize Overall Difficulty</strong>

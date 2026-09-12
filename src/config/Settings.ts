@@ -38,6 +38,7 @@ export const settings = {
   music_rate: numberSetting("gameplay.music_rate", 1, 0.25, 4, 0.05),
   constant_scroll: booleanSetting("gameplay.mania.constant_scroll", false),
   tap_only: booleanSetting("gameplay.mania.tap_only", false),
+  osu_note_lock: booleanSetting("gameplay.osu.note_lock", true),
   customize_osu_overall_difficulty: booleanSetting("gameplay.osu.customize_overall_difficulty", false),
   osu_overall_difficulty: numberSetting("gameplay.osu.overall_difficulty", 5, 0, 12, 0.1),
   customize_osu_circle_size: booleanSetting("gameplay.osu.customize_circle_size", false),

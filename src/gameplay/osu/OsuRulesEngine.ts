@@ -73,7 +73,8 @@ export class OsuRulesEngine {
 
   constructor(private readonly chart: OsuChart, private readonly timings: OsuStandardTimingValues,
     difficulty_multiplier: number,
-    private readonly slider_paths: ReadonlyMap<OsuSlider, OsuSliderPath> = createOsuSliderPaths(chart)) {
+    private readonly slider_paths: ReadonlyMap<OsuSlider, OsuSliderPath> = createOsuSliderPaths(chart),
+    private readonly note_lock = true) {
     this.object_states = new Uint8Array(chart.hit_objects.length);
     this.circle_states = this.object_states;
     this.score_engine = new ScoreEngine([new OsuStandardScore(timings, difficulty_multiplier)]);
@@ -187,11 +188,12 @@ export class OsuRulesEngine {
     if (candidate === undefined) return this.isBeforeAppearance(x, y, song_time) ? "too-early" : "spatial-miss";
 
     const object = this.chart.hit_objects[candidate]!;
-    const first_live = this.findFirstLive(song_time);
-    if (first_live !== undefined && first_live !== candidate &&
-      this.chart.hit_objects[first_live]!.absolute_time < object.absolute_time) {
-      this.shake(candidate, song_time);
-      return "locked";
+    if (this.note_lock) {
+      const blocking = this.findLastBlockingCircle(candidate);
+      if (blocking !== undefined && song_time < this.chart.hit_objects[blocking]!.absolute_time) {
+        this.shake(candidate, song_time);
+        return "locked";
+      }
     }
 
     const delta_time = this.snapTimingDelta(song_time - object.absolute_time);
@@ -201,6 +203,7 @@ export class OsuRulesEngine {
     }
 
     const successful = Math.abs(delta_time) < this.timings.hit_50;
+    if (this.note_lock && successful) this.forceMissEarlierObjects(candidate, song_time);
     if (object.kind === "circle") {
       this.resolveCircle(candidate, successful ? OsuCircleState.Hit : OsuCircleState.Missed, {
         kind: "hit", object_index: candidate, time: song_time, delta_time,
@@ -367,13 +370,30 @@ export class OsuRulesEngine {
     return undefined;
   }
 
-  private findFirstLive(song_time: number): number | undefined {
-    for (let index = this.next_timeout_index; index < this.chart.hit_objects.length; index += 1) {
+  private findLastBlockingCircle(candidate: number): number | undefined {
+    const candidate_time = this.chart.hit_objects[candidate]!.absolute_time;
+    for (let index = candidate - 1; index >= this.next_timeout_index; index -= 1) {
       const object = this.chart.hit_objects[index]!;
-      if (object.kind === "spinner") continue;
-      if (this.object_states[index] === OsuCircleState.Pending && object.absolute_time + this.timings.hit_50 > song_time) return index;
+      if (object.absolute_time >= candidate_time || object.kind === "spinner" ||
+        this.object_states[index] !== OsuCircleState.Pending) continue;
+      return index;
     }
     return undefined;
+  }
+
+  private forceMissEarlierObjects(candidate: number, song_time: number): void {
+    const candidate_time = this.chart.hit_objects[candidate]!.absolute_time;
+    for (let index = this.next_timeout_index; index < candidate; index += 1) {
+      const object = this.chart.hit_objects[index]!;
+      if (object.absolute_time >= candidate_time || object.kind === "spinner" ||
+        this.object_states[index] !== OsuCircleState.Pending) continue;
+      if (object.kind === "circle") {
+        this.resolveCircle(index, OsuCircleState.Missed,
+          { kind: "miss", object_index: index, time: song_time }, song_time);
+      } else {
+        this.resolveSliderHead(index, object, song_time, 0, false, song_time);
+      }
+    }
   }
 
   private isBeforeAppearance(x: number, y: number, song_time: number): boolean {

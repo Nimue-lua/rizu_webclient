@@ -28,8 +28,9 @@ function createChart(circles: readonly { x: number; y: number; absolute_time: nu
   };
 }
 
-function createEngine(circles: readonly { x: number; y: number; absolute_time: number }[]): OsuRulesEngine {
-  return new OsuRulesEngine(createChart(circles), createOsuStandardTimingValues(5), 1);
+function createEngine(circles: readonly { x: number; y: number; absolute_time: number }[],
+  note_lock = true): OsuRulesEngine {
+  return new OsuRulesEngine(createChart(circles), createOsuStandardTimingValues(5), 1, undefined, note_lock);
 }
 
 const sample = { normal_set: 0, addition_set: 0, index: 0, volume: 0, filename: "" };
@@ -52,27 +53,43 @@ function slider(overrides: Partial<OsuSlider> = {}): OsuSlider {
   };
 }
 
-test("blocks a spatially acquired later circle while an earlier circle is live", () => {
+test("blocks a spatially acquired later circle before an earlier circle starts", () => {
   const engine = createEngine([
     { x: 206, y: 192, absolute_time: 1 },
     { x: 256, y: 192, absolute_time: 1.1 },
   ]);
 
-  assert.equal(engine.click(256, 192, 1.1), "locked");
+  assert.equal(engine.click(256, 192, 0.951), "locked");
   assert.deepEqual([...engine.circle_states], [OsuCircleState.Pending, OsuCircleState.Pending]);
   assert.equal(engine.judgment_events.length, 0);
-  assert.deepEqual(engine.circle_transients, [{ kind: "shake", object_index: 1, start_time: 1.1 }]);
+  assert.deepEqual(engine.circle_transients, [{ kind: "shake", object_index: 1, start_time: 0.951 }]);
 });
 
-test("unlocks a later circle exactly at the earlier late-50 deadline", () => {
+test("hitting a later circle after the earlier start time force-misses earlier objects", () => {
   const engine = createEngine([
     { x: 100, y: 100, absolute_time: 1 },
+    { x: 200, y: 100, absolute_time: 1.05 },
     { x: 300, y: 200, absolute_time: 1.15 },
   ]);
 
-  assert.equal(engine.click(300, 200, 1.15), "hit");
-  assert.deepEqual([...engine.circle_states], [OsuCircleState.Pending, OsuCircleState.Hit]);
+  assert.equal(engine.click(300, 200, 1.11), "hit");
+  assert.deepEqual([...engine.circle_states], [OsuCircleState.Missed, OsuCircleState.Missed, OsuCircleState.Hit]);
+  assert.deepEqual(engine.judgment_events.map((event) => [event.kind, event.object_index, event.time]), [
+    ["miss", 0, 1.11], ["miss", 1, 1.11], ["hit", 2, 1.11],
+  ]);
+  assert.equal(engine.score.judges?.miss, 2);
   assert.equal(engine.score.judges?.["300"], 1);
+});
+
+test("allows wrong-order hits without forcing misses when note lock is disabled", () => {
+  const engine = createEngine([
+    { x: 100, y: 100, absolute_time: 1 },
+    { x: 300, y: 200, absolute_time: 1.1 },
+  ], false);
+
+  assert.equal(engine.click(300, 200, 0.96), "hit");
+  assert.deepEqual([...engine.circle_states], [OsuCircleState.Pending, OsuCircleState.Hit]);
+  assert.equal(engine.judgment_events.length, 1);
 });
 
 test("uses chart order deterministically for same-time circles", () => {
@@ -161,9 +178,9 @@ test("restarts rather than accumulating repeated shake animations", () => {
     { x: 206, y: 192, absolute_time: 1 },
     { x: 256, y: 192, absolute_time: 1.1 },
   ]);
-  engine.click(256, 192, 1.05);
-  engine.click(256, 192, 1.06);
-  assert.deepEqual(engine.circle_transients, [{ kind: "shake", object_index: 1, start_time: 1.06 }]);
+  engine.click(256, 192, 0.95);
+  engine.click(256, 192, 0.96);
+  assert.deepEqual(engine.circle_transients, [{ kind: "shake", object_index: 1, start_time: 0.96 }]);
 });
 
 test("advances the active circle cursor as deadlines pass", () => {
@@ -180,16 +197,15 @@ test("advances the active circle cursor as deadlines pass", () => {
   assert.equal(engine.judgment_events.length, 9_000);
 });
 
-test("judges slider heads with circle windows and stable note lock", () => {
+test("a later slider head force-misses an earlier object after its start time", () => {
   const engine = createObjectEngine([
     { kind: "circle", x: 50, y: 50, absolute_time: 0.95, hit_sound: 0, hit_sample: sample,
       new_combo: false, combo_skip: 0, combo_number: 1, combo_color_index: 0 },
     slider(),
   ]);
   engine.setInput(100, 100, true, 1);
-  assert.equal(engine.click(100, 100, 1), "locked");
-  engine.update(1.1);
-  assert.equal(engine.click(100, 100, 1.1), "hit");
+  assert.equal(engine.click(100, 100, 1), "hit");
+  assert.deepEqual([...engine.object_states], [OsuCircleState.Missed, OsuCircleState.Hit]);
   assert.equal(engine.judgment_events.at(-1)?.kind, "slider-head");
   assert.equal(engine.slider_state?.object_index, 1);
 });

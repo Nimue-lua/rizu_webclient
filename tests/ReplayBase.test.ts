@@ -48,7 +48,8 @@ test("osu replay values contain only osu rules and coordinate modifiers", () => 
     timing_values: {
       hit_300: 0.05, hit_100: 0.1, hit_50: 0.15, early_miss: 0.4, late_miss: 0.15,
     },
-    x_flip: false, y_flip: false, approach_rate: null, circle_size: null, overall_difficulty: null,
+    x_flip: false, y_flip: false, note_lock: true,
+    approach_rate: null, circle_size: null, overall_difficulty: null,
   });
   assert.ok(!("nearest" in replay));
   assert.ok(!("tap_only" in replay));
