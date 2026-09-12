@@ -57,6 +57,8 @@ export function SettingsScreen({
   const hit_error_meter_scale = useSetting(settings.hit_error_meter_scale);
   const osu_cursor_renderer = useSetting(settings.osu_cursor_renderer);
   const osu_raw_input = useSetting(settings.osu_raw_input);
+  const osu_slider_snake_in = useSetting(settings.osu_slider_snake_in);
+  const osu_slider_snake_out = useSetting(settings.osu_slider_snake_out);
   const hit_registration = useSetting(settings.mania_hit_registration);
   const online_server_address = useSetting(settings.online_server_address);
   const [selected_section, setSelectedSection] = useState<SettingsSection>("audio");
@@ -221,6 +223,18 @@ export function SettingsScreen({
                   onChange={(event) => appSettings.set(settings.osu_raw_input, event.target.checked)} />
                 <span aria-hidden="true" />
                 <strong>osu! raw pointer input</strong>
+              </label>
+              <label className="settings-checkbox-control">
+                <input type="checkbox" checked={osu_slider_snake_in}
+                  onChange={(event) => appSettings.set(settings.osu_slider_snake_in, event.target.checked)} />
+                <span aria-hidden="true" />
+                <strong>osu! slider snake in</strong>
+              </label>
+              <label className="settings-checkbox-control">
+                <input type="checkbox" checked={osu_slider_snake_out}
+                  onChange={(event) => appSettings.set(settings.osu_slider_snake_out, event.target.checked)} />
+                <span aria-hidden="true" />
+                <strong>osu! slider snake out</strong>
               </label>
               <label className="settings-control settings-select-control" htmlFor="settings-mania-hit-registration">
                 <span>Mania hit registration</span>

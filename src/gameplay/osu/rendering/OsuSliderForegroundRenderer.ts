@@ -16,10 +16,11 @@ const FOLLOW_SCALE_IN = 0.18;
 
 export function drawSliderForeground(skin: OsuStandardSkin, viewport: OsuViewport, slider: OsuSlider,
   path: OsuSliderPath | undefined, slider_state: OsuSliderPresentationState | undefined,
-  slider_states_available: boolean, circle_state_pending: boolean, song_time: number, preempt: number,
+  slider_states_available: boolean, circle_state_pending: boolean, circle_state_successful: boolean,
+  snake_in_enabled: boolean, snake_out_enabled: boolean, song_time: number, preempt: number,
   diameter: number, combo: OsuColor,
   write: SpriteQuadWriter, draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number,
-    color: OsuColor) => void): void {
+    color: OsuColor, snake_start: number, snake_end: number) => void): void {
   const remaining = slider.absolute_time - song_time;
   const end_age = song_time - slider.end_time;
   if (end_age >= SLIDER_FADE_OUT) return;
@@ -27,9 +28,14 @@ export function drawSliderForeground(skin: OsuStandardSkin, viewport: OsuViewpor
   const fade_in_alpha = Math.min(1, Math.max(0, age / CIRCLE_FADE_IN));
   const fade_out_alpha = end_age > 0 ? Math.max(0, 1 - end_age / SLIDER_FADE_OUT) : 1;
   const alpha = fade_in_alpha * fade_out_alpha;
-  if (path) draw_slider?.(slider, path, alpha, combo);
+  const snake = sliderSnakeRange(slider, song_time, preempt,
+    slider_state?.head_successful ?? circle_state_successful, snake_in_enabled, snake_out_enabled);
+  if (path) draw_slider?.(slider, path, alpha, combo, snake.start, snake.end);
   const endpoint = path?.endPosition(slider.repeat_count) ?? { x: slider.x, y: slider.y };
-  drawSliderEndCircle(skin, viewport, endpoint, diameter, alpha, combo, write);
+  const snake_in = Math.min(1, Math.max(0,
+    (song_time - (slider.absolute_time - preempt)) / Math.max(preempt / 3, Number.EPSILON)));
+  const end_circle_alpha = alpha * (snake_in_enabled ? snake_in : 1);
+  drawSliderEndCircle(skin, viewport, endpoint, diameter, end_circle_alpha, combo, write);
   const head_fade_duration = slider_state?.head_successful ? HIT_FADE_OUT : MISS_FADE_OUT;
   const head_alpha = slider_state
     ? Math.min(alpha, Math.max(0, 1 - (song_time - slider_state.head_resolved_at) / head_fade_duration))
@@ -51,6 +57,21 @@ export function drawSliderForeground(skin: OsuStandardSkin, viewport: OsuViewpor
   if (path && slider.repeat_count > 1 && song_time < slider.end_time) {
     drawReverseArrow(skin, viewport, slider, path, song_time, diameter, alpha, preempt, write);
   }
+}
+
+export function sliderSnakeRange(slider: OsuSlider, song_time: number, preempt: number,
+  head_successful: boolean, snake_in_enabled = true, snake_out_enabled = true): Readonly<{ start: number; end: number }> {
+  const snake_in = snake_in_enabled ? Math.min(1, Math.max(0,
+    (song_time - (slider.absolute_time - preempt)) / Math.max(preempt / 3, Number.EPSILON))) : 1;
+  if (!head_successful || !snake_out_enabled || slider.span_duration <= 0 || slider.repeat_count <= 0) {
+    return { start: 0, end: snake_in };
+  }
+  const completion = Math.min(1, Math.max(0,
+    (song_time - slider.absolute_time) / Math.max(slider.total_duration, Number.EPSILON)));
+  const span = Math.min(slider.repeat_count - 1, Math.floor(completion * slider.repeat_count));
+  if (span < slider.repeat_count - 1) return { start: 0, end: 1 };
+  const span_progress = Math.min(1, Math.max(0, completion * slider.repeat_count - span));
+  return span % 2 === 1 ? { start: 0, end: 1 - span_progress } : { start: span_progress, end: 1 };
 }
 
 function drawSliderTicks(skin: OsuStandardSkin, viewport: OsuViewport, slider: OsuSlider, path: OsuSliderPath,

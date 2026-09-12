@@ -21,9 +21,9 @@ test("creates finite indexed capsule coverage with round bounds", () => {
   assert.ok(mesh.indices.length > 0);
   assert.deepEqual(mesh.bounds, { left: -20, top: -20, right: 120, bottom: 20 });
   assert.ok([...mesh.vertices].every(Number.isFinite));
-  const vertex_count = mesh.vertices.length / 6;
+  const vertex_count = mesh.vertices.length / 8;
   assert.ok([...mesh.indices].every((index) => index < vertex_count));
-  assert.deepEqual([...mesh.vertices.slice(2, 6)], [0, 0, 100, 0]);
+  assert.deepEqual([...mesh.vertices.slice(2, 8)], [0, 0, 100, 0, 0, 1]);
   assert.equal(mesh.indices.length, 6);
 });
 
@@ -36,10 +36,10 @@ test("uses segment capsules at a multipart Bezier cusp", () => {
   const path = OsuSliderPath.create(slider, 14);
   const mesh = createOsuSliderMesh(path, 20);
   const vertices = [...mesh.vertices];
-  const cusp_segments = vertices.filter((_value, index) => index % 6 === 2 &&
+  const cusp_segments = vertices.filter((_value, index) => index % 8 === 2 &&
     Math.hypot(vertices[index]! - 397, vertices[index + 1]! - 354) < 1e-6);
   assert.ok(cusp_segments.length > 0);
-  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 6));
+  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 8));
 });
 
 test("covers an exact retracing Bezier turnaround with analytic capsules", () => {
@@ -50,11 +50,11 @@ test("covers an exact retracing Bezier turnaround with analytic capsules", () =>
   const path = OsuSliderPath.create(slider, 14);
   const mesh = createOsuSliderMesh(path, 20);
   const vertices = [...mesh.vertices];
-  const turnaround_segments = vertices.filter((_value, index) => index % 6 === 2 &&
+  const turnaround_segments = vertices.filter((_value, index) => index % 8 === 2 &&
     Math.hypot(vertices[index]! - 288, vertices[index + 1]! - 72) < 1e-6);
   assert.ok(turnaround_segments.length > 0);
   assert.ok([...mesh.vertices].every(Number.isFinite));
-  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 6));
+  assert.ok([...mesh.indices].every((index) => index < mesh.vertices.length / 8));
 });
 
 test("uses one compact analytic capsule per simplified curve segment", () => {

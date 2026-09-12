@@ -103,6 +103,8 @@ function createHarness(playback?: OsuRecordedReplay, autoplay = false, hit_objec
       cursor_scale: 1,
       cursor_renderer: "webgl",
       raw_input: false,
+      slider_snake_in: true,
+      slider_snake_out: true,
       hit_error_meter: { enabled: true, type: "normal", scale: 1 },
       replay_base: createOsuReplayBase(1, 5),
     },

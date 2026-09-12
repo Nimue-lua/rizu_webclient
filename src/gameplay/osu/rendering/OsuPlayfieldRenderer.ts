@@ -22,12 +22,14 @@ export class OsuPlayfieldRenderer {
   private previous_first_active_index = 0;
   private previous_song_time = Number.NEGATIVE_INFINITY;
 
-  constructor(private readonly skin: OsuStandardSkin) {}
+  constructor(private readonly skin: OsuStandardSkin, private readonly snake_in = true,
+    private readonly snake_out = true) {}
 
   draw(viewport: OsuViewport, chart: OsuChart, circle_states: Uint8Array, first_active_index: number,
     circle_transients: readonly OsuCircleTransient[], song_time: number, write: SpriteQuadWriter,
     slider_path?: (slider: OsuSlider) => OsuSliderPath | undefined,
-    draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number, color: OsuColor) => void,
+    draw_slider?: (slider: OsuSlider, path: OsuSliderPath, alpha: number, color: OsuColor,
+      snake_start: number, snake_end: number) => void,
     slider_states: readonly OsuSliderPresentationState[] | undefined = undefined,
     spinner_state: OsuSpinnerPresentationState | null = null): void {
     const preempt = osuApproachPreempt(chart.approach_rate);
@@ -62,7 +64,8 @@ export class OsuPlayfieldRenderer {
       if (object.kind !== "slider" || song_time - object.end_time >= SLIDER_FADE_OUT) continue;
       const slider_state = slider_states?.find((state) => state.object_index === index && state.active);
       drawSliderForeground(this.skin, viewport, object, slider_path?.(object), slider_state,
-        slider_states !== undefined, circle_states[index] === OsuCircleState.Pending, song_time, preempt, diameter,
+        slider_states !== undefined, circle_states[index] === OsuCircleState.Pending,
+        circle_states[index] === OsuCircleState.Hit, this.snake_in, this.snake_out, song_time, preempt, diameter,
         comboColor(this.skin, chart, object.combo_color_index), write, draw_slider);
     }
 

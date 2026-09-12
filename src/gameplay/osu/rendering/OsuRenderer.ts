@@ -50,13 +50,13 @@ export class OsuRenderer implements OsuGameplayRenderer {
   constructor(canvas: HTMLCanvasElement, skin: OsuStandardSkin, hud?: GameplayHudRenderer,
     x_flip = false, y_flip = false, cursor_scale = 1, draw_cursor = true,
     chart?: OsuChart, prepared_slider_paths?: ReadonlyMap<OsuSlider, OsuSliderPath>,
-    hit_error_options?: HitErrorMeterOptions) {
+    hit_error_options?: HitErrorMeterOptions, slider_snaking = { in: true, out: true }) {
     this.skin = skin;
     this.x_flip = x_flip;
     this.y_flip = y_flip;
     this.cursor_scale = cursor_scale;
     this.draw_cursor = draw_cursor;
-    this.playfield = new OsuPlayfieldRenderer(skin);
+    this.playfield = new OsuPlayfieldRenderer(skin, slider_snaking.in, slider_snaking.out);
     this.combo = new OsuComboRenderer(skin);
     this.graphics = new WebGlSpriteGraphics(canvas, skin);
     this.slider_graphics = new WebGlSliderGraphics(canvas);
@@ -133,7 +133,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
   };
 
   private readonly drawSlider = (slider: OsuSlider, _path: OsuSliderPath, alpha: number,
-    color: readonly [number, number, number, number]): void => {
+    color: readonly [number, number, number, number], snake_start: number, snake_end: number): void => {
     const commands = this.active_commands;
     const viewport = this.active_viewport;
     const frame = this.active_frame;
@@ -141,7 +141,7 @@ export class OsuRenderer implements OsuGameplayRenderer {
     this.graphics.submit(commands);
     commands.length = 0;
     this.slider_draw_calls += this.slider_graphics.draw(slider, viewport, frame,
-      this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha);
+      this.skin.sliderTrackOverride ?? color, this.skin.sliderBorderColor, alpha, snake_start, snake_end);
   };
 
   destroy(): void {

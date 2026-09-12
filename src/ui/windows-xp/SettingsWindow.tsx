@@ -33,6 +33,8 @@ export function SettingsWindow() {
   const master_volume = useSetting(settings.master_volume);
   const hit_sound_volume = useSetting(settings.osu_hit_sound_volume);
   const music_offset = useSetting(settings.music_offset);
+  const slider_snake_in = useSetting(settings.osu_slider_snake_in);
+  const slider_snake_out = useSetting(settings.osu_slider_snake_out);
 
   return (
     <section className="windows-xp-settings">
@@ -69,6 +71,14 @@ export function SettingsWindow() {
       </fieldset>
 
       <fieldset>
+        <legend>osu! sliders</legend>
+        <label><input type="checkbox" checked={slider_snake_in}
+          onChange={(event) => appSettings.set(settings.osu_slider_snake_in, event.target.checked)} /> Snake in</label>
+        <label><input type="checkbox" checked={slider_snake_out}
+          onChange={(event) => appSettings.set(settings.osu_slider_snake_out, event.target.checked)} /> Snake out</label>
+      </fieldset>
+
+      <fieldset>
         <legend>Timing</legend>
         <SettingsSlider id="windows-xp-music-offset" label="Music offset" min={-200} max={200} step={1}
           value={music_offset} output={`${music_offset} ms`}
@@ -82,6 +92,8 @@ export function SettingsWindow() {
           appSettings.set(settings.master_volume, settings.master_volume.default);
           appSettings.set(settings.osu_hit_sound_volume, settings.osu_hit_sound_volume.default);
           appSettings.set(settings.music_offset, settings.music_offset.default);
+          appSettings.set(settings.osu_slider_snake_in, settings.osu_slider_snake_in.default);
+          appSettings.set(settings.osu_slider_snake_out, settings.osu_slider_snake_out.default);
         }}>Restore Defaults</button>
       </footer>
     </section>

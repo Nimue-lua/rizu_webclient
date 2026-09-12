@@ -3,7 +3,7 @@ import type { OsuSliderPath } from "../OsuSliderPath";
 
 const MAX_RENDER_POINTS = 2_048;
 const RENDER_POINT_DISTANCE = 6;
-const VERTEX_FLOATS = 6;
+const VERTEX_FLOATS = 8;
 
 export interface OsuSliderMeshData {
   readonly vertices: Float32Array;
@@ -13,14 +13,18 @@ export interface OsuSliderMeshData {
 
 export function createOsuSliderMesh(path: OsuSliderPath, radius: number): OsuSliderMeshData {
   const points = simplify(path.points);
+  const progress_by_point = new Map<Point, number>();
+  if (path.length > 0) {
+    path.points.forEach((point, index) => progress_by_point.set(point, path.cumulative_lengths[index]! / path.length));
+  }
   const vertices: number[] = [];
   const indices: number[] = [];
   let left = Infinity;
   let top = Infinity;
   let right = -Infinity;
   let bottom = -Infinity;
-  const vertex = (x: number, y: number, start: Point, end: Point) => {
-    vertices.push(x, y, start.x, start.y, end.x, end.y);
+  const vertex = (x: number, y: number, start: Point, end: Point, start_progress: number, end_progress: number) => {
+    vertices.push(x, y, start.x, start.y, end.x, end.y, start_progress, end_progress);
     left = Math.min(left, x);
     top = Math.min(top, y);
     right = Math.max(right, x);
@@ -39,20 +43,22 @@ export function createOsuSliderMesh(path: OsuSliderPath, radius: number): OsuSli
     const normal_x = -direction_y / length * radius;
     const normal_y = direction_x / length * radius;
     const base = vertices.length / VERTEX_FLOATS;
-    vertex(start.x - along_x + normal_x, start.y - along_y + normal_y, start, end);
-    vertex(start.x - along_x - normal_x, start.y - along_y - normal_y, start, end);
-    vertex(end.x + along_x + normal_x, end.y + along_y + normal_y, start, end);
-    vertex(end.x + along_x - normal_x, end.y + along_y - normal_y, start, end);
+    const start_progress = progress_by_point.get(start) ?? 0;
+    const end_progress = progress_by_point.get(end) ?? 1;
+    vertex(start.x - along_x + normal_x, start.y - along_y + normal_y, start, end, start_progress, end_progress);
+    vertex(start.x - along_x - normal_x, start.y - along_y - normal_y, start, end, start_progress, end_progress);
+    vertex(end.x + along_x + normal_x, end.y + along_y + normal_y, start, end, start_progress, end_progress);
+    vertex(end.x + along_x - normal_x, end.y + along_y - normal_y, start, end, start_progress, end_progress);
     indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
   }
 
   if (vertices.length === 0) {
     const point = path.points[0]!;
     const base = vertices.length / VERTEX_FLOATS;
-    vertex(point.x - radius, point.y - radius, point, point);
-    vertex(point.x + radius, point.y - radius, point, point);
-    vertex(point.x - radius, point.y + radius, point, point);
-    vertex(point.x + radius, point.y + radius, point, point);
+    vertex(point.x - radius, point.y - radius, point, point, 0, 1);
+    vertex(point.x + radius, point.y - radius, point, point, 0, 1);
+    vertex(point.x - radius, point.y + radius, point, point, 0, 1);
+    vertex(point.x + radius, point.y + radius, point, point, 0, 1);
     indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
   }
   return {

@@ -47,7 +47,7 @@ function createGl(max_viewport = 16_384) {
     createBuffer() { calls.buffers += 1; return handle(); },
     deleteBuffer(value: object | null) { if (value) calls.deleted_buffers += 1; }, bindBuffer() {}, bufferData() {},
     getAttribLocation: (_program: object, name: string) =>
-      ({ position: 0, segment_start: 1, segment_end: 2 })[name] ?? -1,
+      ({ position: 0, segment_start: 1, segment_end: 2, segment_progress: 3 })[name] ?? -1,
     enableVertexAttribArray() {}, vertexAttribPointer() {}, useProgram() {},
     uniform2f(_uniform: object, ...values: number[]) { calls.uniform2.push(values); }, uniform4f() {},
     createFramebuffer() { calls.framebuffers += 1; return handle(); }, deleteFramebuffer() {},
@@ -80,6 +80,7 @@ test("uploads each slider once, draws indexed geometry, and destroys owned buffe
   assert.match(fake.calls.shader_sources[0]!, /in vec2 segment_start;/);
   assert.match(fake.calls.shader_sources[1]!, /distance\(path_position,/);
   assert.match(fake.calls.shader_sources[1]!, /gl_FragDepth = radial/);
+  assert.match(fake.calls.shader_sources[1]!, /clipped_start_progress = max\(path_progress\.x, snake_range\.x\)/);
   const slider = createSlider();
   const path = OsuSliderPath.create(slider, 14);
   assert.equal(graphics.upload(slider, path, 20), true);
@@ -88,7 +89,7 @@ test("uploads each slider once, draws indexed geometry, and destroys owned buffe
   assert.equal(fake.calls.arrays, 1);
   graphics.draw(slider, new OsuViewport(640, 480), {
     framebuffer_width: 640, framebuffer_height: 480, logical_width: 640, logical_height: 480,
-  }, [1, 0, 0, 1], [1, 1, 1, 1], 1);
+  }, [1, 0, 0, 1], [1, 1, 1, 1], 1, 0.25, 0.75);
   assert.equal(fake.calls.draws, 2);
   assert.deepEqual(fake.calls.depth_masks, [true, false]);
   assert.deepEqual(fake.calls.depth_funcs, [fake.gl.LEQUAL, fake.gl.EQUAL]);
@@ -99,6 +100,7 @@ test("uploads each slider once, draws indexed geometry, and destroys owned buffe
   assert.deepEqual(fake.calls.stencil_masks, [0xff, 0xff]);
   assert.deepEqual(fake.calls.color_masks, [[false, false, false, false], [true, true, true, true]]);
   assert.deepEqual(fake.calls.scissors, [[0, 0, 640, 480]]);
+  assert.ok(fake.calls.uniform2.some((values) => values[0] === 0.25 && values[1] === 0.75));
   graphics.destroy();
   graphics.destroy();
   assert.equal(fake.calls.deleted_buffers, 2);

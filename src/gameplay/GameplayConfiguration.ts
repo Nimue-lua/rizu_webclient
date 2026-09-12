@@ -21,6 +21,8 @@ export interface OsuGameplayConfiguration {
   cursor_scale: number;
   cursor_renderer: OsuCursorRendererMode;
   raw_input: boolean;
+  slider_snake_in: boolean;
+  slider_snake_out: boolean;
   replay_base: OsuReplayBaseValues;
 }
 

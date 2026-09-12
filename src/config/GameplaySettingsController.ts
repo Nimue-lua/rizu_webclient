@@ -87,7 +87,8 @@ export class GameplaySettingsController {
         hit_registration: value(settings.mania_hit_registration) },
       osu: { hit_sound_volume: value<number>(settings.osu_hit_sound_volume), cursor_scale: value<number>(settings.cursor_scale),
         cursor_renderer: value(settings.osu_cursor_renderer), raw_input: value<boolean>(settings.osu_raw_input),
-        replay_base: osu_replay_base },
+        slider_snake_in: value<boolean>(settings.osu_slider_snake_in),
+        slider_snake_out: value<boolean>(settings.osu_slider_snake_out), replay_base: osu_replay_base },
     };
     return {
       configuration,

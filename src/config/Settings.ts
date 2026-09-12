@@ -32,6 +32,8 @@ export const settings = {
   hit_error_meter_scale: numberSetting("renderer.hit_error_meter.scale", 1, 0.5, 2, 0.05),
   osu_cursor_renderer: choiceSetting<OsuCursorRendererMode>("renderer.osu.cursor", "os", ["os", "webgl"]),
   osu_raw_input: booleanSetting("gameplay.osu.raw_input", true),
+  osu_slider_snake_in: booleanSetting("gameplay.osu.slider_snake_in", true),
+  osu_slider_snake_out: booleanSetting("gameplay.osu.slider_snake_out", true),
   mania_hit_registration: choiceSetting<ManiaHitRegistration>("gameplay.mania.hit_registration", "earliest", ["earliest", "nearest"]),
   music_rate: numberSetting("gameplay.music_rate", 1, 0.25, 4, 0.05),
   constant_scroll: booleanSetting("gameplay.mania.constant_scroll", false),

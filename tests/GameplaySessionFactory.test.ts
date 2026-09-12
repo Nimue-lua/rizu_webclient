@@ -50,6 +50,8 @@ function createOptions(data: ManiaGameplayData | OsuGameplayData): GameplaySessi
         cursor_scale: 1.25,
         cursor_renderer: "webgl",
         raw_input: false,
+        slider_snake_in: true,
+        slider_snake_out: true,
         replay_base: createOsuReplayBase(),
       },
     },

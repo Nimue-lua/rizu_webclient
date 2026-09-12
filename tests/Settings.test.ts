@@ -27,6 +27,22 @@ test("persists hit error meter visibility, type, and scale", () => {
   });
 });
 
+test("persists independent osu slider snaking options", () => {
+  let stored: string | null = null;
+  const config = createSettingsConfig({
+    getItem: () => stored,
+    setItem: (_key, value) => { stored = value; },
+    removeItem: () => { stored = null; },
+  });
+  assert.equal(config.get(settings.osu_slider_snake_in), true);
+  assert.equal(config.get(settings.osu_slider_snake_out), true);
+  config.set(settings.osu_slider_snake_in, false);
+  config.set(settings.osu_slider_snake_out, false);
+  const values = JSON.parse(stored!).values;
+  assert.equal(values["gameplay.osu.slider_snake_in"], false);
+  assert.equal(values["gameplay.osu.slider_snake_out"], false);
+});
+
 test("limits hit error meter scale to 0.5x through 2x", () => {
   const config = createSettingsConfig();
   config.set(settings.hit_error_meter_scale, 0.5);

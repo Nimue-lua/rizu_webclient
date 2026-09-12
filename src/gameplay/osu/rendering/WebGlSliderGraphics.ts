@@ -4,13 +4,14 @@ import type { OsuViewport } from "../OsuViewport";
 import type { GameplayFrame } from "../../renderer/GameplayFrame";
 import { createOsuSliderMesh } from "./OsuSliderMesh";
 
-const VERTEX_FLOATS = 6;
+const VERTEX_FLOATS = 8;
 const MAX_SLIDER_BUFFER_BYTES = 64 * 1024 * 1024;
 
 const vertex_source = `#version 300 es
 in vec2 position;
 in vec2 segment_start;
 in vec2 segment_end;
+in vec2 segment_progress;
 uniform vec2 viewport_size;
 uniform vec2 playfield_scale;
 uniform vec2 playfield_offset;
@@ -21,6 +22,7 @@ uniform float depth_bias;
 out vec2 path_position;
 out vec2 path_start;
 out vec2 path_end;
+out vec2 path_progress;
 void main() {
   vec2 screen = playfield_offset + position * playfield_scale;
   screen = stable_body_origin + (screen - stable_body_origin) * stable_viewport_scale;
@@ -30,6 +32,7 @@ void main() {
   path_position = position;
   path_start = segment_start;
   path_end = segment_end;
+  path_progress = segment_progress;
 }`;
 
 const fragment_source = `#version 300 es
@@ -37,19 +40,32 @@ precision highp float;
 in vec2 path_position;
 in vec2 path_start;
 in vec2 path_end;
+in vec2 path_progress;
 uniform vec4 body_color;
 uniform vec4 border_color;
 uniform float opacity;
 uniform float path_radius;
 uniform float depth_bias;
+uniform vec2 snake_range;
 out vec4 color;
 void main() {
   vec2 segment = path_end - path_start;
-  float segment_length_squared = dot(segment, segment);
+  float progress_length = path_progress.y - path_progress.x;
+  float clipped_start_progress = max(path_progress.x, snake_range.x);
+  float clipped_end_progress = min(path_progress.y, snake_range.y);
+  if (clipped_start_progress > clipped_end_progress) discard;
+  float local_start = progress_length > 0.0
+    ? clamp((clipped_start_progress - path_progress.x) / progress_length, 0.0, 1.0) : 0.0;
+  float local_end = progress_length > 0.0
+    ? clamp((clipped_end_progress - path_progress.x) / progress_length, 0.0, 1.0) : 1.0;
+  vec2 clipped_start = path_start + segment * local_start;
+  vec2 clipped_end = path_start + segment * local_end;
+  vec2 clipped_segment = clipped_end - clipped_start;
+  float segment_length_squared = dot(clipped_segment, clipped_segment);
   float progress = segment_length_squared > 0.0
-    ? clamp(dot(path_position - path_start, segment) / segment_length_squared, 0.0, 1.0)
+    ? clamp(dot(path_position - clipped_start, clipped_segment) / segment_length_squared, 0.0, 1.0)
     : 0.0;
-  float radial = distance(path_position, path_start + segment * progress) / path_radius;
+  float radial = distance(path_position, clipped_start + clipped_segment * progress) / path_radius;
   if (radial > 1.0) discard;
   gl_FragDepth = radial * 0.9 + 0.1 - depth_bias;
   float track_position = 1.0 - radial;
@@ -91,7 +107,7 @@ export class WebGlSliderGraphics {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly uniforms: Readonly<Record<"viewport" | "scale" | "offset" | "stable_origin" | "stable_scale" |
-    "projection_y" | "depth_bias" | "body" | "border" | "opacity" | "radius", WebGLUniformLocation>>;
+    "projection_y" | "depth_bias" | "body" | "border" | "opacity" | "radius" | "snake_range", WebGLUniformLocation>>;
   private readonly meshes = new Map<OsuSlider, UploadedMesh>();
   private uploaded_bytes = 0;
   private destroyed = false;
@@ -108,6 +124,7 @@ export class WebGlSliderGraphics {
       projection_y: gl.getUniformLocation(program, "projection_y_direction"),
       body: gl.getUniformLocation(program, "body_color"), border: gl.getUniformLocation(program, "border_color"),
       opacity: gl.getUniformLocation(program, "opacity"), radius: gl.getUniformLocation(program, "path_radius"),
+      snake_range: gl.getUniformLocation(program, "snake_range"),
     };
     if (Object.values(uniforms).some((uniform) => !uniform)) {
       gl.deleteProgram(program);
@@ -138,7 +155,8 @@ export class WebGlSliderGraphics {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertex_buffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, mesh.vertices, this.gl.STATIC_DRAW);
     const stride = VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
-    for (const [name, size, offset] of [["position", 2, 0], ["segment_start", 2, 2], ["segment_end", 2, 4]] as const) {
+    for (const [name, size, offset] of [["position", 2, 0], ["segment_start", 2, 2], ["segment_end", 2, 4],
+      ["segment_progress", 2, 6]] as const) {
       const location = this.gl.getAttribLocation(this.program, name);
       if (location < 0) throw new Error(`Slider shader is missing ${name}`);
       this.gl.enableVertexAttribArray(location);
@@ -154,7 +172,8 @@ export class WebGlSliderGraphics {
   }
 
   draw(slider: OsuSlider, viewport: OsuViewport, frame: GameplayFrame,
-    body: readonly [number, number, number, number], border: readonly [number, number, number, number], opacity: number): number {
+    body: readonly [number, number, number, number], border: readonly [number, number, number, number], opacity: number,
+    snake_start = 0, snake_end = 1): number {
     const mesh = this.meshes.get(slider);
     if (!mesh || mesh.index_count === 0) return 0;
     const gl = this.gl;
@@ -174,6 +193,7 @@ export class WebGlSliderGraphics {
     gl.uniform4f(this.uniforms.border, ...border);
     gl.uniform1f(this.uniforms.opacity, Math.min(Math.max(opacity, 0), 1));
     gl.uniform1f(this.uniforms.radius, mesh.radius);
+    gl.uniform2f(this.uniforms.snake_range, Math.min(snake_start, snake_end), Math.max(snake_start, snake_end));
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthMask(true);
