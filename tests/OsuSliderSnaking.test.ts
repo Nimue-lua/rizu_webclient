@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { OsuSlider } from "../src/chart/Chart";
-import { sliderSnakeRange } from "../src/gameplay/osu/rendering/OsuSliderForegroundRenderer";
+import { sliderBodyFadeOutAlpha, sliderSnakeRange } from "../src/gameplay/osu/rendering/OsuSliderForegroundRenderer";
 
 function slider(repeat_count = 1): OsuSlider {
   return {
@@ -13,6 +13,14 @@ function slider(repeat_count = 1): OsuSlider {
     span_duration: 1, total_duration: repeat_count, end_time: 1 + repeat_count, tick_distances: [],
   };
 }
+
+test("fades a successfully hit snaking-out slider body over 40 ms", () => {
+  assert.equal(sliderBodyFadeOutAlpha(-0.01, true, true), 1);
+  assert.equal(sliderBodyFadeOutAlpha(0.02, true, true), 0.5);
+  assert.equal(sliderBodyFadeOutAlpha(0.04, true, true), 0);
+  assert.equal(sliderBodyFadeOutAlpha(0.2, false, true), 1);
+  assert.equal(sliderBodyFadeOutAlpha(0.2, true, false), 1);
+});
 
 test("snakes slider bodies in during the first third of preempt", () => {
   const object = slider();

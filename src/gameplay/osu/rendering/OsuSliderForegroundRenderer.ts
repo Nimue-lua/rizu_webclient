@@ -9,6 +9,7 @@ import { APPROACH_FADE_IN, CIRCLE_FADE_IN, HIT_FADE_OUT, MISS_FADE_OUT,
   OSU_HIT_OBJECT_TEXTURE_SIZE, type OsuColor } from "./OsuPlayfieldRenderShared";
 
 export const SLIDER_FADE_OUT = 0.24;
+const SNAKING_SLIDER_BODY_FADE_OUT = 0.04;
 const REVERSE_ARROW_FADE_IN = 0.15;
 const REVERSE_ARROW_PULSE_DURATION = 0.3;
 const FOLLOW_FADE_IN = 0.06;
@@ -28,9 +29,11 @@ export function drawSliderForeground(skin: OsuStandardSkin, viewport: OsuViewpor
   const fade_in_alpha = Math.min(1, Math.max(0, age / CIRCLE_FADE_IN));
   const fade_out_alpha = end_age > 0 ? Math.max(0, 1 - end_age / SLIDER_FADE_OUT) : 1;
   const alpha = fade_in_alpha * fade_out_alpha;
+  const head_successful = slider_state?.head_successful ?? circle_state_successful;
   const snake = sliderSnakeRange(slider, song_time, preempt,
-    slider_state?.head_successful ?? circle_state_successful, snake_in_enabled, snake_out_enabled);
-  if (path) draw_slider?.(slider, path, alpha, combo, snake.start, snake.end);
+    head_successful, snake_in_enabled, snake_out_enabled);
+  const body_alpha = alpha * sliderBodyFadeOutAlpha(end_age, head_successful, snake_out_enabled);
+  if (path) draw_slider?.(slider, path, body_alpha, combo, snake.start, snake.end);
   const endpoint = path?.endPosition(slider.repeat_count) ?? { x: slider.x, y: slider.y };
   const snake_in = Math.min(1, Math.max(0,
     (song_time - (slider.absolute_time - preempt)) / Math.max(preempt / 3, Number.EPSILON)));
@@ -57,6 +60,12 @@ export function drawSliderForeground(skin: OsuStandardSkin, viewport: OsuViewpor
   if (path && slider.repeat_count > 1 && song_time < slider.end_time) {
     drawReverseArrow(skin, viewport, slider, path, song_time, diameter, alpha, preempt, write);
   }
+}
+
+export function sliderBodyFadeOutAlpha(end_age: number, head_successful: boolean,
+  snake_out_enabled: boolean): number {
+  if (end_age <= 0 || !head_successful || !snake_out_enabled) return 1;
+  return Math.max(0, 1 - end_age / SNAKING_SLIDER_BODY_FADE_OUT);
 }
 
 export function sliderSnakeRange(slider: OsuSlider, song_time: number, preempt: number,
